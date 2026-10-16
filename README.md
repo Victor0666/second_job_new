@@ -1,62 +1,105 @@
 # MAHDRL 实验代码
 
-项目按职责组织。每个算法的环境、专用智能体、训练和评测入口放在同一个目录中。
+训练、评测按算法组织，场景统一由命令行指定。每个学习算法只有 `train.py` 和 `evaluate.py` 两个入口；启发式算法只有评测入口。
 
 ```text
-algorithms/                算法实现与实验入口
-  mahdrl/                  主算法
+algorithms/
+  mahdrl/                  主算法：环境、train.py、evaluate.py
   ablation_hostrand/       随机主机选择消融
   ablation_mgrrand/        随机管理器消融
   ablation_vmrand/         随机虚拟机选择消融
   ablation_nohost/         去掉主机层的消融
-  marl/                    MARL 环境、智能体与入口
-  irws/                    IRWS 环境、任务选择器、PPO 与入口
-  pd3qn/                   PD3QN 环境与入口
-  ertf_fifs/               启发式评测入口
-common/                    共享 D3QN、基础环境、工作流、资源、日志与截止期预计算
-data/                     实验输入（下方两项）
-  dax/                     DAX 工作流 XML
-  deadlines/               训练和评测使用的基准 makespan 缓存
-plots/                     绘图与统计脚本、Excel 输入表格
-outputs/                   本地模型 ckpts、日志 logs、评测 run、图表 figures（不上传）
-docs/                      论文、环境版本、目录迁移映射与历史归档 archive
+  marl/                    MARL 环境、智能体与统一入口
+  irws/                    IRWS 环境、智能体与统一入口
+  pd3qn/                   PD3QN 环境与统一入口
+  ertf_fifs/               启发式统一评测入口
+common/                    场景配置、共享智能体/环境、工作流、资源、日志、预计算及回归测试
+data/dax/                  工作流 XML
+data/deadlines/            截止期基准缓存
+plots/                     绘图/统计脚本与 Excel 输入
+outputs/                   本地模型、日志、评测及图表，不上传
+docs/                      论文、环境版本、配置修正说明及验证记录
 ```
 
-## 安装与运行
+## 安装
 
-Windows 下先运行 `setup.cmd` 建立虚拟环境；其他电脑需有可用的 Python，并按 `requirements.txt` 安装依赖。PyTorch/CUDA 版本应与本机设备兼容；当前验证环境见 `docs/runtime_versions.json`。
+Windows 下先运行 `setup.cmd` 建立 `.venv`，依赖见 `requirements.txt`，验证环境见 `docs/runtime_versions.json`。其他电脑需有可用的 Python；PyTorch/CUDA 版本应与设备兼容。不要直接复制其他电脑的虚拟环境。
+
+## 训练与评测
 
 在项目根目录的 PowerShell 中运行：
 
 ```powershell
-# 扫描当前全部共享模块、训练和评测入口，验证导入与根目录定位
+# 训练：小任务、小资源、紧截止期，默认 600 回合
+.\run.cmd algorithms/mahdrl/train.py --task S --resource S --deadline Tight
+
+# 切换资源和截止期
+.\run.cmd algorithms/mahdrl/train.py --task S --resource L --deadline Medium
+
+# 只训练一回合（会写入该场景的模型与日志）
+.\run.cmd algorithms/mahdrl/train.py --task S --resource S --deadline Tight --episodes 1
+
+# 评测：默认使用该资源和截止期下以 S 任务训练的模型，种子 2..31
+.\run.cmd algorithms/mahdrl/evaluate.py --task S --resource S --deadline Tight
+
+# 泛化评测：M 任务、M 资源、Medium；以 S 任务训练的模型；只跑种子 2
+.\run.cmd algorithms/mahdrl/evaluate.py --task M --resource M --deadline Medium --seeds 2
+
+# 如果模型以 M 任务训练，明确指定 --train-task M
+.\run.cmd algorithms/mahdrl/evaluate.py --task L --resource M --deadline Medium --train-task M --seeds 2,5,8
+
+# 预览参数与模型目录，不运行实验
+.\run.cmd algorithms/mahdrl/evaluate.py --task L --resource L --deadline Loose --dry-run
+```
+
+将路径中的 `mahdrl` 换成其他学习算法目录，即可使用相同参数。启发式使用：
+
+```powershell
+.\run.cmd algorithms/ertf_fifs/evaluate.py --task M --resource S --deadline Medium --seeds 2
+```
+
+| 参数 | 可选值/默认值 | 含义 |
+|---|---|---|
+| `--task` | S / M / L，默认 S | 工作流规模分布 |
+| `--resource` | S / M / L，默认 S | 3 / 6 / 9 个主机，25 / 50 / 75 个 VM |
+| `--deadline` | Tight / Medium / Loose，默认 Tight | ddlAlpha=2.0 的概率为 0.8 / 0.5 / 0.2，其余为 3.0 |
+| `--episodes` | 正整数，默认 600 | 训练回合数，仅训练入口 |
+| `--seeds` | 如 `2-31` 或 `2,5,8`，默认 2-31 | 评测种子，范围含两端 |
+| `--train-task` | S / M / L，默认 S | 被评测模型的训练任务规模，独立于评测任务 |
+| `--checkpoint-dir` | 目录路径 | 显式选择评测模型目录 |
+| `--dry-run` | 开关 | 只打印所选配置 |
+
+S 任务仅使用约 30 节点的五类工作流；M 任务按 30/50 节点组的 3:7 混合；L 任务按 30/50/100 节点组的 2:3:5 混合。每回合仍为 50 个工作流。统一配置位于 `common/scenarios.py`。
+
+MARL 额外保留 `--deadline-cache`、`--ckpt-global`、`--ckpt-local`、`--out` 和 `--device`，可用 `--help` 查看。其余算法自动选择 CUDA 或 CPU。
+
+训练输出在 `outputs/ckpts` 和 `outputs/logs`，评测 CSV 在 `outputs/run`。训练会更新所选场景的模型和日志；需要保留旧实验时，先备份这些目录。评测不会自动搜索并替换为其他场景的模型；缺失模型时会明确报错。
+
+## 截止期缓存、绘图与检查
+
+```powershell
+# 统一预计算入口：默认生成指定任务/资源的种子 0..1000 缓存
+.\run.cmd common/precompute_deadlines.py --task M --resource L
+
+# 快速检查一个种子，另存到 outputs，不覆盖正式缓存
+.\run.cmd common/precompute_deadlines.py --task S --resource S --seeds 2 --out outputs/deadline_check.json
+
+# 入口导入与根目录检查，不需要权重
 .\run.cmd verify_package.py --imports-only
 
-# 主算法训练（原设置：600 回合）
-.\run.cmd algorithms/mahdrl/train_taskS_resS_Tight.py
+# 全场景配置回归测试：不训练、不加载权重
+.\.venv\Scripts\python.exe -m unittest common.test_scenarios
 
-# 主算法评测（原设置：30 个种子，需要对应已有模型）
-.\run.cmd algorithms/mahdrl/eval_taskS_resS_Tight.py
-
-# 重新生成 SS 场景的截止期缓存（较耗时）
-.\run.cmd common/precompute_ddl_fcfs_ss.py
-
-# 绘图示例；启动器自动切换到 plots，以读取相邻 Excel
+# 绘图：启动器会切换到 plots，读取相邻 Excel
 .\run.cmd plots/algorithm_boxPlot_Merge.py
 ```
 
-同一算法目录内，`train_*.py` 是训练入口，`eval_*.py` 是评测入口。文件名中 `taskS/M/L` 和 `resS/M/L` 分别表示工作流和资源规模，`Tight/Medium/Loose` 表示截止期设置。保留原有场景入口，避免在目录整理中改变实验参数。
+预计算只选择 `--task` 和 `--resource`；基准 makespan 缓存与 Tight/Medium/Loose 无关。非完整种子的输出会使用独立文件名，或由 `--out` 指定，避免把正式的 0..1000 缓存替换成不完整文件。
 
-不带参数运行 `run.cmd` 会执行导入检查，并对九种算法分别评测一个 SS/Tight 回合；报告写入 `outputs/verification_result.json`。此检查需要本地 `outputs/ckpts` 下的已有权重。GitHub 中不包含权重，克隆后可先执行 `--imports-only` 检查，再训练或另行获取权重。
+不带参数运行 `run.cmd` 会检查导入，并对九种算法各评测一个 SS/Tight 回合；报告在 `outputs/verification_result.json`。GitHub 不包含权重，克隆后可先检查导入，再训练或另行获取已有权重。
 
-训练和评测会更新对应的本地结果，运行前请保留需要对比的模型。部分绘图脚本使用历史汇总值或指定日志，需按实际数据选择脚本与参数。
+## 实验版本说明
 
-## 目录整合
+本次将 314 个训练/评测入口合并为 17 个，将九个截止期预计算入口合并为一个。MAHDRL 目录从 39 个文件减为 5 个。旧入口可通过 Git 提交 `31d7110` 恢复，当前目录中已移除旧场景脚本的临时副本。历史打包记录保留在本地 `docs/archive`，不进入当前 GitHub 文件列表。
 
-- 原 `b_hrl`、`b_hrl_legacy_ave`、`b_hrl_legacy_fcfs` 合并到 `common`。
-- 原 `b_marl_FCFS`、`b_irws_FCFS` 并入 `algorithms/marl`、`algorithms/irws`。
-- 原 `b_*` 实现与 `c_run` 评测按算法合并到 `algorithms`，不再分散存放。
-- 输入统一到 `data`，运行产物统一到 `outputs`；原有模型和缓存内容不变。
-- 原提取清单、校验和、名称映射和审计报告在本地 `docs/archive` 保留，不进入当前 GitHub 文件列表；旧版本也可从 Git 历史查看，其路径与哈希不代表当前布局。
-
-逐文件的新旧位置见 `docs/structure_migration.json`。原始版本保存在 Git 提交 `0ef88a2`。算法、奖励、训练超参数与已有权重不因这次目录整理而修改；目录与导入检查通过不等同于严格复现论文。
+此次也按用户要求修正了若干历史场景配置，因此部分新旧实验不可直接等同。具体修正及对照规则见 [场景修正说明](docs/scenario_changes.md)。已有模型、原始数据和历史实验输出未被批量改写；部分历史绘图仍使用旧汇总数据，重新出图时应核对实验版本。

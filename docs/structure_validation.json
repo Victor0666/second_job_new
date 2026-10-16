@@ -1,6 +1,16 @@
 {
-  "imports": 353,
-  "episodes": [
+  "baseline_commit": "31d7110",
+  "old_scenario_entries": 323,
+  "new_scenario_entries": 18,
+  "consolidated_algorithm_entries": 17,
+  "consolidated_precompute_entries": 1,
+  "legacy_algorithm_entries_compared": 314,
+  "mahdrl_files": 5,
+  "compiled_runtime_files": 72,
+  "imported_modules": 50,
+  "training_configuration_checks": 216,
+  "evaluation_configuration_checks": 243,
+  "single_episode_evaluations": [
     "MAHDRL",
     "NHA",
     "NTA",
@@ -11,9 +21,14 @@
     "MARL",
     "ERTF-H-FIFS"
   ],
-  "failures": 0,
-  "compiled": 375,
-  "compared": 350,
-  "unexpected_differences": [],
-  "plot_check": "algorithm_boxPlot_Merge.py: nine scenarios and legend generated with Agg backend"
+  "single_episode_training": [
+    "MAHDRL SS/Tight",
+    "MARL SL/Medium"
+  ],
+  "cli_generalization_check": "MAHDRL MM/Medium seed 2",
+  "marl_cli_check": "SS/Tight seed 2, --out and --device cpu",
+  "precompute_check": "SS seed 2, separate output file",
+  "precompute_max_difference_from_existing_cache": 0.0,
+  "full_training_rerun": false,
+  "all_scenario_multiseed_rerun": false
 }

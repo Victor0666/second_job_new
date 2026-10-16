@@ -8,7 +8,7 @@ import random
 import numpy as np
 import torch
 
-PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
@@ -17,8 +17,8 @@ SCENARIO = Scenario(mode="eval")
 from common.metrics_logger import CSVLogger
 from common.workflow_opt import energy_from_records
 from environments.irws import IRWSEnvRouteA
-from algorithms.irws_task_ranker import IRWSTaskSelector, TaskSelectorConfig
-from algorithms.irws_vm_agent import PPOVMAgent, PPOConfig
+from algorithms.irws.task_ranker import IRWSTaskSelector, TaskSelectorConfig
+from algorithms.irws.vm_agent import PPOVMAgent, PPOConfig
 
 
 def set_seed(seed: int):

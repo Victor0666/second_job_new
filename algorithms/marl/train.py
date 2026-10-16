@@ -6,7 +6,7 @@ import json
 import numpy as np
 import torch
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
@@ -14,7 +14,7 @@ from common.scenarios import Scenario, parse_scenario
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
 from common.workflow_opt import energy_from_records
-from algorithms.marl_agents import A2CAgent, A2CConfig, LocalSharedActorIndependentCriticA2C
+from algorithms.marl.agents import A2CAgent, A2CConfig, LocalSharedActorIndependentCriticA2C
 from environments.marl import CloudWorkflowEnv_MARL
 
 

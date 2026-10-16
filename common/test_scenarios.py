@@ -56,7 +56,7 @@ class ScenarioTests(unittest.TestCase):
     def test_all_training_configurations(self):
         # Intercept the first environment constructor before agents, logs or models are created.
         for algorithm in MODEL_NAMES:
-            module = importlib.import_module(f"algorithms.{algorithm}_train")
+            module = importlib.import_module(f"algorithms.{algorithm}.train")
             for task, resource, deadline in itertools.product(
                 "SML", "SML", ("Tight", "Medium", "Loose")
             ):
@@ -75,7 +75,7 @@ class ScenarioTests(unittest.TestCase):
 
     def test_all_evaluation_configurations(self):
         for algorithm in [*MODEL_NAMES, "ertf_fifs"]:
-            module = importlib.import_module(f"algorithms.{algorithm}_evaluate")
+            module = importlib.import_module(f"algorithms.{algorithm}.evaluate")
             for task, resource, deadline in itertools.product(
                 "SML", "SML", ("Tight", "Medium", "Loose")
             ):

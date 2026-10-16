@@ -2,7 +2,7 @@
 
 ## 合并方式
 
-- 八种学习算法各使用一个 `algorithms/<算法名>_train.py` 和一个 `algorithms/<算法名>_evaluate.py`；启发式使用 `algorithms/ertf_fifs_evaluate.py`。
+- 八种学习算法各使用一个 `algorithms/<算法名>/train.py` 和一个 `algorithms/<算法名>/evaluate.py`；启发式使用 `algorithms/ertf_fifs/evaluate.py`。
 - 九个截止期预计算脚本合并为 `common/precompute_deadlines.py`。
 - 任务分布、资源规模、截止期概率、缓存和模型目录由 `common/scenarios.py` 统一配置。
 - 对合并前的 314 个入口逐一做语法树对比。在提取场景参数、统一结果命名、应用以下修正后，共用实现的训练/评测流程一致。
@@ -26,4 +26,4 @@
 
 ## 当前文件布局
 
-算法入口和专用智能体平铺在 `algorithms/`；八个环境实现集中在 `environments/`，其中 `base_fcfs.py`、`base_heft.py` 是共享基础环境。原来的 `common.env_*` 与 `algorithms.<算法名>.*` 导入已同步更新。此次文件迁移没有再次调整场景参数或计算逻辑，模型、缓存与结果目录保持原有路径。
+算法入口和专用智能体按算法分别放在 `algorithms/<算法名>/`；八个环境实现集中在 `environments/`，其中 `base_fcfs.py`、`base_heft.py` 是共享基础环境。环境通过 `environments.*` 导入，算法组件通过 `algorithms.<算法名>.*` 导入。此次文件迁移没有再次调整场景参数或计算逻辑，模型、缓存与结果目录保持原有路径。

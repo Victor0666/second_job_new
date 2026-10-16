@@ -1,11 +1,11 @@
-"""ablation_vmrand: eval. Select --task, --resource and --deadline; see --help."""
+"""mahdrl: eval. Select --task, --resource and --deadline; see --help."""
 
 import os
 import sys
 import numpy as np
 import torch
 
-PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
@@ -13,10 +13,7 @@ from common.scenarios import Scenario, parse_scenario
 SCENARIO = Scenario(mode="eval")
 from common.metrics_logger import CSVLogger
 from common.d3qn_agent_EXDehid import D3QNAgent
-from environments.mahdrl_fcfs import (
-    CloudWorkflowEnv_VMAgents as EnvHRLVMRandom,
-    MANAGER_ACTION_TABLE,
-)
+from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents as EnvHRLMix, MANAGER_ACTION_TABLE
 
 
 def set_seed(seed: int):
@@ -32,47 +29,19 @@ def set_seed(seed: int):
 NUM_OPTIONS = int(MANAGER_ACTION_TABLE.shape[0])
 
 
-def manager_apply_action(env: EnvHRLVMRandom, act_idx: int):
+def manager_apply_action(env: EnvHRLMix, act_idx: int):
     """act_idx ∈ [0,242] -> Δw(5,) -> env.apply_manager_delta(Δw)"""
     delta = MANAGER_ACTION_TABLE[int(act_idx)]
     env.apply_manager_delta(delta)
 
 
-def _sync_env_scales(env: EnvHRLVMRandom, env_kwargs: dict):
+def _sync_env_scales(env: EnvHRLMix, env_kwargs: dict):
     """与训练脚本一致：同步 Route-A 参数。"""
     env.energy_reward_scale = float(env_kwargs["energy_reward_scale"])
     env.task_baseline_norm = float(env_kwargs["task_baseline_norm"])
     env.energy_norm_per_mi_ref = float(env_kwargs["energy_norm_per_mi_ref"])
     env.alpha_delay_host = float(env_kwargs["alpha_delay_host"])
     env.alpha_delay_vm = float(env_kwargs["alpha_delay_vm"])
-
-
-def _vm_random_seed_from_episode_seed(seed: int) -> int:
-    """
-    与训练脚本一致：
-    独立 VM 随机流由 episode_seed 派生，避免污染 env.rng
-    """
-    return int(seed) * 1000003 + 20260325 & 4294967295
-
-
-class RandomVMSelector:
-    """
-    在合法 vm_mask 内随机选一个 VM 槽位。
-    使用独立 RandomState，避免污染 env.rng。
-    """
-
-    def __init__(self, seed: int = 0):
-        self.reset(seed)
-
-    def reset(self, seed: int):
-        self.rng = np.random.RandomState(int(seed) & 4294967295)
-
-    def select_action(self, mask) -> int:
-        mask = np.asarray(mask, dtype=np.float32).reshape(-1)
-        valid = np.flatnonzero(mask > 0.5)
-        if valid.size == 0:
-            return 0
-        return int(self.rng.choice(valid))
 
 
 def _to_float(x, default=None):
@@ -333,7 +302,7 @@ def _extract_wf_finished_flags(env):
     return out
 
 
-def compute_task_and_workflow_metrics(env: EnvHRLVMRandom):
+def compute_task_and_workflow_metrics(env: EnvHRLMix):
     """
     同时统计：
     1) task级 lateness / tardiness / success_rate
@@ -509,7 +478,7 @@ def compute_task_and_workflow_metrics(env: EnvHRLVMRandom):
     }
 
 
-def build_env_kwargs_vm_random(random_seed=1):
+def build_env_kwargs_hrl_mix(random_seed=1):
     dax_dir = os.path.join(PROJECT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
     horizon = 1000000000.0
@@ -564,13 +533,11 @@ def build_env_kwargs_vm_random(random_seed=1):
     return env_kwargs
 
 
-def evaluate_hrl_vm_random_one_seed(env_cls, env_kwargs, host_agent, manager_agent):
+def evaluate_hrl_mix_one_seed(env_cls, env_kwargs, vm_agent, host_agent, manager_agent):
     """
     deterministic=True（不走 epsilon）
-    VM 选择：随机合法动作
     返回：
-      Host / VM(random得到的reward统计) / Manager 奖励均值、总能耗、
-      task级指标、workflow级指标、makespan
+      三层奖励均值、总能耗、task级指标、workflow级指标、makespan
     """
     ctor_block = {
         "energy_reward_scale",
@@ -583,7 +550,6 @@ def evaluate_hrl_vm_random_one_seed(env_cls, env_kwargs, host_agent, manager_age
     env = env_cls(**ctor_kwargs)
     _sync_env_scales(env, env_kwargs)
     env.reset()
-    vm_selector = RandomVMSelector(_vm_random_seed_from_episode_seed(env_kwargs["random_seed"]))
     sH = env.get_manager_state()
     m_mask = env.get_manager_action_mask()
     m_act = manager_agent.select_action(sH, m_mask, deterministic=True, count_step=False)
@@ -607,7 +573,9 @@ def evaluate_hrl_vm_random_one_seed(env_cls, env_kwargs, host_agent, manager_age
             st_vm, ok_vm = env.get_vm_state_for_current_task()
             if not ok_vm:
                 break
-            a_vm = vm_selector.select_action(st_vm["mask"])
+            a_vm = vm_agent.select_action(
+                st_vm["obs"], st_vm["mask"], deterministic=True, count_step=False
+            )
             r_host, r_vm, _info_task = env.vm_assign(int(a_vm))
             host_rewards.append(float(r_host))
             vm_rewards.append(float(r_vm))
@@ -639,7 +607,7 @@ def evaluate_hrl_vm_random_one_seed(env_cls, env_kwargs, host_agent, manager_age
     return metrics
 
 
-def build_host_manager_agents_and_load(env_kwargs: dict):
+def build_three_layer_agents_and_load(env_kwargs: dict):
     ctor_block = {
         "energy_reward_scale",
         "task_baseline_norm",
@@ -648,17 +616,13 @@ def build_host_manager_agents_and_load(env_kwargs: dict):
         "alpha_delay_vm",
     }
     ctor_kwargs = {k: v for k, v in env_kwargs.items() if k not in ctor_block}
-    tmp_env = EnvHRLVMRandom(**ctor_kwargs)
+    tmp_env = EnvHRLMix(**ctor_kwargs)
     _sync_env_scales(tmp_env, env_kwargs)
     tmp_env.reset()
     st_host, ok = tmp_env.get_host_state_for_next_assignment()
     while not ok and (not tmp_env.done_flag):
         _rM, _ = tmp_env.finish_phase_and_advance()
         st_host, ok = tmp_env.get_host_state_for_next_assignment()
-    if not ok:
-        raise RuntimeError(
-            "Probe host_state failed: get_host_state_for_next_assignment() returned has_next=False"
-        )
     host_state_dim = int(st_host["obs"].shape[0])
     host_act_dim = int(st_host["mask"].shape[0])
     a_host0 = int(np.argmax(st_host["mask"])) if np.sum(st_host["mask"]) > 0 else 0
@@ -668,12 +632,28 @@ def build_host_manager_agents_and_load(env_kwargs: dict):
         raise RuntimeError(
             "Probe vm_state failed: get_vm_state_for_current_task() returned ok_vm=False"
         )
+    vm_state_dim = int(st_vm["obs"].shape[0])
     vm_act_dim = int(st_vm["mask"].shape[0])
     mgr_state_dim = int(tmp_env.get_manager_state().shape[0])
     print(
-        f"[HRL_VMRANDOM probe] host_obs_dim={host_state_dim}, host_act_dim={host_act_dim} | vm_act_dim={vm_act_dim}(random) | mgr_obs_dim={mgr_state_dim}, mgr_act_dim={NUM_OPTIONS}"
+        f"[HRL_MIX probe] host_obs_dim={host_state_dim}, host_act_dim={host_act_dim} | vm_obs_dim={vm_state_dim}, vm_act_dim={vm_act_dim} | mgr_obs_dim={mgr_state_dim}, mgr_act_dim={NUM_OPTIONS}"
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    vm_agent = D3QNAgent(
+        input_dim=vm_state_dim,
+        output_dim=vm_act_dim,
+        lr=0.0003,
+        gamma=0.95,
+        batch_size=256,
+        buffer_size=120000,
+        eps_start=1.0,
+        eps_end=0.05,
+        eps_decay_steps=80000,
+        target_update_tau=0.005,
+        grad_clip=10.0,
+        hidden_dims=(1024, 1024, 512, 512, 256),
+        device=device,
+    )
     host_agent = D3QNAgent(
         input_dim=host_state_dim,
         output_dim=host_act_dim,
@@ -704,33 +684,40 @@ def build_host_manager_agents_and_load(env_kwargs: dict):
         hidden_dims=(512, 512, 256, 128),
         device=device,
     )
-    ckpt_dir_default = str(SCENARIO.checkpoint_dir("ablation_vmrand"))
+    ckpt_dir_default = str(SCENARIO.checkpoint_dir("mahdrl"))
+    ckpt_vm = os.path.join(ckpt_dir_default, "best_vm.pth")
     ckpt_host = os.path.join(ckpt_dir_default, "best_host.pth")
     ckpt_mgr = os.path.join(ckpt_dir_default, "best_manager.pth")
-    if not (os.path.exists(ckpt_host) and os.path.exists(ckpt_mgr)):
+    if not (os.path.exists(ckpt_vm) and os.path.exists(ckpt_host) and os.path.exists(ckpt_mgr)):
         raise FileNotFoundError(
-            f"Missing model files under {SCENARIO.checkpoint_dir('ablation_vmrand')}; train this scenario or use --checkpoint-dir"
+            f"Missing model files under {SCENARIO.checkpoint_dir('mahdrl')}; train this scenario or use --checkpoint-dir"
         )
-    print(f"[HRL_VMRANDOM load] ckpt_dir: {ckpt_dir_default}")
-    print(f"[HRL_VMRANDOM load] host   : {ckpt_host}")
+    print(f"[HRL_MIX load] ckpt_dir: {ckpt_dir_default}")
+    print(f"[HRL_MIX load] vm     : {ckpt_vm}")
+    vm_agent.load(ckpt_vm)
+    print(f"[HRL_MIX load] host   : {ckpt_host}")
     host_agent.load(ckpt_host)
-    print(f"[HRL_VMRANDOM load] manager: {ckpt_mgr}")
+    print(f"[HRL_MIX load] manager: {ckpt_mgr}")
     manager_agent.load(ckpt_mgr)
+    vm_agent.online.eval()
+    vm_agent.target.eval()
     host_agent.online.eval()
     host_agent.target.eval()
     manager_agent.online.eval()
     manager_agent.target.eval()
-    return (host_agent, manager_agent)
+    return (vm_agent, host_agent, manager_agent)
 
 
 def main():
     seeds = list(SCENARIO.seeds)
-    env_kwargs_base = build_env_kwargs_vm_random(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", "hrl_vmrand_ddlMix")
+    env_kwargs_base = build_env_kwargs_hrl_mix(random_seed=seeds[0])
+    result_dir = os.path.join(
+        PROJECT_DIR, "outputs", "run", f"hrl_mix_wfInfo__HVrn_{SCENARIO.deadline}"
+    )
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,
-        f"run_hrl_VMRAND_task{SCENARIO.task}_res{SCENARIO.resource}_{len(SCENARIO.seeds)}seeds_ddlMix_{SCENARIO.deadline}.csv",
+        f"eval_mahdrl_task{SCENARIO.task}_res{SCENARIO.resource}_{len(SCENARIO.seeds)}seeds_r075_mix_{SCENARIO.deadline}.csv",
     )
     logger = CSVLogger(
         filepath=csv_path,
@@ -760,11 +747,10 @@ def main():
             "makespan",
         ],
     )
-    print(">>> 构建 Host/Manager agents 并加载下层消融 best_ckpt ...")
-    print(">>> vm mode: random legal vm (no vm checkpoint)")
+    print(">>> 构建三层 agents 并加载最新 HRL_MIX best_ckpt ...")
     print(f">>> ddlAlpha cfg: small=2.0, large=3.0, P(small)={SCENARIO.small_probability}")
     print(">>> manager reward cfg: alpha_delay=0.75, delay_mode=tardiness")
-    host_agent, manager_agent = build_host_manager_agents_and_load(env_kwargs_base)
+    vm_agent, host_agent, manager_agent = build_three_layer_agents_and_load(env_kwargs_base)
     vm_list, host_list, mgr_list, energy_list = ([], [], [], [])
     task_late_list, task_tard_list, task_succ_list, task_pct_list = ([], [], [], [])
     wf_late_list, wf_tard_list, wf_succ_list, wf_pct_list = ([], [], [], [])
@@ -774,7 +760,7 @@ def main():
         set_seed(sd)
         kwargs_i = dict(env_kwargs_base)
         kwargs_i["random_seed"] = int(sd)
-        out = evaluate_hrl_vm_random_one_seed(EnvHRLVMRandom, kwargs_i, host_agent, manager_agent)
+        out = evaluate_hrl_mix_one_seed(EnvHRLMix, kwargs_i, vm_agent, host_agent, manager_agent)
         logger.log(
             run_idx=idx,
             seed=sd,
@@ -814,12 +800,12 @@ def main():
         wf_pct_list.append(float(out["wf_pct_tardy"]))
         ms_list.append(float(out["makespan"]))
         print(
-            f"[HRL_VMRANDOM] vm={out['eval_vm_reward']:.6f} host={out['eval_host_reward']:.6f} mgr={out['eval_mgr_reward']:.6f} energy={out['eval_energy']:.3f} J | tasks={out['task_n_finished']} tardy={out['task_n_tardy']} | task_avg_lateness={out['task_avg_lateness']:.6f} task_avg_tardiness={out['task_avg_tardiness']:.6f} task_success_rate={out['task_success_rate']:.6f} | wf={out['wf_n_finished']} tardy={out['wf_n_tardy']} | wf_avg_lateness={out['wf_avg_lateness']:.6f} wf_avg_tardiness={out['wf_avg_tardiness']:.6f} wf_success_rate={out['wf_success_rate']:.6f} | makespan={out['makespan']:.3f}"
+            f"[HRL_MIX] vm={out['eval_vm_reward']:.6f} host={out['eval_host_reward']:.6f} mgr={out['eval_mgr_reward']:.6f} energy={out['eval_energy']:.3f} J | tasks={out['task_n_finished']} tardy={out['task_n_tardy']} | task_avg_lateness={out['task_avg_lateness']:.6f} task_avg_tardiness={out['task_avg_tardiness']:.6f} task_success_rate={out['task_success_rate']:.6f} | wf={out['wf_n_finished']} tardy={out['wf_n_tardy']} | wf_avg_lateness={out['wf_avg_lateness']:.6f} wf_avg_tardiness={out['wf_avg_tardiness']:.6f} wf_success_rate={out['wf_success_rate']:.6f} | makespan={out['makespan']:.3f}"
         )
         print(
             f"[Detail] task_total_lateness={out['task_total_lateness']:.6f} task_total_tardiness={out['task_total_tardiness']:.6f} | wf_total_lateness={out['wf_total_lateness']:.6f} wf_total_tardiness={out['wf_total_tardiness']:.6f}"
         )
-    print("\n================= HRL_VMRANDOM（30 seeds）汇总 =================")
+    print("\n================= HRL_MIX（30 seeds）汇总 =================")
     print(f"avg_vm_reward        = {float(np.mean(vm_list)):.6f}")
     print(f"avg_host_reward      = {float(np.mean(host_list)):.6f}")
     print(f"avg_mgr_reward       = {float(np.mean(mgr_list)):.6f}")
@@ -833,10 +819,10 @@ def main():
     print(f"wf_avg_pct_tardy     = {float(np.mean(wf_pct_list)):.6f}")
     print(f"wf_avg_success       = {float(np.mean(wf_succ_list)):.6f}")
     print(f"avg_makespan         = {float(np.mean(ms_list)):.3f}")
-    print("===============================================================")
+    print("=========================================================")
     print(f"结果已写入 CSV: {csv_path}")
 
 
 if __name__ == "__main__":
-    SCENARIO = parse_scenario("eval", "ablation_vmrand")
+    SCENARIO = parse_scenario("eval", "mahdrl")
     main()

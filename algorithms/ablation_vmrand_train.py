@@ -1,18 +1,18 @@
-"""ablation_hostrand: train. Select --task, --resource and --deadline; see --help."""
+"""ablation_vmrand: train. Select --task, --resource and --deadline; see --help."""
 
 import os
 import sys
 import numpy as np
 import torch
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
 
 SCENARIO = Scenario(mode="train")
 from common.d3qn_agent_EXDehid import D3QNAgent
-from algorithms.mahdrl.env_fcfs import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
+from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
 from common.metrics_logger import CSVLogger
 
 
@@ -77,35 +77,33 @@ def _sync_env_scales(eval_env: CloudWorkflowEnv_VMAgents, env_kwargs: dict):
             setattr(eval_env, k, env_kwargs[k])
 
 
-class RandomHostSelector:
+def _vm_random_seed_from_episode_seed(seed: int) -> int:
+    return int(seed) * 1000003 + 20260325 & 4294967295
+
+
+class RandomVMSelector:
     """
-    中层消融：不学习 host，只在合法 mask 内随机选一个 host。
-
-    设计要点：
-    1) 不使用 env.rng，避免污染环境内部随机序列；
-    2) 每个 episode / eval seed 用独立随机流，保证可复现；
-    3) deterministic=True 时，也仍然是“固定随机流上的可复现随机序列”，
-       而不是贪心，因为本消融就是随机 host 策略。
+    在合法 vm_mask 内随机选一个 VM 槽位。
+    使用独立 RandomState，避免污染 env.rng。
     """
 
-    def __init__(self, base_seed: int = 0):
-        self.base_seed = int(base_seed)
-        self.rs = np.random.RandomState(self.base_seed)
+    def __init__(self, seed: int = 0):
+        self.reset(seed)
 
-    def reset(self, episode_seed: int):
-        local_seed = int(episode_seed) * 1000003 + 20260325 + self.base_seed * 97 & 4294967295
-        self.rs = np.random.RandomState(local_seed)
+    def reset(self, seed: int):
+        self.rng = np.random.RandomState(int(seed) & 4294967295)
 
-    def select_action(self, mask, deterministic=True, count_step=False):
+    def select_action(self, mask) -> int:
         mask = np.asarray(mask, dtype=np.float32).reshape(-1)
         valid = np.flatnonzero(mask > 0.5)
         if valid.size == 0:
             return 0
-        idx = int(self.rs.randint(valid.size))
-        return int(valid[idx])
+        return int(self.rng.choice(valid))
 
 
-def evaluate_hrl_three_layer_multi_seed(env_cls, env_kwargs, vm_agent, manager_agent, seeds):
+def evaluate_hrl_three_layer_multi_seed_vm_random(
+    env_cls, env_kwargs, host_agent, manager_agent, seeds
+):
     ctor_block = {
         "energy_reward_scale",
         "task_baseline_norm",
@@ -121,8 +119,7 @@ def evaluate_hrl_three_layer_multi_seed(env_cls, env_kwargs, vm_agent, manager_a
         eval_env = env_cls(**ctor_kwargs)
         _sync_env_scales(eval_env, env_kwargs)
         eval_env.reset()
-        host_selector = RandomHostSelector(base_seed=123456)
-        host_selector.reset(int(sd))
+        vm_selector = RandomVMSelector(_vm_random_seed_from_episode_seed(sd))
         sH = eval_env.get_manager_state()
         m_mask = eval_env.get_manager_action_mask()
         m_act = manager_agent.select_action(sH, m_mask, deterministic=True, count_step=False)
@@ -139,16 +136,14 @@ def evaluate_hrl_three_layer_multi_seed(env_cls, env_kwargs, vm_agent, manager_a
                 st_host, has_next = eval_env.get_host_state_for_next_assignment()
                 if not has_next:
                     break
-                a_host = host_selector.select_action(
-                    st_host["mask"], deterministic=True, count_step=False
+                a_host = host_agent.select_action(
+                    st_host["obs"], st_host["mask"], deterministic=True, count_step=False
                 )
                 eval_env.host_select(int(a_host))
                 st_vm, ok_vm = eval_env.get_vm_state_for_current_task()
                 if not ok_vm:
                     break
-                a_vm = vm_agent.select_action(
-                    st_vm["obs"], st_vm["mask"], deterministic=True, count_step=False
-                )
+                a_vm = vm_selector.select_action(st_vm["mask"])
                 r_host, r_vm, _info_task = eval_env.vm_assign(int(a_vm))
                 host_rewards.append(float(r_host))
                 vm_rewards.append(float(r_vm))
@@ -206,16 +201,16 @@ def train():
     DEADLINE_ALPHA_SMALL = 2.0
     DEADLINE_ALPHA_LARGE = 3.0
     DEADLINE_ALPHA_SMALL_PROB = SCENARIO.small_probability
-    lr_vm = 0.0003
-    gamma_vm = 0.95
-    batch_vm = 256
-    buf_vm = 120000
-    eps_start_vm = 1.0
-    eps_end_vm = 0.05
-    eps_decay_vm = 80000
-    tau_vm = 0.005
-    grad_vm = 10.0
-    hid_vm = (1024, 1024, 512, 512, 256)
+    lr_host = 0.0003
+    gamma_host = 0.95
+    batch_host = 256
+    buf_host = 120000
+    eps_start_host = 1.0
+    eps_end_host = 0.05
+    eps_decay_host = 80000
+    tau_host = 0.005
+    grad_host = 10.0
+    hid_host = (1024, 1024, 512, 512, 256)
     lr_mgr = 0.0003
     gamma_mgr = 0.95
     batch_mgr = 256
@@ -228,9 +223,9 @@ def train():
     hid_mgr = (512, 512, 256, 128)
     MAX_EPISODES = SCENARIO.episodes
     save_interval = 2000
-    save_dir = str(SCENARIO.checkpoint_dir("ablation_hostrand"))
+    save_dir = str(SCENARIO.checkpoint_dir("ablation_vmrand"))
     log_path = os.path.join(
-        ROOT_DIR, "outputs", "logs", SCENARIO.model_name("ablation_hostrand"), "train_hostrand.csv"
+        ROOT_DIR, "outputs", "logs", SCENARIO.model_name("ablation_vmrand"), "train_vmrand.csv"
     )
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
@@ -287,26 +282,13 @@ def train():
         st_host, ok = env.get_host_state_for_next_assignment()
     host_state_dim = int(st_host["obs"].shape[0])
     host_act_dim = int(st_host["mask"].shape[0])
-    probe_host_selector = RandomHostSelector(base_seed=999)
-    probe_host_selector.reset(int(env.random_seed))
-    a_host0 = probe_host_selector.select_action(
-        st_host["mask"], deterministic=True, count_step=False
-    )
-    env.host_select(int(a_host0))
-    st_vm, ok_vm = env.get_vm_state_for_current_task()
-    if not ok_vm:
-        raise RuntimeError("探测 VM state 失败，请检查环境状态流转。")
-    vm_state_dim = int(st_vm["obs"].shape[0])
-    vm_act_dim = int(st_vm["mask"].shape[0])
     env.reset()
     env.energy_reward_scale = env_kwargs["energy_reward_scale"]
     env.task_baseline_norm = env_kwargs["task_baseline_norm"]
     env.energy_norm_per_mi_ref = env_kwargs["energy_norm_per_mi_ref"]
     env.alpha_delay_host = env_kwargs["alpha_delay_host"]
     env.alpha_delay_vm = env_kwargs["alpha_delay_vm"]
-    print(
-        f"[env] host_obs_dim={host_state_dim} host_act_dim={host_act_dim} | vm_obs_dim={vm_state_dim} vm_act_dim={vm_act_dim}"
-    )
+    print(f"[env] host_obs_dim={host_state_dim} host_act_dim={host_act_dim}")
     print(
         f"[manager] action_dim={NUM_OPTIONS} (3^5), manager_state_dim={env.get_manager_state().shape[0]}"
     )
@@ -316,21 +298,21 @@ def train():
     print(
         f"[ddl alpha cfg] P({DEADLINE_ALPHA_SMALL})={DEADLINE_ALPHA_SMALL_PROB:.2f}, P({DEADLINE_ALPHA_LARGE})={1.0 - DEADLINE_ALPHA_SMALL_PROB:.2f}"
     )
-    print("[host ablation] Host 不学习，采用合法 mask 内随机选择。")
+    print("[vm policy] random legal VM selection with independent RNG")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    vm_agent = D3QNAgent(
-        input_dim=vm_state_dim,
-        output_dim=vm_act_dim,
-        lr=lr_vm,
-        gamma=gamma_vm,
-        batch_size=batch_vm,
-        buffer_size=buf_vm,
-        eps_start=eps_start_vm,
-        eps_end=eps_end_vm,
-        eps_decay_steps=eps_decay_vm,
-        target_update_tau=tau_vm,
-        grad_clip=grad_vm,
-        hidden_dims=hid_vm,
+    host_agent = D3QNAgent(
+        input_dim=host_state_dim,
+        output_dim=host_act_dim,
+        lr=lr_host,
+        gamma=gamma_host,
+        batch_size=batch_host,
+        buffer_size=buf_host,
+        eps_start=eps_start_host,
+        eps_end=eps_end_host,
+        eps_decay_steps=eps_decay_host,
+        target_update_tau=tau_host,
+        grad_clip=grad_host,
+        hidden_dims=hid_host,
         device=device,
     )
     sH0 = env.get_manager_state()
@@ -350,8 +332,7 @@ def train():
         hidden_dims=hid_mgr,
         device=device,
     )
-    host_selector = RandomHostSelector(base_seed=314159)
-    host_selector.reset(int(env.random_seed))
+    vm_selector = RandomVMSelector(_vm_random_seed_from_episode_seed(env.random_seed))
     logger = CSVLogger(
         filepath=log_path,
         fieldnames=[
@@ -388,7 +369,7 @@ def train():
         ],
     )
     best_eval_energy = float("inf")
-    best_ckpt_vm = os.path.join(save_dir, "best_vm.pth")
+    best_ckpt_host = os.path.join(save_dir, "best_host.pth")
     best_ckpt_mgr = os.path.join(save_dir, "best_manager.pth")
     global_step = 0
     episode_idx = 0
@@ -403,13 +384,15 @@ def train():
     if torch.cuda.is_available():
         print("current_device:", torch.cuda.current_device())
         print("device_name:", torch.cuda.get_device_name(torch.cuda.current_device()))
-    print("vm_agent online device:", next(vm_agent.online.parameters()).device)
+    print("host_agent online device:", next(host_agent.online.parameters()).device)
     print("manager_agent online device:", next(manager_agent.online.parameters()).device)
     HARD_MAX_STEPS = 10**9
     while episode_idx < MAX_EPISODES and global_step < HARD_MAX_STEPS:
         if env.done_flag:
-            eval_vm, eval_host, eval_mgr, eval_energy = evaluate_hrl_three_layer_multi_seed(
-                EnvCls, dict(env_kwargs), vm_agent, manager_agent, seeds=EVAL_SEEDS
+            eval_vm, eval_host, eval_mgr, eval_energy = (
+                evaluate_hrl_three_layer_multi_seed_vm_random(
+                    EnvCls, dict(env_kwargs), host_agent, manager_agent, seeds=EVAL_SEEDS
+                )
             )
             ep_energy = float(env.total_energy - ep_energy0)
             ep_total_late, ep_avg_late, wf_avg_late = compute_episode_task_lateness_metrics(env)
@@ -423,8 +406,8 @@ def train():
                 episode_energy=ep_energy,
                 wf_completed=getattr(env, "completed_workflows", 0),
                 wf_target=getattr(env, "workflows_per_episode", None) or "",
-                eps_vm=vm_agent.epsilon(),
-                eps_host=0.0,
+                eps_vm=0.0,
+                eps_host=host_agent.epsilon(),
                 eps_mgr=manager_agent.epsilon(),
                 assign_cnt="",
                 phase_size_sum_mi="",
@@ -451,13 +434,13 @@ def train():
             )
             if eval_energy < best_eval_energy:
                 best_eval_energy = eval_energy
-                vm_agent.save(best_ckpt_vm)
+                host_agent.save(best_ckpt_host)
                 manager_agent.save(best_ckpt_mgr)
                 print(
-                    f"⭐ best updated: eval_energy={best_eval_energy:.3f}J -> saved {best_ckpt_vm} / {best_ckpt_mgr}"
+                    f"⭐ best updated: eval_energy={best_eval_energy:.3f}J -> saved {best_ckpt_host} / {best_ckpt_mgr}"
                 )
             if global_step % save_interval == 0:
-                vm_agent.save(os.path.join(save_dir, f"vm_step{global_step}.pth"))
+                host_agent.save(os.path.join(save_dir, f"host_step{global_step}.pth"))
                 manager_agent.save(os.path.join(save_dir, f"mgr_step{global_step}.pth"))
             env.random_seed = getattr(env, "random_seed", 0) + 1
             env.reset()
@@ -466,7 +449,7 @@ def train():
             env.energy_norm_per_mi_ref = env_kwargs["energy_norm_per_mi_ref"]
             env.alpha_delay_host = env_kwargs["alpha_delay_host"]
             env.alpha_delay_vm = env_kwargs["alpha_delay_vm"]
-            host_selector.reset(int(env.random_seed))
+            vm_selector.reset(_vm_random_seed_from_episode_seed(env.random_seed))
             ep_energy0 = float(env.total_energy)
             episode_steps = 0
             episode_idx += 1
@@ -481,26 +464,24 @@ def train():
             st_host, has_next = env.get_host_state_for_next_assignment()
             if not has_next:
                 break
-            a_host = host_selector.select_action(
-                st_host["mask"], deterministic=False, count_step=False
+            a_host = host_agent.select_action(
+                st_host["obs"], st_host["mask"], deterministic=False, count_step=True
             )
             env.host_select(int(a_host))
             st_vm, ok_vm = env.get_vm_state_for_current_task()
             if not ok_vm:
                 break
-            a_vm = vm_agent.select_action(
-                st_vm["obs"], st_vm["mask"], deterministic=False, count_step=True
-            )
+            a_vm = vm_selector.select_action(st_vm["mask"])
             r_host, r_vm, _info_task = env.vm_assign(int(a_vm))
             phase_host_rewards.append(float(r_host))
             phase_vm_rewards.append(float(r_vm))
-            z_vm_s = np.zeros_like(st_vm["obs"])
-            z_vm_m = np.zeros_like(st_vm["mask"])
-            vm_agent.remember(
-                st_vm["obs"], st_vm["mask"], int(a_vm), float(r_vm), z_vm_s, z_vm_m, 1.0
+            z_host_s = np.zeros_like(st_host["obs"])
+            z_host_m = np.zeros_like(st_host["mask"])
+            host_agent.remember(
+                st_host["obs"], st_host["mask"], int(a_host), float(r_host), z_host_s, z_host_m, 1.0
             )
-            if _warmup_ready(vm_agent, WARMUP_FRAC):
-                vm_agent.update()
+            if _warmup_ready(host_agent, WARMUP_FRAC):
+                host_agent.update()
         r_manager_raw, pinfo = env.finish_phase_and_advance()
         assign_cnt = int(pinfo.get("assign_cnt", 0))
         phase_size_sum_mi = float(pinfo.get("phase_size_sum_mi", 0.0))
@@ -517,8 +498,8 @@ def train():
             episode_energy="",
             wf_completed="",
             wf_target="",
-            eps_vm=vm_agent.epsilon(),
-            eps_host=0.0,
+            eps_vm=0.0,
+            eps_host=host_agent.epsilon(),
             eps_mgr=manager_agent.epsilon(),
             assign_cnt=assign_cnt,
             phase_size_sum_mi=phase_size_sum_mi,
@@ -561,15 +542,15 @@ def train():
         if not env.done_flag:
             m_act = manager_agent.select_action(sH, m_mask, deterministic=False, count_step=True)
             manager_apply_action(env, m_act)
-    vm_final = os.path.join(save_dir, "vm_final.pth")
+    host_final = os.path.join(save_dir, "host_final.pth")
     mgr_final = os.path.join(save_dir, "manager_final.pth")
-    vm_agent.save(vm_final)
+    host_agent.save(host_final)
     manager_agent.save(mgr_final)
     print(
-        f"训练结束。\nVM最终模型：{vm_final}\nManager最终模型：{mgr_final}\n最优评测模型：{best_ckpt_vm} / {best_ckpt_mgr}\n日志：{log_path}"
+        f"训练结束。\nHost最终模型：{host_final}\nManager最终模型：{mgr_final}\n最优评测模型：{best_ckpt_host} / {best_ckpt_mgr}\n日志：{log_path}"
     )
 
 
 if __name__ == "__main__":
-    SCENARIO = parse_scenario("train", "ablation_hostrand")
+    SCENARIO = parse_scenario("train", "ablation_vmrand")
     train()

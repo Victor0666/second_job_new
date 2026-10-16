@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 from common.scenarios import Scenario, parse_scenario
-from common.env_fcfs import CloudWorkflowEnv_VMAgents
+from environments.base_fcfs import CloudWorkflowEnv_VMAgents
 
 
 def build_env_kwargs(scenario):

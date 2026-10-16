@@ -21,7 +21,9 @@ def main():
         "episodes": [],
     }
     sources = sorted(
-        p for folder in ("common", "algorithms") for p in (ROOT / folder).rglob("*.py")
+        p
+        for folder in ("common", "algorithms", "environments")
+        for p in (ROOT / folder).rglob("*.py")
     )
     for path in sources:
         rel = path.relative_to(ROOT)
@@ -97,7 +99,7 @@ def main():
         for label, folder, kwfn, agentfn, evalfn, envname in cases:
             started = time.time()
             try:
-                p = ROOT / "algorithms" / folder / "evaluate.py"
+                p = ROOT / "algorithms" / f"{folder}_evaluate.py"
                 m = importlib.import_module(".".join(p.relative_to(ROOT).with_suffix("").parts))
                 kw = getattr(m, kwfn)(random_seed=2)
                 agents = getattr(m, agentfn)(kw)
@@ -130,7 +132,7 @@ def main():
                     "MARL": "marl",
                     "ERTF-H-FIFS": "ertf_fifs",
                 }
-                p = ROOT / "algorithms" / folders[label] / "evaluate.py"
+                p = ROOT / "algorithms" / f"{folders[label]}_evaluate.py"
                 m = importlib.import_module(".".join(p.relative_to(ROOT).with_suffix("").parts))
                 if label == "PD3QN":
                     kw, agent = m.build_agent_and_env_kwargs()
@@ -157,7 +159,7 @@ def main():
                     result = m.evaluate_one_seed(kw, built[0], built[1], 2, 0)
                     del built
                 else:
-                    hm = importlib.import_module("algorithms.mahdrl.evaluate")
+                    hm = importlib.import_module("algorithms.mahdrl_evaluate")
                     kw = hm.build_env_kwargs_hrl_mix(random_seed=2)
                     result = m.run_one_episode(m.CloudWorkflowEnv_VMAgents, kw, 2)
                 report["episodes"].append(

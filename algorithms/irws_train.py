@@ -9,17 +9,17 @@ from typing import Dict, Any, List, Optional
 import numpy as np
 import torch
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
-from algorithms.irws.env_irws import IRWSEnvRouteA
-from algorithms.irws.gnn_task_ranker import IRWSTaskSelector, TaskSelectorConfig
-from algorithms.irws.intrinsic_reward_net import IntrinsicRewardNet, IntrinsicNetConfig
-from algorithms.irws.ppo_vm_agent import PPOVMAgent, PPOConfig
+from environments.irws import IRWSEnvRouteA
+from algorithms.irws_task_ranker import IRWSTaskSelector, TaskSelectorConfig
+from algorithms.irws_intrinsic_reward import IntrinsicRewardNet, IntrinsicNetConfig
+from algorithms.irws_vm_agent import PPOVMAgent, PPOConfig
 
 
 @dataclass

@@ -38,7 +38,7 @@ from common.workflow_opt import Workflow
 from common.read_xml_opt_Tsize import load_workflow_from_dax
 
 # 继承你已有的 HEFT 基类环境
-from algorithms.mahdrl.env_heft import (
+from environments.mahdrl_heft import (
     CloudWorkflowEnv_VMAgents as _BaseEnv,
     MANAGER_ACTION_TABLE,
     _topo_sort_local,

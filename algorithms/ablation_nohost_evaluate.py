@@ -1,11 +1,11 @@
-"""mahdrl: eval. Select --task, --resource and --deadline; see --help."""
+"""ablation_nohost: eval. Select --task, --resource and --deadline; see --help."""
 
 import os
 import sys
 import numpy as np
 import torch
 
-PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
@@ -13,7 +13,10 @@ from common.scenarios import Scenario, parse_scenario
 SCENARIO = Scenario(mode="eval")
 from common.metrics_logger import CSVLogger
 from common.d3qn_agent_EXDehid import D3QNAgent
-from algorithms.mahdrl.env_fcfs import CloudWorkflowEnv_VMAgents as EnvHRLMix, MANAGER_ACTION_TABLE
+from environments.ablation_nohost import (
+    CloudWorkflowEnv_VMAgents as EnvNoHost,
+    MANAGER_ACTION_TABLE,
+)
 
 
 def set_seed(seed: int):
@@ -29,18 +32,17 @@ def set_seed(seed: int):
 NUM_OPTIONS = int(MANAGER_ACTION_TABLE.shape[0])
 
 
-def manager_apply_action(env: EnvHRLMix, act_idx: int):
+def manager_apply_action(env: EnvNoHost, act_idx: int):
     """act_idx ∈ [0,242] -> Δw(5,) -> env.apply_manager_delta(Δw)"""
     delta = MANAGER_ACTION_TABLE[int(act_idx)]
     env.apply_manager_delta(delta)
 
 
-def _sync_env_scales(env: EnvHRLMix, env_kwargs: dict):
-    """与训练脚本一致：同步 Route-A 参数。"""
+def _sync_env_scales(env: EnvNoHost, env_kwargs: dict):
+    """与两层 noHost 训练脚本一致：同步 Route-A 参数。"""
     env.energy_reward_scale = float(env_kwargs["energy_reward_scale"])
     env.task_baseline_norm = float(env_kwargs["task_baseline_norm"])
     env.energy_norm_per_mi_ref = float(env_kwargs["energy_norm_per_mi_ref"])
-    env.alpha_delay_host = float(env_kwargs["alpha_delay_host"])
     env.alpha_delay_vm = float(env_kwargs["alpha_delay_vm"])
 
 
@@ -302,17 +304,11 @@ def _extract_wf_finished_flags(env):
     return out
 
 
-def compute_task_and_workflow_metrics(env: EnvHRLMix):
+def compute_task_and_workflow_metrics(env: EnvNoHost):
     """
     同时统计：
     1) task级 lateness / tardiness / success_rate
     2) workflow级 lateness / tardiness / success_rate
-
-    task级：
-        基于 env.task_baseline_finish 与 env.task_end_time
-    workflow级：
-        优先调用 env.get_episode_metrics()
-        若无，则手工从 workflow deadline / finish time 恢复
     """
     task_state = getattr(env, "task_state", [])
     task_end_time = getattr(env, "task_end_time", [])
@@ -478,7 +474,7 @@ def compute_task_and_workflow_metrics(env: EnvHRLMix):
     }
 
 
-def build_env_kwargs_hrl_mix(random_seed=1):
+def build_env_kwargs_nohost(random_seed=1):
     dax_dir = os.path.join(PROJECT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
     horizon = 1000000000.0
@@ -489,7 +485,6 @@ def build_env_kwargs_hrl_mix(random_seed=1):
     ENERGY_REWARD_SCALE = 0.001
     TASK_BASELINE_NORM = 300.0
     ENERGY_NORM_PER_MI_REF = 20.0
-    ALPHA_DELAY_HOST = 0.75
     ALPHA_DELAY_VM = 0.75
     MGR_ALPHA_DELAY = 0.75
     MGR_DELAY_MODE = "tardiness"
@@ -527,23 +522,21 @@ def build_env_kwargs_hrl_mix(random_seed=1):
         energy_reward_scale=float(ENERGY_REWARD_SCALE),
         task_baseline_norm=float(TASK_BASELINE_NORM),
         energy_norm_per_mi_ref=float(ENERGY_NORM_PER_MI_REF),
-        alpha_delay_host=float(ALPHA_DELAY_HOST),
         alpha_delay_vm=float(ALPHA_DELAY_VM),
     )
     return env_kwargs
 
 
-def evaluate_hrl_mix_one_seed(env_cls, env_kwargs, vm_agent, host_agent, manager_agent):
+def evaluate_nohost_one_seed(env_cls, env_kwargs, vm_agent, manager_agent):
     """
     deterministic=True（不走 epsilon）
     返回：
-      三层奖励均值、总能耗、task级指标、workflow级指标、makespan
+      两层奖励均值、总能耗、task级指标、workflow级指标、makespan
     """
     ctor_block = {
         "energy_reward_scale",
         "task_baseline_norm",
         "energy_norm_per_mi_ref",
-        "alpha_delay_host",
         "alpha_delay_vm",
     }
     ctor_kwargs = {k: v for k, v in env_kwargs.items() if k not in ctor_block}
@@ -558,31 +551,20 @@ def evaluate_hrl_mix_one_seed(env_cls, env_kwargs, vm_agent, host_agent, manager
     phases = 0
     ret_mgr = 0.0
     ret_vm_phase_mean = 0.0
-    ret_host_phase_mean = 0.0
     while not done:
         vm_rewards = []
-        host_rewards = []
         while True:
-            st_host, has_next = env.get_host_state_for_next_assignment()
+            st_vm, has_next = env.get_vm_state_for_next_assignment()
             if not has_next:
-                break
-            a_host = host_agent.select_action(
-                st_host["obs"], st_host["mask"], deterministic=True, count_step=False
-            )
-            env.host_select(int(a_host))
-            st_vm, ok_vm = env.get_vm_state_for_current_task()
-            if not ok_vm:
                 break
             a_vm = vm_agent.select_action(
                 st_vm["obs"], st_vm["mask"], deterministic=True, count_step=False
             )
-            r_host, r_vm, _info_task = env.vm_assign(int(a_vm))
-            host_rewards.append(float(r_host))
+            r_vm, _info_task = env.vm_assign_global(int(a_vm))
             vm_rewards.append(float(r_vm))
         r_manager_raw, _pinfo = env.finish_phase_and_advance()
         ret_mgr += float(r_manager_raw)
         ret_vm_phase_mean += float(np.mean(vm_rewards)) if len(vm_rewards) > 0 else 0.0
-        ret_host_phase_mean += float(np.mean(host_rewards)) if len(host_rewards) > 0 else 0.0
         phases += 1
         done = bool(getattr(env, "done_flag", False))
         if done:
@@ -592,14 +574,13 @@ def evaluate_hrl_mix_one_seed(env_cls, env_kwargs, vm_agent, host_agent, manager
         m_act = manager_agent.select_action(sH, m_mask, deterministic=True, count_step=False)
         manager_apply_action(env, m_act)
     avg_vm = ret_vm_phase_mean / max(phases, 1)
-    avg_host = ret_host_phase_mean / max(phases, 1)
     avg_mgr = ret_mgr / max(phases, 1)
     total_energy = float(env.total_energy)
     metrics = compute_task_and_workflow_metrics(env)
     metrics.update(
         {
             "eval_vm_reward": float(avg_vm),
-            "eval_host_reward": float(avg_host),
+            "eval_host_reward": 0.0,
             "eval_mgr_reward": float(avg_mgr),
             "eval_energy": float(total_energy),
         }
@@ -607,56 +588,35 @@ def evaluate_hrl_mix_one_seed(env_cls, env_kwargs, vm_agent, host_agent, manager
     return metrics
 
 
-def build_three_layer_agents_and_load(env_kwargs: dict):
+def build_two_layer_agents_and_load(env_kwargs: dict):
     ctor_block = {
         "energy_reward_scale",
         "task_baseline_norm",
         "energy_norm_per_mi_ref",
-        "alpha_delay_host",
         "alpha_delay_vm",
     }
     ctor_kwargs = {k: v for k, v in env_kwargs.items() if k not in ctor_block}
-    tmp_env = EnvHRLMix(**ctor_kwargs)
+    tmp_env = EnvNoHost(**ctor_kwargs)
     _sync_env_scales(tmp_env, env_kwargs)
     tmp_env.reset()
-    st_host, ok = tmp_env.get_host_state_for_next_assignment()
+    st_vm, ok = tmp_env.get_vm_state_for_next_assignment()
     while not ok and (not tmp_env.done_flag):
         _rM, _ = tmp_env.finish_phase_and_advance()
-        st_host, ok = tmp_env.get_host_state_for_next_assignment()
-    host_state_dim = int(st_host["obs"].shape[0])
-    host_act_dim = int(st_host["mask"].shape[0])
-    a_host0 = int(np.argmax(st_host["mask"])) if np.sum(st_host["mask"]) > 0 else 0
-    tmp_env.host_select(a_host0)
-    st_vm, ok_vm = tmp_env.get_vm_state_for_current_task()
-    if not ok_vm:
+        st_vm, ok = tmp_env.get_vm_state_for_next_assignment()
+    if not ok:
         raise RuntimeError(
-            "Probe vm_state failed: get_vm_state_for_current_task() returned ok_vm=False"
+            "Probe vm_state failed: get_vm_state_for_next_assignment() returned ok=False"
         )
     vm_state_dim = int(st_vm["obs"].shape[0])
     vm_act_dim = int(st_vm["mask"].shape[0])
     mgr_state_dim = int(tmp_env.get_manager_state().shape[0])
     print(
-        f"[HRL_MIX probe] host_obs_dim={host_state_dim}, host_act_dim={host_act_dim} | vm_obs_dim={vm_state_dim}, vm_act_dim={vm_act_dim} | mgr_obs_dim={mgr_state_dim}, mgr_act_dim={NUM_OPTIONS}"
+        f"[HRL_noHost probe] vm_obs_dim={vm_state_dim}, vm_act_dim={vm_act_dim} | mgr_obs_dim={mgr_state_dim}, mgr_act_dim={NUM_OPTIONS}"
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     vm_agent = D3QNAgent(
         input_dim=vm_state_dim,
         output_dim=vm_act_dim,
-        lr=0.0003,
-        gamma=0.95,
-        batch_size=256,
-        buffer_size=120000,
-        eps_start=1.0,
-        eps_end=0.05,
-        eps_decay_steps=80000,
-        target_update_tau=0.005,
-        grad_clip=10.0,
-        hidden_dims=(1024, 1024, 512, 512, 256),
-        device=device,
-    )
-    host_agent = D3QNAgent(
-        input_dim=host_state_dim,
-        output_dim=host_act_dim,
         lr=0.0003,
         gamma=0.95,
         batch_size=256,
@@ -684,40 +644,33 @@ def build_three_layer_agents_and_load(env_kwargs: dict):
         hidden_dims=(512, 512, 256, 128),
         device=device,
     )
-    ckpt_dir_default = str(SCENARIO.checkpoint_dir("mahdrl"))
+    ckpt_dir_default = str(SCENARIO.checkpoint_dir("ablation_nohost"))
     ckpt_vm = os.path.join(ckpt_dir_default, "best_vm.pth")
-    ckpt_host = os.path.join(ckpt_dir_default, "best_host.pth")
     ckpt_mgr = os.path.join(ckpt_dir_default, "best_manager.pth")
-    if not (os.path.exists(ckpt_vm) and os.path.exists(ckpt_host) and os.path.exists(ckpt_mgr)):
+    if not (os.path.exists(ckpt_vm) and os.path.exists(ckpt_mgr)):
         raise FileNotFoundError(
-            f"Missing model files under {SCENARIO.checkpoint_dir('mahdrl')}; train this scenario or use --checkpoint-dir"
+            f"Missing model files under {SCENARIO.checkpoint_dir('ablation_nohost')}; train this scenario or use --checkpoint-dir"
         )
-    print(f"[HRL_MIX load] ckpt_dir: {ckpt_dir_default}")
-    print(f"[HRL_MIX load] vm     : {ckpt_vm}")
+    print(f"[HRL_noHost load] ckpt_dir: {ckpt_dir_default}")
+    print(f"[HRL_noHost load] vm     : {ckpt_vm}")
     vm_agent.load(ckpt_vm)
-    print(f"[HRL_MIX load] host   : {ckpt_host}")
-    host_agent.load(ckpt_host)
-    print(f"[HRL_MIX load] manager: {ckpt_mgr}")
+    print(f"[HRL_noHost load] manager: {ckpt_mgr}")
     manager_agent.load(ckpt_mgr)
     vm_agent.online.eval()
     vm_agent.target.eval()
-    host_agent.online.eval()
-    host_agent.target.eval()
     manager_agent.online.eval()
     manager_agent.target.eval()
-    return (vm_agent, host_agent, manager_agent)
+    return (vm_agent, manager_agent)
 
 
 def main():
     seeds = list(SCENARIO.seeds)
-    env_kwargs_base = build_env_kwargs_hrl_mix(random_seed=seeds[0])
-    result_dir = os.path.join(
-        PROJECT_DIR, "outputs", "run", f"hrl_mix_wfInfo__HVrn_{SCENARIO.deadline}"
-    )
+    env_kwargs_base = build_env_kwargs_nohost(random_seed=seeds[0])
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", "hrl_nohost_ddlMix")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,
-        f"eval_mahdrl_task{SCENARIO.task}_res{SCENARIO.resource}_{len(SCENARIO.seeds)}seeds_r075_mix_{SCENARIO.deadline}.csv",
+        f"run_hrl_NOHOST_task{SCENARIO.task}_res{SCENARIO.resource}_{len(SCENARIO.seeds)}seeds_ddlMix_{SCENARIO.deadline}.csv",
     )
     logger = CSVLogger(
         filepath=csv_path,
@@ -747,10 +700,11 @@ def main():
             "makespan",
         ],
     )
-    print(">>> 构建三层 agents 并加载最新 HRL_MIX best_ckpt ...")
+    print(">>> 构建两层 agents 并加载 noHost best_ckpt ...")
+    print(">>> mode: Manager + Global-VMAgent (no HostAgent)")
     print(f">>> ddlAlpha cfg: small=2.0, large=3.0, P(small)={SCENARIO.small_probability}")
     print(">>> manager reward cfg: alpha_delay=0.75, delay_mode=tardiness")
-    vm_agent, host_agent, manager_agent = build_three_layer_agents_and_load(env_kwargs_base)
+    vm_agent, manager_agent = build_two_layer_agents_and_load(env_kwargs_base)
     vm_list, host_list, mgr_list, energy_list = ([], [], [], [])
     task_late_list, task_tard_list, task_succ_list, task_pct_list = ([], [], [], [])
     wf_late_list, wf_tard_list, wf_succ_list, wf_pct_list = ([], [], [], [])
@@ -760,7 +714,7 @@ def main():
         set_seed(sd)
         kwargs_i = dict(env_kwargs_base)
         kwargs_i["random_seed"] = int(sd)
-        out = evaluate_hrl_mix_one_seed(EnvHRLMix, kwargs_i, vm_agent, host_agent, manager_agent)
+        out = evaluate_nohost_one_seed(EnvNoHost, kwargs_i, vm_agent, manager_agent)
         logger.log(
             run_idx=idx,
             seed=sd,
@@ -800,12 +754,12 @@ def main():
         wf_pct_list.append(float(out["wf_pct_tardy"]))
         ms_list.append(float(out["makespan"]))
         print(
-            f"[HRL_MIX] vm={out['eval_vm_reward']:.6f} host={out['eval_host_reward']:.6f} mgr={out['eval_mgr_reward']:.6f} energy={out['eval_energy']:.3f} J | tasks={out['task_n_finished']} tardy={out['task_n_tardy']} | task_avg_lateness={out['task_avg_lateness']:.6f} task_avg_tardiness={out['task_avg_tardiness']:.6f} task_success_rate={out['task_success_rate']:.6f} | wf={out['wf_n_finished']} tardy={out['wf_n_tardy']} | wf_avg_lateness={out['wf_avg_lateness']:.6f} wf_avg_tardiness={out['wf_avg_tardiness']:.6f} wf_success_rate={out['wf_success_rate']:.6f} | makespan={out['makespan']:.3f}"
+            f"[HRL_noHost] vm={out['eval_vm_reward']:.6f} host={out['eval_host_reward']:.6f} mgr={out['eval_mgr_reward']:.6f} energy={out['eval_energy']:.3f} J | tasks={out['task_n_finished']} tardy={out['task_n_tardy']} | task_avg_lateness={out['task_avg_lateness']:.6f} task_avg_tardiness={out['task_avg_tardiness']:.6f} task_success_rate={out['task_success_rate']:.6f} | wf={out['wf_n_finished']} tardy={out['wf_n_tardy']} | wf_avg_lateness={out['wf_avg_lateness']:.6f} wf_avg_tardiness={out['wf_avg_tardiness']:.6f} wf_success_rate={out['wf_success_rate']:.6f} | makespan={out['makespan']:.3f}"
         )
         print(
             f"[Detail] task_total_lateness={out['task_total_lateness']:.6f} task_total_tardiness={out['task_total_tardiness']:.6f} | wf_total_lateness={out['wf_total_lateness']:.6f} wf_total_tardiness={out['wf_total_tardiness']:.6f}"
         )
-    print("\n================= HRL_MIX（30 seeds）汇总 =================")
+    print("\n================= HRL_noHost（30 seeds）汇总 =================")
     print(f"avg_vm_reward        = {float(np.mean(vm_list)):.6f}")
     print(f"avg_host_reward      = {float(np.mean(host_list)):.6f}")
     print(f"avg_mgr_reward       = {float(np.mean(mgr_list)):.6f}")
@@ -819,10 +773,10 @@ def main():
     print(f"wf_avg_pct_tardy     = {float(np.mean(wf_pct_list)):.6f}")
     print(f"wf_avg_success       = {float(np.mean(wf_succ_list)):.6f}")
     print(f"avg_makespan         = {float(np.mean(ms_list)):.3f}")
-    print("=========================================================")
+    print("==========================================================")
     print(f"结果已写入 CSV: {csv_path}")
 
 
 if __name__ == "__main__":
-    SCENARIO = parse_scenario("eval", "mahdrl")
+    SCENARIO = parse_scenario("eval", "ablation_nohost")
     main()

@@ -9,13 +9,13 @@ from typing import Dict, List, Tuple
 import numpy as np
 import torch
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
 
 SCENARIO = Scenario(mode="eval")
-from algorithms.mahdrl.env_fcfs import CloudWorkflowEnv_VMAgents
+from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents
 from common.workflow_opt import energy_from_records
 
 

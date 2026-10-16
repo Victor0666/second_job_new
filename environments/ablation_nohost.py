@@ -25,7 +25,7 @@ env_nohost.py
 
 import numpy as np
 
-from algorithms.mahdrl.env_fcfs import (
+from environments.mahdrl_fcfs import (
     CloudWorkflowEnv_VMAgents as _BaseEnv,
     MANAGER_ACTION_TABLE,
 )

@@ -6,7 +6,7 @@ import random
 import numpy as np
 import torch
 
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR in sys.path:
     sys.path.remove(ROOT_DIR)
 sys.path.insert(0, ROOT_DIR)
@@ -16,7 +16,7 @@ SCENARIO = Scenario(mode="eval")
 from common.metrics_logger import CSVLogger
 from common.workflow_opt import energy_from_records
 from common.d3qn_agent_PER import D3QNAgent
-from algorithms.pd3qn.env_pd3qn import CloudWorkflowEnv_PD3QN_Cost
+from environments.pd3qn import CloudWorkflowEnv_PD3QN_Cost
 
 
 def set_seed(seed: int):

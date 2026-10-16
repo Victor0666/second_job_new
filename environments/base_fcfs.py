@@ -32,7 +32,7 @@ from common.workflow_opt import Workflow
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 
 # 继承你已有的 HEFT deadline env（不改动原文件）
-from common.env_heft import (
+from environments.base_heft import (
     CloudWorkflowEnv_VMAgents as _BaseEnv,
     MANAGER_ACTION_TABLE,  # 训练脚本还会用
     _topo_sort_local,      # 复用 topo/succ

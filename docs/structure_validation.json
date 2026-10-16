@@ -1,0 +1,19 @@
+{
+  "imports": 353,
+  "episodes": [
+    "MAHDRL",
+    "NHA",
+    "NTA",
+    "NVA",
+    "TL",
+    "PD3QN",
+    "IRWS",
+    "MARL",
+    "ERTF-H-FIFS"
+  ],
+  "failures": 0,
+  "compiled": 375,
+  "compared": 350,
+  "unexpected_differences": [],
+  "plot_check": "algorithm_boxPlot_Merge.py: nine scenarios and legend generated with Agg backend"
+}

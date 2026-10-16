@@ -8,11 +8,11 @@ sys.stdout.reconfigure(encoding="utf-8")
 def main():
  import torch
  torch.set_num_threads(1)
+ (ROOT/"outputs").mkdir(exist_ok=True)
  report = {"root": str(ROOT), "python": sys.executable, "cuda": torch.cuda.is_available(), "imports": [], "failures": [], "episodes": []}
- manifest = json.loads((ROOT / "extraction_manifest.json").read_text(encoding="utf-8"))
- for row in manifest["files"]:
-  rel = Path(row["path"])
-  if rel.suffix != ".py" or rel.parts[0] in ["e_draw_plot", "output"]: continue
+ sources = sorted(p for folder in ("common", "algorithms") for p in (ROOT / folder).rglob("*.py"))
+ for path in sources:
+  rel = path.relative_to(ROOT)
   mod = ".".join(rel.with_suffix("").parts)
   if mod.endswith(".__init__"): mod = mod[:-9]
   try:
@@ -24,6 +24,10 @@ def main():
     value = getattr(loaded, key, None)
     if isinstance(value, str) and Path(value).is_absolute() and not Path(value).resolve().is_relative_to(ROOT):
      raise RuntimeError(key + " points outside extracted package: " + value)
+   for key in ["ROOT_DIR", "PROJECT_DIR", "PROJECT_ROOT"]:
+    value = getattr(loaded, key, None)
+    if isinstance(value, str) and Path(value).is_absolute() and Path(value).resolve() != ROOT:
+     raise RuntimeError(key + " is not the project root: " + value)
    report["imports"].append(mod)
   except Exception as e:
    report["failures"].append({"module": mod, "error": repr(e), "traceback": traceback.format_exc()})
@@ -40,7 +44,7 @@ def main():
   for label, folder, kwfn, agentfn, evalfn, envname in cases:
    started=time.time()
    try:
-    p=next((ROOT/"c_run"/folder).glob("*taskS_resS*Tight.py"))
+    p=next((ROOT/"algorithms"/folder).glob("*taskS_resS*Tight.py"))
     m=importlib.import_module(".".join(p.relative_to(ROOT).with_suffix("").parts))
     kw=getattr(m,kwfn)(random_seed=2)
     agents=getattr(m,agentfn)(kw)
@@ -56,7 +60,7 @@ def main():
    started=time.time()
    try:
     folders={"PD3QN":"pd3qn","IRWS":"irws","MARL":"marl","ERTF-H-FIFS":"ertf_fifs"}
-    p=next((ROOT/"c_run"/folders[label]).glob("*taskS_resS*Tight.py"))
+    p=next((ROOT/"algorithms"/folders[label]).glob("*taskS_resS*Tight.py"))
     m=importlib.import_module(".".join(p.relative_to(ROOT).with_suffix("").parts))
     if label=="PD3QN":
      kw,agent=m.build_agent_and_env_kwargs();kw["random_seed"]=2
@@ -67,15 +71,15 @@ def main():
      result=m.evaluate_one_seed(kw,selector,ppo,seed=2)
      del selector,ppo
     elif label=="MARL":
-     cache=ROOT/"d_output/deadlines/ddl_fcfs_taskS_resS_seed0-1000.json"
+     cache=ROOT/"data/deadlines/ddl_fcfs_taskS_resS_seed0-1000.json"
      kw=m.build_env_kwargs(str(cache))
-     ckpt=ROOT/"d_output/ckpts/marl_taskS_resS_eval1_ep1000_mix_Tight"
+     ckpt=ROOT/"outputs/ckpts/marl_taskS_resS_eval1_ep1000_mix_Tight"
      device="cuda" if torch.cuda.is_available() else "cpu"
      built=m.build_agents_and_probe_dims(kw,2,device,str(ckpt/"best_global.pth"),str(ckpt/"best_local_actor_critics.pth"))
      result=m.evaluate_one_seed(kw,built[0],built[1],2,0)
      del built
     else:
-     hm=importlib.import_module("c_run.mahdrl.eval_taskS_resS_Tight")
+     hm=importlib.import_module("algorithms.mahdrl.eval_taskS_resS_Tight")
      kw=hm.build_env_kwargs_hrl_mix(random_seed=2)
      result=m.run_one_episode(m.CloudWorkflowEnv_VMAgents,kw,2)
     report["episodes"].append({"algorithm":label,"seconds":round(time.time()-started,2),"result":result})
@@ -85,7 +89,7 @@ def main():
    except Exception as e:
     report["failures"].append({"algorithm":label,"error":repr(e),"traceback":traceback.format_exc()})
     print(label,"FAILED",repr(e),flush=True)
- (ROOT/"verification_result.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,default=str),encoding="utf-8")
+ (ROOT/"outputs/verification_result.json").write_text(json.dumps(report,ensure_ascii=False,indent=2,default=str),encoding="utf-8")
  print("Verification failures:",len(report["failures"]),flush=True)
  for x in report["failures"]: print(x,flush=True)
  return bool(report["failures"])

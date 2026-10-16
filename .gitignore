@@ -1,4 +1,4 @@
-# Local Python environments and caches
+# Python environments and caches
 .venv/
 venv/
 __pycache__/
@@ -13,33 +13,23 @@ __pycache__/
 .env.*
 !.env.example
 
-# Experiment artifacts; retain the baseline cache required by the code
-/d_output/*
-!/d_output/deadlines/
-output/
-/e_draw_plot/**/d_output/
+# Models, logs, evaluations and generated figures
+/outputs/
 *.pt
 *.pth
 *.ckpt
 *.log
+/plots/**/*.png
+/plots/**/*.jpg
+/plots/**/*.jpeg
+/plots/**/*.pdf
+/plots/**/*.svg
+/plots/**/*.eps
+/plots/**/wilcoxon*.csv
 
-# Generated figures and statistical reports; retain Excel/other input tables
-/e_draw_plot/**/*.png
-/e_draw_plot/**/*.jpg
-/e_draw_plot/**/*.jpeg
-/e_draw_plot/**/*.pdf
-/e_draw_plot/**/*.svg
-/e_draw_plot/**/*.eps
-/e_draw_plot/**/wilcoxon*.csv
+# Historical packaging records are retained locally and in Git history
+/docs/archive/
 
-# Local migration backups and generated verification reports
-/docs/*backup*.zip
-/docs/*validation*.json
-/copy_verification.json
-/validation_before_copy.json
-/verification_result.json
-
-# OS temporary files
 Thumbs.db
 .DS_Store
 ~$*

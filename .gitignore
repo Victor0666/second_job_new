@@ -1,0 +1,45 @@
+# Local Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.idea/
+.vscode/
+.env
+.env.*
+!.env.example
+
+# Experiment artifacts; retain the baseline cache required by the code
+/d_output/*
+!/d_output/deadlines/
+output/
+/e_draw_plot/**/d_output/
+*.pt
+*.pth
+*.ckpt
+*.log
+
+# Generated figures and statistical reports; retain Excel/other input tables
+/e_draw_plot/**/*.png
+/e_draw_plot/**/*.jpg
+/e_draw_plot/**/*.jpeg
+/e_draw_plot/**/*.pdf
+/e_draw_plot/**/*.svg
+/e_draw_plot/**/*.eps
+/e_draw_plot/**/wilcoxon*.csv
+
+# Local migration backups and generated verification reports
+/docs/*backup*.zip
+/docs/*validation*.json
+/copy_verification.json
+/validation_before_copy.json
+/verification_result.json
+
+# OS temporary files
+Thumbs.db
+.DS_Store
+~$*

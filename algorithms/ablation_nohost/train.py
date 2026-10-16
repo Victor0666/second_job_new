@@ -189,7 +189,7 @@ def train():
     DEADLINE_CACHE_PATH = str(SCENARIO.cache_path)
     if not os.path.exists(DEADLINE_CACHE_PATH):
         raise FileNotFoundError(
-            f"deadline cache 不存在：{DEADLINE_CACHE_PATH}\n请先运行：common/precompute_deadlines.py --task S --resource S 生成 cache"
+            f"deadline cache 不存在：{DEADLINE_CACHE_PATH}\n请先运行：common/precompute_deadlines.py --task {SCENARIO.task} --resource {SCENARIO.resource} 生成 cache"
         )
     set_seed(random_seed)
     EnvCls = CloudWorkflowEnv_VMAgents

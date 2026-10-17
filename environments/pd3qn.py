@@ -1,24 +1,9 @@
 # -*- coding: utf-8 -*-
-"""
-env_pd3qn.py  (SHALLOW ALIGN to HRL0.75 lower-layer VM reward)
+"""PD3QN with DAG completion events and full-cluster episode energy.
 
-浅对齐内容：
-1) reward 改为对齐 HRL 下层 VMAgent 的形式：
-       r_delay       = - clip( max(0, finish_time - task_deadline) / task_baseline_norm , 0, 1 )
-       r_energy_host = - ΔE_host * energy_reward_scale
-       reward        = (1-alpha_delay_vm) * r_energy_host + alpha_delay_vm * r_delay
-
-2) 这里只做“浅对齐”：
-   - 仍沿用当前 PD3QN 的能耗结算方式：
-       ΔE_host = 本次 assignment 对所选 host 执行区间 [start_t, end_t] 新增的能耗
-   - 不改成 HRL 那种“只有推进到下一个决策点才记 lower-layer energy reward”的深对齐方式
-
-3) 兼容保留旧参数名：
-   - w_delay / w_energy / delay_norm_ref / energy_norm_per_mi_ref
-   其中：
-   - w_delay / w_energy 若传入，则映射到 alpha_delay_vm
-   - delay_norm_ref 若传入，则映射到 task_baseline_norm
-   - energy_norm_per_mi_ref 仅保留为兼容字段，本版 reward 中不再使用
+The step energy reward includes assignment energy and all hosts' idle energy
+added while advancing to the next decision or episode end. Legacy reward
+parameters remain supported.
 """
 
 import os
@@ -797,6 +782,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
                 return self._build_obs(), 0.0, self.done_flag, False, {}
             action = int(valid[0])
 
+        energy_before = float(self.total_energy)
         vm_idx = int(action)
         vm_id = int(self.vm_ids[vm_idx])
         vm = self.vms[vm_id]
@@ -836,7 +822,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         if gid in self.ready_task_ids:
             self.ready_task_ids.remove(gid)
 
-        # 浅对齐：仍然使用当前 assignment 执行区间对应的 host 增量能耗
+        # Preserve the selected-host assignment increment for diagnostics.
         dE_host = self._add_interval_load(host_id, start_t, end_t, float(vm.pc))
 
         ddl = float(self.task_baseline_finish[gid]) if gid < len(self.task_baseline_finish) else (end_t + 1e9)
@@ -846,17 +832,17 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         delay_norm = _clip01(tardiness / max(self.task_baseline_norm, 1e-9))
         r_delay = -float(delay_norm)
 
-        # 对齐 HRL 下层 VM energy reward
-        r_energy_host = -float(dE_host) * float(self.energy_reward_scale)
-
-        reward = (1.0 - float(self.alpha_delay_vm)) * float(r_energy_host) + float(self.alpha_delay_vm) * float(r_delay)
-
         self._observe_until_decision()
+        dE_total = float(self.total_energy - energy_before)
+        r_energy_total = -dE_total * float(self.energy_reward_scale)
+        r_energy_host = -float(dE_host) * float(self.energy_reward_scale)
+        reward = (1.0 - self.alpha_delay_vm) * r_energy_total + self.alpha_delay_vm * r_delay
 
         info = {
             "time": float(self.current_time),
             "energy": float(self.total_energy),
             "delta_energy": float(dE_host),
+            "delta_energy_total": float(dE_total),
             "task_gid": int(gid),
             "task_end": float(end_t),
             "task_deadline": float(ddl),
@@ -866,8 +852,9 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
             "delay_norm": float(delay_norm),
             "r_delay": float(r_delay),
             "r_energy_host": float(r_energy_host),
+            "r_energy_total": float(r_energy_total),
             "alpha_delay_vm": float(self.alpha_delay_vm),
-            "reward_mode": "shallow_align_to_hrl_vm",
+            "reward_mode": "full_cluster_energy",
         }
         return self._build_obs(), float(reward), bool(self.done_flag), False, info
 

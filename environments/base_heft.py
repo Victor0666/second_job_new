@@ -988,13 +988,6 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         started = len(self.workflows) > 0
         if not started:
             return 0.0
-        if self.workflows_per_episode is not None:
-            counting = self.completed_workflows < self.workflows_per_episode
-        else:
-            counting = any(s != "Finished" for s in self.task_state)
-        if not counting:
-            return 0.0
-
         t = self.current_time
         clipped = []
         for r in self._records:
@@ -1007,7 +1000,9 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
                 continue
             clipped.append(LoadRecord(r.start_time, end, r.server_id, r.vm_pc))
 
-        E = energy_from_records(clipped, self.hosts)
+        E = energy_from_records(
+            clipped, self.hosts, start_time=self.first_arrival_time, end_time=t
+        )
         dE = max(0.0, E - self._energy_cache)
         self._energy_cache = E
         self.total_energy += dE

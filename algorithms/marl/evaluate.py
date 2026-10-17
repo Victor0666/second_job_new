@@ -240,7 +240,11 @@ def evaluate_one_seed(
     else:
         wf_success_rate = float("nan")
     recs = env.records if hasattr(env, "records") else getattr(env, "_records", None)
-    E_re = float(energy_from_records(recs, env.hosts)) if recs is not None else float("nan")
+    E_re = float(energy_from_records(
+        recs, env.hosts,
+        start_time=float(env.arrival_times[0]) if len(env.arrival_times) else 0.0,
+        end_time=float(env.current_time),
+    )) if recs is not None else float("nan")
     E_acc = float(getattr(env, "total_energy", energy))
     diff = float(E_acc - E_re) if np.isfinite(E_re) else float("nan")
     print(f"[EnergyCheck] E_acc={E_acc:.6f}  E_re={E_re:.6f}  diff={diff:.6f}")

@@ -248,7 +248,11 @@ def _compute_metrics(env: CloudWorkflowEnv_VMAgents) -> Dict[str, float]:
     recs = _get_records(env)
     if len(recs) > 0 and hasattr(env, "hosts"):
         try:
-            energy_check = float(energy_from_records(recs, env.hosts))
+            energy_check = float(energy_from_records(
+                recs, env.hosts,
+                start_time=float(env.arrival_times[0]) if len(env.arrival_times) else 0.0,
+                end_time=float(env.current_time),
+            ))
         except Exception:
             energy_check = float("nan")
     else:

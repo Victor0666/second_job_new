@@ -33,16 +33,9 @@ IRWS 环境（Route-A）——对齐 HRL 公平口径版本（6点全对齐）�
 - 支持“每个 workflow 独立采样 ddlAlpha”
 - 使用独立的 deadline_rng，避免打乱 self.rng 的 DAX 模板抽样序列
 
-本版关键修改：
-- 环境 reward 改为与“修改后的 PD3QN reward”相同（浅对齐版）：
-
-    r_delay       = - clip( max(0, finish_time - task_deadline) / task_baseline_norm , 0, 1 )
-    r_energy_host = - ΔE_host * energy_reward_scale
-    reward        = (1-alpha_delay_vm) * r_energy_host + alpha_delay_vm * r_delay
-
-其中：
-- ΔE_host 为本次 assignment 在所选 host 上新增的真实增量能耗
-- 不再使用旧版 e_proxy / MI / energy_norm_per_mi_ref
+Energy reward uses the full-cluster increment from assignment through the
+next decision or episode end, including idle hosts and gaps between workflows.
+The selected-host assignment increment is retained in info for diagnostics.
 """
 
 from __future__ import annotations
@@ -618,10 +611,16 @@ class IRWSEnvRouteA(gym.Env):
             info = {"illegal": True}
             return np.zeros((1,), dtype=np.float32), float(reward), False, False, info
 
+        energy_before = float(self.total_energy)
         self.ready_task_ids.remove(gid)
         reward, info = self._assign_task_to_vm(gid, vm_id)
 
         self._advance_until_decision()
+        dE_total = float(self.total_energy - energy_before)
+        r_energy_total = -dE_total * float(self.energy_reward_scale)
+        reward = (1.0 - self.alpha_delay_vm) * r_energy_total + self.alpha_delay_vm * info["r_delay"]
+        info.update(delta_energy_total=dE_total, r_energy_total=r_energy_total,
+                    reward_mode="full_cluster_energy")
 
         terminated = bool(self.done_flag)
         truncated = False
@@ -952,7 +951,9 @@ class IRWSEnvRouteA(gym.Env):
 
     def _finalize_energy_if_done(self):
         e_prev = float(self.total_energy)
-        e_true = float(energy_from_records(self.records, self.hosts))
+        e_true = float(energy_from_records(
+            self.records, self.hosts, start_time=self.first_arrival_time, end_time=self.current_time
+        ))
         diff = abs(e_prev - e_true)
 
         if self.energy_check_on_done and diff > 1e-6:
@@ -964,7 +965,9 @@ class IRWSEnvRouteA(gym.Env):
 
     def get_episode_metrics(self) -> Dict[str, float]:
         if not self.done_flag:
-            E = float(energy_from_records(self.records, self.hosts))
+            E = float(energy_from_records(
+                self.records, self.hosts, start_time=self.first_arrival_time, end_time=self.current_time
+            ))
         else:
             E = float(self.total_energy)
 

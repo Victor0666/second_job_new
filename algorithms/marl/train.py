@@ -107,7 +107,11 @@ def evaluate_marl(
             ep_total_late, ep_task_cnt, ep_wf_late
         )
         recs = env.records if hasattr(env, "records") else env._records
-        E_re = float(energy_from_records(recs, env.hosts))
+        E_re = float(energy_from_records(
+            recs, env.hosts,
+            start_time=float(env.arrival_times[0]) if len(env.arrival_times) else 0.0,
+            end_time=float(env.current_time),
+        ))
         E_acc = float(env.total_energy)
         diff = abs(E_re - E_acc)
         print(f"[EnergyCheck] E_acc={E_acc:.6f}  E_re={E_re:.6f}  diff={diff:.6f}")
@@ -368,7 +372,11 @@ def train():
             eval_workflow_avg_lateness="",
         )
         recs = env.records if hasattr(env, "records") else env._records
-        E_re = float(energy_from_records(recs, env.hosts))
+        E_re = float(energy_from_records(
+            recs, env.hosts,
+            start_time=float(env.arrival_times[0]) if len(env.arrival_times) else 0.0,
+            end_time=float(env.current_time),
+        ))
         E_acc = float(env.total_energy)
         diff = abs(E_re - E_acc)
         print(f"[EnergyCheck] E_acc={E_acc:.6f}  E_re={E_re:.6f}  diff={diff:.6f}")

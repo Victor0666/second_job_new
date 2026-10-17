@@ -110,3 +110,11 @@ MARL 额外保留 `--deadline-cache`、`--ckpt-global`、`--ckpt-local`、`--out
 此前平铺算法的版本可通过 Git 提交 `be8b6ed` 查看，旧场景入口可通过 `31d7110` 恢复。历史打包记录保留在本地 `docs/archive`，不进入当前 GitHub 文件列表。
 
 此前场景整合也按用户要求修正了若干历史场景配置，因此部分新旧实验不可直接等同。具体修正及对照规则见 [场景修正说明](docs/scenario_changes.md)。已有模型、原始数据和历史实验输出未被批量改写；部分历史绘图仍使用旧汇总数据，重新出图时应核对实验版本。
+
+## 统一能耗计量
+
+所有算法的 episode 能耗统一为：从首个工作流到达到最后一个任务完成，对全部主机积分功耗。未使用主机、各主机任务执行前后的空闲时段，以及工作流之间的空闲间隔均计入；首个到达之前不计入。
+
+公共函数 `energy_from_records(records, hosts, start_time=..., end_time=...)` 接收明确的共同窗口。主算法及消融的总能耗奖励和分主机奖励使用同一窗口；IRWS、PD3QN 的步骤能耗奖励包含分配增量及推进期间全部主机的空闲能耗，`info.r_energy_total` 对应该分量。原有 `r_energy_host` 保留作所选主机分配增量的诊断字段。
+
+能耗窗口回归检查：`.\.venv\Scripts\python.exe -m unittest common.test_energy`。历史模型、日志和统计图表不应与修正后的新结果混用。

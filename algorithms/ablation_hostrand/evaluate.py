@@ -281,7 +281,11 @@ def evaluate_hostrand_one_seed(env_cls, env_kwargs, vm_agent, manager_agent):
     avg_mgr = ret_mgr / max(phases, 1)
     eval_energy = float(env.total_energy)
     recs = getattr(env, "_records", getattr(env, "records", []))
-    energy_recalc = float(energy_from_records(recs, env.hosts))
+    energy_recalc = float(energy_from_records(
+        recs, env.hosts,
+        start_time=float(env.arrival_times[0]) if len(env.arrival_times) else 0.0,
+        end_time=float(env.current_time),
+    ))
     energy_diff = float(eval_energy - energy_recalc)
     metrics = compute_task_workflow_metrics(env)
     metrics.update(

@@ -159,7 +159,11 @@ def evaluate_one_episode(env_cls, env_kwargs: dict, agent: D3QNAgent, determinis
         if steps > 10**9:
             break
     E_acc = _safe_float(getattr(env, "total_energy", np.nan), np.nan)
-    E_re = _safe_float(energy_from_records(env.records, env.hosts), np.nan)
+    E_re = _safe_float(energy_from_records(
+        env.records, env.hosts,
+        start_time=float(env.arrival_times[0]) if len(env.arrival_times) else 0.0,
+        end_time=float(env.current_time),
+    ), np.nan)
     print(f"[EnergyCheck] E_acc={E_acc:.6f}  E_re={E_re:.6f}  diff={E_re - E_acc:.6f}")
     raw_metrics = env.get_episode_metrics()
     metrics = dict(raw_metrics)

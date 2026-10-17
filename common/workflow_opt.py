@@ -134,37 +134,40 @@ def exec_time_components(
     return tau_in, tau_comp, tau_out, tau_exec
 
 
-def energy_from_records(records, hosts):
-    """
-    与原版一致：按主机时间分片积分能量（W·s）
-    """
-    from collections import defaultdict
+def energy_from_records(records, hosts, *, start_time=None, end_time=None):
+    """Integrate every host over one common window, including idle power.
 
-    srv_records = defaultdict(list)
+    Explicit endpoints define the episode window. If omitted, use the common
+    span of all records, rather than a different span for each host.
+    """
+    records = list(records)
+    if start_time is None:
+        start_time = min((r.start_time for r in records), default=0.0)
+    if end_time is None:
+        end_time = max((r.end_time for r in records), default=start_time)
+    start_time, end_time = float(start_time), float(end_time)
+    if end_time < start_time:
+        raise ValueError("Energy window end must not precede its start")
+    if end_time == start_time:
+        return 0.0
+
+    events = {hid: {start_time: 0.0, end_time: 0.0} for hid in hosts}
     for r in records:
-        srv_records[r.server_id].append(r)
+        start = max(start_time, float(r.start_time))
+        end = min(end_time, float(r.end_time))
+        if end <= start:
+            continue
+        host_events = events[r.server_id]
+        host_events[start] = host_events.get(start, 0.0) + float(r.vm_pc)
+        host_events[end] = host_events.get(end, 0.0) - float(r.vm_pc)
 
     total_energy = 0.0
-    very_small = 1e-9
-
-    for srv_id, recs in srv_records.items():
-        host = hosts[srv_id]
-        times = set()
-        for r in recs:
-            times.add(r.start_time)
-            times.add(r.end_time)
-        timeline = sorted(times)
-
-        for t0, t1 in zip(timeline, timeline[1:]):
-            if (t1 - t0) < very_small:
-                continue
-            vm_pc_sum = 0.0
-            for r in recs:
-                if r.start_time <= t0 and r.end_time >= t1:
-                    vm_pc_sum += r.vm_pc
-
-            load_ratio = vm_pc_sum / max(host.total_pc, very_small)
-            power = host.power(load_ratio)
-            total_energy += power * (t1 - t0)
-
-    return total_energy
+    for hid, host in hosts.items():
+        load = 0.0
+        previous = start_time
+        for t, delta in sorted(events[hid].items()):
+            ratio = max(0.0, min(1.0, load / max(float(host.total_pc), 1e-9)))
+            total_energy += float(host.power(ratio)) * (t - previous)
+            load += delta
+            previous = t
+    return float(total_energy)

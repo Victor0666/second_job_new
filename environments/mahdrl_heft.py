@@ -937,14 +937,6 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         if not started:
             return 0.0, {int(h): 0.0 for h in self.host_ids}
 
-        if self.workflows_per_episode is not None:
-            counting = self.completed_workflows < self.workflows_per_episode
-        else:
-            counting = any(s != "Finished" for s in self.task_state)
-
-        if not counting:
-            return 0.0, {int(h): 0.0 for h in self.host_ids}
-
         t = self.current_time
         clipped_all = []
         clipped_by_host = {int(h): [] for h in self.host_ids}
@@ -961,16 +953,18 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             clipped_all.append(rr)
             clipped_by_host[int(r.server_id)].append(rr)
 
-        E_total = energy_from_records(clipped_all, self.hosts)
+        E_total = energy_from_records(
+            clipped_all, self.hosts, start_time=self.first_arrival_time, end_time=t
+        )
         dE_total = max(0.0, E_total - self._energy_cache)
         self._energy_cache = float(E_total)
 
         dE_by_host = {}
         for h in self.host_ids:
-            if len(clipped_by_host[int(h)]) == 0:
-                E_h = 0.0
-            else:
-                E_h = energy_from_records(clipped_by_host[int(h)], {int(h): self.hosts[int(h)]})
+            E_h = energy_from_records(
+                clipped_by_host[int(h)], {int(h): self.hosts[int(h)]},
+                start_time=self.first_arrival_time, end_time=t,
+            )
             prev_h = float(self._energy_cache_by_host.get(int(h), 0.0))
             dE_h = max(0.0, float(E_h) - prev_h)
             self._energy_cache_by_host[int(h)] = float(E_h)

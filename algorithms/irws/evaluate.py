@@ -267,7 +267,11 @@ def evaluate_one_seed(env_kwargs: dict, task_selector, ppo, seed: int) -> dict:
         recs = getattr(env, "records", None)
         hosts = getattr(env, "hosts", None)
         if recs is not None and hosts is not None:
-            E_re = float(energy_from_records(recs, hosts))
+            E_re = float(energy_from_records(
+                recs, hosts,
+                start_time=float(env.arrival_times[0]) if len(env.arrival_times) else 0.0,
+                end_time=float(env.current_time),
+            ))
             m["energy_check_diff"] = float(E_acc - E_re)
         else:
             m["energy_check_diff"] = float("nan")

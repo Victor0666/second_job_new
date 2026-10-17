@@ -19,7 +19,7 @@ except Exception:
 
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 from common.resource_opt import create_cluster
-from common.workflow_opt import validate_deadline_cache
+from common.workflow_opt import validate_deadline_cache, task_subdeadlines
 from common.workflow_opt import Workflow, exec_time_components, LoadRecord
 
 
@@ -41,51 +41,6 @@ def _pick_fcfs_task(ready_task_ids: List[int], task_ready_time: List[float]) -> 
             best_key = key
             best = int(gid)
     return int(best)
-
-
-def _topo_sort_local(tasks) -> Tuple[List[int], List[List[int]]]:
-    n = len(tasks)
-    indeg = np.zeros((n,), dtype=np.int32)
-    succ = [[] for _ in range(n)]
-    for i, t in enumerate(tasks):
-        for c in getattr(t, "children", []):
-            succ[i].append(int(c))
-        indeg[i] = len(getattr(t, "parents", []))
-    q = [i for i in range(n) if indeg[i] == 0]
-    topo = []
-    while q:
-        u = q.pop(0)
-        topo.append(u)
-        for v in succ[u]:
-            indeg[v] -= 1
-            if indeg[v] == 0:
-                q.append(v)
-    if len(topo) != n:
-        topo = list(range(n))
-    return topo, succ
-
-
-def _avg_task_dur_over_all_vms(tasks, vm_pc_mi_s: np.ndarray, vm_bw_bps: np.ndarray) -> np.ndarray:
-    n = len(tasks)
-    if n == 0:
-        return np.zeros((0,), dtype=np.float64)
-
-    mi = np.array([float(t.workload_mi) for t in tasks], dtype=np.float64)
-    in_bits = np.array(
-        [float((getattr(t, "ext_in_bits", 0.0) or 0.0) + (getattr(t, "from_parents_bits", 0.0) or 0.0)) for t in tasks],
-        dtype=np.float64,
-    )
-    out_bits = np.array([float(getattr(t, "out_file_size_sum_bits", 0.0) or 0.0) for t in tasks], dtype=np.float64)
-
-    bw = vm_bw_bps.reshape(1, -1)
-    pc = vm_pc_mi_s.reshape(1, -1)
-
-    dur = (
-        in_bits.reshape(-1, 1) / np.maximum(bw, 1e-12)
-        + mi.reshape(-1, 1) / np.maximum(pc, 1e-12)
-        + out_bits.reshape(-1, 1) / np.maximum(bw, 1e-12)
-    )
-    return dur.mean(axis=1)
 
 
 class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
@@ -624,35 +579,14 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
             else:
                 raise ValueError(f"Unsupported deadline_mode: {self.deadline_mode}")
 
-            n_local = len(tasks)
-            topo, succ = _topo_sort_local(tasks)
-            avg_dur = _avg_task_dur_over_all_vms(tasks, self._vm_pc, self._vm_bw_bps)
-            D_wf_rel = float(wf.deadline - arr_t)
-
-            LF = np.zeros((n_local,), dtype=np.float64)
-            LS = np.zeros((n_local,), dtype=np.float64)
-            is_sink = np.array([len(succ[i]) == 0 for i in range(n_local)], dtype=bool)
-
-            for i in range(n_local):
-                if is_sink[i]:
-                    LF[i] = D_wf_rel
-                    LS[i] = LF[i] - avg_dur[i]
-
-            for u in reversed(topo):
-                if is_sink[u]:
-                    continue
-                if len(succ[u]) > 0:
-                    min_LS_child = float(np.min(LS[np.array(succ[u], dtype=np.int32)]))
-                    LF[u] = min_LS_child
-                else:
-                    LF[u] = D_wf_rel
-                LS[u] = LF[u] - avg_dur[u]
+            subdeadlines = task_subdeadlines(
+                tasks, self._vm_pc, self._vm_bw_bps, arr_t, wf.deadline,
+            )
 
             base = len(self.task_meta)
             self.wf_task_base[int(wf.workflow_id)] = int(base)
 
-            for local_id in range(n_local):
-                self.task_baseline_finish.append(float(arr_t + LF[local_id]))
+            self.task_baseline_finish.extend(subdeadlines.tolist())
 
             for t in tasks:
                 self.task_meta.append((wf.workflow_id, int(t.task_id)))

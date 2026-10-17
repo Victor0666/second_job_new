@@ -135,3 +135,9 @@ foreach ($taskSize in 'S', 'M', 'L') {
 ```
 
 上面的预计算覆盖各场景的正式 `seed0-1000` 缓存；仅 Tight/Medium/Loose 不同的实验共用同一任务/资源基准。回归测试：`.\.venv\Scripts\python.exe -m unittest common.test_communication`。
+
+## 统一任务子截止期
+
+MARL、MAHDRL（含消融和启发式）、PD3QN、IRWS 的缓存截止期环境共同调用 `common.workflow_opt.task_subdeadlines`。每个任务先计算在各个 VM 上的输入传输、计算和输出传输时长，再对 VM 时长取算术平均，使用 Latest-Finish 从后继向前逆推。汇点子截止期等于工作流截止期；不执行 `max(LF, local_EF)` 下界修正，也不替换成平均 PC、平均带宽下的时长。
+
+此修改保持工作流截止期与 alpha 采样方式不变。任务到达时尚未确定 VM 放置，子截止期估算包含全部父任务输入；实际执行仍使用仅同 VM 减免的通信规则。验证命令：`.\.venv\Scripts\python.exe -m unittest common.test_task_deadlines`。

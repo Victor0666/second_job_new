@@ -33,7 +33,7 @@ try:
 except Exception:
     import gym
 
-from common.workflow_opt import validate_deadline_cache
+from common.workflow_opt import validate_deadline_cache, task_subdeadlines
 from common.workflow_opt import (
     LoadRecord,
     energy_from_records,
@@ -851,7 +851,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 wf.deadline = float(arr_t + ddl_alpha_i * makespan_ref)
             else:
                 bw_mean_bps = bw_mean * 1e6
-                local_EF = []
+                fallback_durations = []
                 for t in tasks:
                     in_bits_total = float((t.ext_in_bits or 0.0) + (t.from_parents_bits or 0.0))
                     dur = (
@@ -859,8 +859,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
                         + float(t.workload_mi) / max(pc_mean, 1.0)
                         + float(t.out_file_size_sum_bits) / max(bw_mean_bps, 1e-9)
                     )
-                    local_EF.append(dur)
-                M_avg = float(np.sum(local_EF))
+                    fallback_durations.append(dur)
+                M_avg = float(np.sum(fallback_durations))
                 wf.deadline = float(arr_t + ddl_alpha_i * M_avg)
 
             self.wf_deadline_abs[wf_id] = float(wf.deadline)
@@ -878,71 +878,14 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 self.task_ready_time.append(0.0)
                 self.task_end_time.append(0.0)
 
-            # ---------- task sub-deadlines：Latest-Finish 倒推 ----------
-            n_local = len(tasks)
-            bw_mean_bps = (bw_mean * 1e6) if n_local > 0 else 1.0
-
-            indeg = [len(t.parents) for t in tasks]
-            children = [[] for _ in range(n_local)]
-            for i, t in enumerate(tasks):
-                for p in t.parents:
-                    children[p].append(i)
-
-            q = [i for i in range(n_local) if indeg[i] == 0]
-            topo = []
-            while q:
-                u = q.pop(0)
-                topo.append(u)
-                for v in children[u]:
-                    indeg[v] -= 1
-                    if indeg[v] == 0:
-                        q.append(v)
-            if len(topo) != n_local:
-                topo = list(range(n_local))
-
-            local_EF = [0.0] * n_local
-            P = [0.0] * n_local
-            for i in topo:
-                ti = tasks[i]
-                in_bits_total = float((ti.ext_in_bits or 0.0) + (ti.from_parents_bits or 0.0))
-                dur = (
-                    in_bits_total / max(bw_mean_bps, 1e-9)
-                    + float(ti.workload_mi) / max(pc_mean, 1.0)
-                    + float(ti.out_file_size_sum_bits) / max(bw_mean_bps, 1e-9)
-                )
-                P[i] = dur
-                est_start = 0.0
-                if ti.parents:
-                    est_start = max(local_EF[p] for p in ti.parents)
-                local_EF[i] = est_start + dur
-
-            D_wf_rel = float(wf.deadline - arr_t)
-            LF = [0.0] * n_local
-            LS = [0.0] * n_local
-
-            is_sink = [len(children[i]) == 0 for i in range(n_local)]
-            for i in range(n_local):
-                if is_sink[i]:
-                    LF[i] = D_wf_rel
-                    LS[i] = LF[i] - P[i]
-
-            for i in reversed(topo):
-                if is_sink[i]:
-                    continue
-                if len(children[i]) > 0:
-                    LF[i] = min(LS[j] for j in children[i])
-                else:
-                    LF[i] = D_wf_rel
-                LS[i] = LF[i] - P[i]
-
-            for i in range(n_local):
-                LF[i] = max(LF[i], local_EF[i])
-
-            task_deadlines_abs = []
-            for local_id in range(n_local):
-                abs_deadline = float(arr_t + LF[local_id])
-                self.task_baseline_finish.append(abs_deadline)
-                task_deadlines_abs.append((int(local_id), abs_deadline))
+            subdeadlines = task_subdeadlines(
+                tasks,
+                [self.vms[vid].pc for vid in self.vm_ids],
+                [self.vms[vid].bw * 1e6 for vid in self.vm_ids],
+                arr_t, wf.deadline,
+            )
+            self.task_baseline_finish.extend(subdeadlines.tolist())
+            task_deadlines_abs = [(i, float(deadline)) for i, deadline in enumerate(subdeadlines)]
 
             self._log_workflow_deadlines(
                 wf_id=int(wf_id),
@@ -1039,7 +982,6 @@ class CloudWorkflowEnv_MARL(gym.Env):
         wf_id, local_task_id = self.task_meta[gid]
         wf_id = int(wf_id)
         local_task_id = int(local_task_id)
-
 
 
         tau_exec = self._task_duration(gid, vm_index_global)

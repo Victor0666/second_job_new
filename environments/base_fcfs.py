@@ -28,7 +28,7 @@ try:
 except Exception:
     import gym
 
-from common.workflow_opt import validate_deadline_cache
+from common.workflow_opt import validate_deadline_cache, task_subdeadlines
 from common.workflow_opt import Workflow
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 
@@ -36,35 +36,7 @@ from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_ti
 from environments.base_heft import (
     CloudWorkflowEnv_VMAgents as _BaseEnv,
     MANAGER_ACTION_TABLE,  # 训练脚本还会用
-    _topo_sort_local,      # 复用 topo/succ
 )
-
-
-def _avg_task_dur_over_all_vms(tasks, vm_pc, vm_bw_bps):
-    """
-    计算每个任务在“所有 VM 上 duration 的均值”：
-        dur(i,p)=in/bw + mi/pc + out/bw
-    返回 avg_dur: shape=(n_tasks,)
-    """
-    n = len(tasks)
-    if n == 0:
-        return np.zeros((0,), dtype=np.float64)
-
-    mi = np.array([float(t.workload_mi) for t in tasks], dtype=np.float64)
-    in_bits = np.array(
-        [float((getattr(t, "ext_in_bits", 0.0) or 0.0) + (getattr(t, "from_parents_bits", 0.0) or 0.0)) for t in tasks],
-        dtype=np.float64,
-    )
-    out_bits = np.array([float(getattr(t, "out_file_size_sum_bits", 0.0) or 0.0) for t in tasks], dtype=np.float64)
-
-    bw = vm_bw_bps.reshape(1, -1)  # [1,P]
-    pc = vm_pc.reshape(1, -1)      # [1,P]
-    dur = (
-        in_bits.reshape(-1, 1) / np.maximum(bw, 1e-12)
-        + mi.reshape(-1, 1) / np.maximum(pc, 1e-12)
-        + out_bits.reshape(-1, 1) / np.maximum(bw, 1e-12)
-    )
-    return dur.mean(axis=1)  # [n]
 
 
 class CloudWorkflowEnv_VMAgents(_BaseEnv):
@@ -227,41 +199,11 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
                 raise ValueError(f"Unsupported deadline_mode: {self.deadline_mode}")
 
             # ========== 2) 任务子 deadline：由 wf.deadline 倒推（Latest-Finish 反推） ==========
-            n_local = len(tasks)
-            topo, succ = _topo_sort_local(tasks)
+            subdeadlines = task_subdeadlines(
+                tasks, self._heft_vm_pc, self._heft_vm_bw_bps, arr_t, wf.deadline,
+            )
+            self.task_baseline_finish.extend(subdeadlines.tolist())
 
-            avg_dur = _avg_task_dur_over_all_vms(tasks, self._heft_vm_pc, self._heft_vm_bw_bps)  # [n]
-            # 相对 wf deadline
-            D_wf_rel = float(wf.deadline - arr_t)
-
-            # Latest Finish / Latest Start
-            LF = np.zeros((n_local,), dtype=np.float64)
-            LS = np.zeros((n_local,), dtype=np.float64)
-            is_sink = np.array([len(succ[i]) == 0 for i in range(n_local)], dtype=bool)
-
-            # sink init
-            for i in range(n_local):
-                if is_sink[i]:
-                    LF[i] = D_wf_rel
-                    LS[i] = LF[i] - avg_dur[i]
-
-            # reverse topo
-            for u in reversed(topo):
-                if is_sink[u]:
-                    continue
-                if len(succ[u]) > 0:
-                    min_LS_child = float(np.min(LS[np.array(succ[u], dtype=np.int32)]))
-                    LF[u] = min_LS_child
-                else:
-                    LF[u] = D_wf_rel
-                LS[u] = LF[u] - avg_dur[u]
-
-            # 绝对 deadline 写入 task_baseline_finish（按 local_id 顺序）
-            for local_id in range(n_local):
-                abs_deadline = float(arr_t + LF[local_id])
-                self.task_baseline_finish.append(abs_deadline)
-
-            # ========== 3) 扁平化写入 env arrays（与原 env 一致） ==========
             base = len(self.task_meta)
             for t in tasks:
                 self.task_meta.append((wf.workflow_id, t.task_id))

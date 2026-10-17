@@ -12,6 +12,7 @@ workflow_opt.py
 """
 
 import networkx as nx
+import numpy as np
 from dataclasses import dataclass
 
 BITS_PER_MB = 1024.0 * 1024.0 * 8.0
@@ -86,6 +87,42 @@ class Workflow:
             for p in self.graph.predecessors(tid):
                 pred_rank = max(pred_rank, self.tasks[p].downward_rank or 0.0)
             t.downward_rank = self_time + pred_rank
+
+
+def task_subdeadlines(tasks, vm_pc_mi_s, vm_bw_bps, arrival_time, workflow_deadline):
+    """Absolute Latest-Finish deadlines using mean execution time across VMs.
+
+    Placements are unknown at workflow arrival, so include all input/output
+    data in each VM duration. Do not clamp deadlines to local earliest finish.
+    """
+    n = len(tasks)
+    if n == 0:
+        return np.zeros((0,), dtype=np.float64)
+    pc = np.asarray(vm_pc_mi_s, dtype=np.float64).reshape(1, -1)
+    bw = np.asarray(vm_bw_bps, dtype=np.float64).reshape(1, -1)
+    mi = np.array([float(t.workload_mi) for t in tasks], dtype=np.float64)
+    in_bits = np.array([
+        float((getattr(t, "ext_in_bits", 0.0) or 0.0)
+              + (getattr(t, "from_parents_bits", 0.0) or 0.0)) for t in tasks
+    ], dtype=np.float64)
+    out_bits = np.array([
+        float(getattr(t, "out_file_size_sum_bits", 0.0) or 0.0) for t in tasks
+    ], dtype=np.float64)
+    durations = (in_bits[:, None] / np.maximum(bw, 1e-12)
+                 + mi[:, None] / np.maximum(pc, 1e-12)
+                 + out_bits[:, None] / np.maximum(bw, 1e-12))
+    avg_duration = durations.mean(axis=1)
+    children = [list(getattr(t, "children", [])) for t in tasks]
+    graph = nx.DiGraph()
+    graph.add_nodes_from(range(n))
+    graph.add_edges_from((i, child) for i in range(n) for child in children[i])
+    latest_finish = np.full(n, float(workflow_deadline) - float(arrival_time), dtype=np.float64)
+    latest_start = np.zeros(n, dtype=np.float64)
+    for i in reversed(list(nx.topological_sort(graph))):
+        if children[i]:
+            latest_finish[i] = min(latest_start[child] for child in children[i])
+        latest_start[i] = latest_finish[i] - avg_duration[i]
+    return float(arrival_time) + latest_finish
 
 
 COMMUNICATION_MODEL = "same_vm_only_v1"

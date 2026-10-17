@@ -52,7 +52,7 @@ except Exception:
     from gym import spaces
 
 # === 统一能耗与工作流 ===
-from common.workflow_opt import LoadRecord, energy_from_records, Workflow
+from common.workflow_opt import LoadRecord, energy_from_records, Workflow, exec_time_components
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 from common.resource_opt import create_cluster
 
@@ -207,6 +207,7 @@ def _heft_makespan_and_finish_times(tasks, vm_pc, vm_bw_bps):
     # parents list for quick access
     parents = [list(getattr(tasks[i], "parents", [])) for i in range(n)]
 
+    placement = {}
     scheduled = 0
     while ready:
         _neg_r, u = heapq.heappop(ready)
@@ -218,11 +219,19 @@ def _heft_makespan_and_finish_times(tasks, vm_pc, vm_bw_bps):
 
         # compute EFT on all VMs
         st = np.maximum(vm_ready, ready_t)
-        ft = st + dur[u]  # [P]
+        candidate_durations = np.array([
+            exec_time_components(
+                tasks[u], float(vm_pc[j]), float(vm_bw_bps[j]) / 1e6,
+                parents_loc=placement, child_vm_id=j, zero_if_same_host=False,
+            )[-1]
+            for j in range(Pn)
+        ])
+        ft = st + candidate_durations
         p_star = int(np.argmin(ft))
         start[u] = float(st[p_star])
         finish[u] = float(ft[p_star])
         vm_ready[p_star] = finish[u]
+        placement[u] = (p_star, -1)
 
         scheduled += 1
         for v in succ[u]:
@@ -387,6 +396,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         self.total_energy = 0.0
         self.lifetime_energy = 0.0
         self._records = []
+        self.parents_loc_by_wf = {}
         self._energy_cache = 0.0
 
         # 保险丝阈值
@@ -639,17 +649,11 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             return float(r_host), float(r_vm), info
 
         vm_id = self.vm_ids[vm_global_idx]
-        bw_bps  = self.vms[vm_id].bw * 1e6
         pc_mi_s = self.vms[vm_id].pc
 
-        in_bits  = self.task_in_bits[tid]
-        out_bits = self.task_out_bits[tid]
         mi       = self.task_mi[tid]
 
-        t_upload   = in_bits  / max(bw_bps, 1e-9)
-        t_compute  = mi       / max(pc_mi_s, 1e-9)
-        t_download = out_bits / max(bw_bps, 1e-9)
-        duration = float(t_upload + t_compute + t_download)
+        duration = self._task_duration(tid, vm_global_idx)
 
         start_time = max(now, float(self.vm_available_at[vm_global_idx]))
         finish_time = start_time + duration
@@ -837,6 +841,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
 
         self.total_energy = 0.0
         self._records = []
+        self.parents_loc_by_wf = {}
         self._energy_cache = 0.0
 
         self._cur_tid = None
@@ -1165,17 +1170,10 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         sum_mi = float(np.sum([self.task_mi[x] for x in self.ready_task_ids])) if len(self.ready_task_ids) > 0 else 0.0
         urgent_cnt = 0
 
-        pc_mean = float(np.mean([self.vms[v].pc for v in self.vms])) if len(self.vms) > 0 else 1.0
-        bw_mean = float(np.mean([self.vms[v].bw for v in self.vms])) if len(self.vms) > 0 else 1.0
-        bw_bps  = bw_mean * 1e6
 
         slacks = []
         for x in self.ready_task_ids:
-            exp_t = (
-                self.task_in_bits[x]  / max(bw_bps, 1e-9)
-                + self.task_mi[x]     / max(pc_mean, 1.0)
-                + self.task_out_bits[x]/ max(bw_bps, 1e-9)
-            )
+            exp_t = float(np.mean([self._task_duration(x, j) for j in range(self.num_vms)]))
             wf_idx, _ = self.task_meta[x]
             wf = self.workflows[wf_idx]
             dl = getattr(wf, "deadline", None)
@@ -1233,13 +1231,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         else:
             durations = []
             for j in idle_indices:
-                vm_id = self.vm_ids[j]
-                bw_bps_vm  = self.vms[vm_id].bw * 1e6
-                pc_mi_s    = self.vms[vm_id].pc
-                t_upload   = in_bits  / max(bw_bps_vm, 1e-9)
-                t_compute  = mi       / max(pc_mi_s, 1e-9)
-                t_download = out_bits / max(bw_bps_vm, 1e-9)
-                durations.append(t_upload + t_compute + t_download)
+                durations.append(self._task_duration(tid, j))
             est_best = float(np.min(durations))
             est_mean = float(np.mean(durations))
 
@@ -1352,11 +1344,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             vm = self.vms[vid]
             idle_flag = 1.0 if self.vm_available_at[j] <= now + 1e-12 else 0.0
             avail_delay = max(0.0, float(self.vm_available_at[j] - now))
-            bw_bps_vm = vm.bw * 1e6
-            t_upload = in_bits / max(bw_bps_vm, 1e-9)
-            t_compute = mi / max(vm.pc, 1e-9)
-            t_download = out_bits / max(bw_bps_vm, 1e-9)
-            pred_finish = max(now, float(self.vm_available_at[j])) + t_upload + t_compute + t_download
+            pred_finish = max(now, float(self.vm_available_at[j])) + self._task_duration(tid, j)
 
             vm_block[slot] = np.array([
                 idle_flag,
@@ -1397,22 +1385,26 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         return float(dP * duration)
 
     # ---------------- 分配/辅助 ----------------
+    def _task_duration(self, task_id: int, vm_index: int) -> float:
+        wf_id, local_id = self.task_meta[task_id]
+        vm_id = self.vm_ids[vm_index]
+        vm = self.vms[vm_id]
+        return float(exec_time_components(
+            self.workflows[int(wf_id)].tasks[int(local_id)],
+            vm_pc_mi_s=float(vm.pc), vm_bw_Mb_s=float(vm.bw),
+            parents_loc=self.parents_loc_by_wf.get(int(wf_id), {}),
+            child_vm_id=int(vm_id), child_host_id=int(vm.host_id),
+            zero_if_same_vm=True, zero_if_same_host=False,
+        )[-1])
+
     def _assign_task_to_specific_vm(self, task_id, vm_index):
         vm_id = self.vm_ids[vm_index]
         now = self.current_time
-        bw_bps  = self.vms[vm_id].bw * 1e6
         pc_mi_s = self.vms[vm_id].pc
 
-        in_bits  = self.task_in_bits[task_id]
-        out_bits = self.task_out_bits[task_id]
-        mi       = self.task_mi[task_id]
-
-        t_upload   = in_bits  / max(bw_bps, 1e-9)
-        t_compute  = mi       / max(pc_mi_s, 1e-9)
-        t_download = out_bits / max(bw_bps, 1e-9)
 
         start_time = max(now, float(self.vm_available_at[vm_index]))
-        end_time   = start_time + t_upload + t_compute + t_download
+        end_time = start_time + self._task_duration(task_id, vm_index)
 
         self.task_state[task_id] = "Running"
         self.task_end_time[task_id] = end_time
@@ -1423,6 +1415,8 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
 
         host_id = self.vms[vm_id].host_id
         self._records.append(LoadRecord(start_time, end_time, host_id, pc_mi_s))
+        wf_id, local_id = self.task_meta[task_id]
+        self.parents_loc_by_wf.setdefault(int(wf_id), {})[int(local_id)] = (int(vm_id), int(host_id))
 
     def _vm_serial_order(self):
         avail = np.round(self.vm_available_at, 12)

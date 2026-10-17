@@ -88,6 +88,21 @@ class Workflow:
             t.downward_rank = self_time + pred_rank
 
 
+COMMUNICATION_MODEL = "same_vm_only_v1"
+
+
+def validate_deadline_cache(obj, path):
+    """Reject reference makespans computed under a different transfer model."""
+    if obj.get("meta", {}).get("communication_model") != COMMUNICATION_MODEL:
+        import re
+        match = re.search(r"task([SML])_res([SML])", str(path))
+        scenario = f" --task {match[1]} --resource {match[2]}" if match else " --task S --resource S"
+        raise ValueError(
+            f"Deadline cache uses an outdated communication model: {path}. "
+            f"Regenerate with: .\\run.cmd common/precompute_deadlines.py{scenario}"
+        )
+
+
 def exec_time_components(
     task,
     vm_pc_mi_s: float,
@@ -97,18 +112,18 @@ def exec_time_components(
     child_vm_id: int | None = None,
     child_host_id: int | None = None,
     zero_if_same_vm: bool = True,
-    zero_if_same_host: bool = True,
+    zero_if_same_host: bool = False,
 ):
     """
     计算 (tau_in, tau_comp, tau_out, tau_exec)
     - task.workload_mi：MI
     - 带宽换算：bits/s = vm_bw_Mb_s * 1e6
-    - 若提供 parents_loc / child_{vm,host}，可在“同 VM/同 Host”时将父→子传输记为 0。
+    - 若提供 parents_loc / child_{vm,host}，可在“同 VM（同主机不同 VM 不减免）”时将父→子传输记为 0。
       否则默认将 task.from_parents_bits 全部通过网络传输。
     """
     bps = max(vm_bw_Mb_s, 1e-9) * 1e6
 
-    # 来自父任务的数据量（考虑同机/同VM零传输的近似）
+    # 来自父任务的数据量（考虑同 VM 零传输的近似）
     from_parents_bits_eff = 0.0
     if parents_loc is None or (child_vm_id is None and child_host_id is None):
         from_parents_bits_eff = task.from_parents_bits
@@ -122,7 +137,7 @@ def exec_time_components(
             same_vm = (child_vm_id is not None and p_vm == child_vm_id)
             same_host = (child_host_id is not None and p_host == child_host_id)
             if (same_vm and zero_if_same_vm) or (same_host and zero_if_same_host):
-                # 近似：同 VM / 同 Host 视为 0 成本
+                # The experiment enables only the same-VM exemption.
                 pass
             else:
                 from_parents_bits_eff += bits

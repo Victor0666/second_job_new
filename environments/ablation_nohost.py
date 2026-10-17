@@ -83,11 +83,7 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
             idle_flag = 1.0 if self.vm_available_at[j] <= now + 1e-12 else 0.0
             avail_delay = max(0.0, float(self.vm_available_at[j] - now))
 
-            bw_bps_vm = vm.bw * 1e6
-            t_upload = in_bits / max(bw_bps_vm, 1e-9)
-            t_compute = mi / max(vm.pc, 1e-9)
-            t_download = out_bits / max(bw_bps_vm, 1e-9)
-            pred_finish = max(now, float(self.vm_available_at[j])) + t_upload + t_compute + t_download
+            pred_finish = max(now, float(self.vm_available_at[j])) + self._task_duration(tid, j)
 
             # host_block 每行含义：
             # [total_pc_n, host_load, host_idle_vm, host_soonest_delay, host_running_ratio]
@@ -180,17 +176,10 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
         host_id = int(self.vms[vm_id].host_id)
         self._cur_host_id = host_id  # 仅为兼容内部逻辑/信息记录
 
-        bw_bps = self.vms[vm_id].bw * 1e6
-        pc_mi_s = self.vms[vm_id].pc
 
-        in_bits = self.task_in_bits[tid]
-        out_bits = self.task_out_bits[tid]
         mi = self.task_mi[tid]
 
-        t_upload = in_bits / max(bw_bps, 1e-9)
-        t_compute = mi / max(pc_mi_s, 1e-9)
-        t_download = out_bits / max(bw_bps, 1e-9)
-        duration = float(t_upload + t_compute + t_download)
+        duration = self._task_duration(tid, j)
 
         start_time = max(now, float(self.vm_available_at[j]))
         finish_time = start_time + duration

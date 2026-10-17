@@ -54,6 +54,7 @@ except Exception:
     import gym
 
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
+from common.workflow_opt import validate_deadline_cache
 from common.workflow_opt import Workflow, exec_time_components, LoadRecord, energy_from_records
 from common.resource_opt import create_cluster
 
@@ -303,6 +304,7 @@ class IRWSEnvRouteA(gym.Env):
             raise FileNotFoundError(f"deadline cache not found: {path}")
         with open(path, "r", encoding="utf-8") as f:
             obj = json.load(f)
+        validate_deadline_cache(obj, path)
 
         cache: Dict[int, dict] = {}
         if isinstance(obj, dict) and "data" in obj and isinstance(obj["data"], list):
@@ -784,7 +786,7 @@ class IRWSEnvRouteA(gym.Env):
             child_vm_id=int(vm_id),
             child_host_id=int(host_id),
             zero_if_same_vm=True,
-            zero_if_same_host=True,
+            zero_if_same_host=False,
         )
         dur = float(tau_exec)
         t1 = float(t0 + dur)
@@ -1140,7 +1142,7 @@ class IRWSEnvRouteA(gym.Env):
                 child_vm_id=int(vm_id),
                 child_host_id=int(vm.host_id),
                 zero_if_same_vm=True,
-                zero_if_same_host=True,
+                zero_if_same_host=False,
             )
             est_exec = float(tau_exec)
             est_finish = float(max(t, float(self.vm_available_at[vm_id])) + est_exec)

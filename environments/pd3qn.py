@@ -19,6 +19,7 @@ except Exception:
 
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 from common.resource_opt import create_cluster
+from common.workflow_opt import validate_deadline_cache
 from common.workflow_opt import Workflow, exec_time_components, LoadRecord
 
 
@@ -301,6 +302,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
             raise FileNotFoundError(f"deadline cache not found: {path}")
         with open(path, "r", encoding="utf-8") as f:
             obj = json.load(f)
+        validate_deadline_cache(obj, path)
 
         cache: Dict[int, Dict[str, Any]] = {}
         if isinstance(obj, dict) and "data" in obj and isinstance(obj["data"], list):
@@ -795,10 +797,10 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
             vm_pc_mi_s=float(vm.pc),
             vm_bw_Mb_s=float(vm.bw),
             parents_loc=parents_loc,
-            child_vm_id=None,
-            child_host_id=None,
+            child_vm_id=int(vm_id),
+            child_host_id=int(host_id),
             zero_if_same_vm=True,
-            zero_if_same_host=True,
+            zero_if_same_host=False,
         )
 
         wf_id, _ = self.task_meta[gid]

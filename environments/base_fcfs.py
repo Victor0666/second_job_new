@@ -28,6 +28,7 @@ try:
 except Exception:
     import gym
 
+from common.workflow_opt import validate_deadline_cache
 from common.workflow_opt import Workflow
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 
@@ -104,6 +105,7 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
 
         with open(path, "r", encoding="utf-8") as f:
             obj = json.load(f)
+        validate_deadline_cache(obj, path)
 
         # 兼容两种结构：
         # 1) {"meta":..., "data":[{"seed":..,"wf_makespans":[..],...}, ...]}

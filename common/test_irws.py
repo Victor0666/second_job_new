@@ -47,7 +47,7 @@ class IRWSNumberingTests(unittest.TestCase):
 
     def test_execution_and_prediction_for_first_and_later_workflows(self):
         for wf_id in (0, 1):
-            for vm_id, expected in ((0, 10.0), (1, 10.0), (2, 18.0)):
+            for vm_id, expected in ((0, 10.0), (1, 18.0), (2, 18.0)):
                 with self.subTest(workflow=wf_id, vm=vm_id):
                     env = self.make_env()
                     base = wf_id * 10
@@ -59,7 +59,7 @@ class IRWSNumberingTests(unittest.TestCase):
                     env.select_task(base + 1)
                     obs = env.get_vm_obs_and_mask()["obs"]
                     vm_feats = obs[7:].reshape(env.num_vms, 6)
-                    np.testing.assert_allclose(vm_feats[:, 4], [10.0, 10.0, 18.0])
+                    np.testing.assert_allclose(vm_feats[:, 4], [10.0, 18.0, 18.0])
                     _, _, _, _, info = env.step(vm_id)
                     self.assertEqual(info["dur"], expected)
                     self.assertEqual(info["start"], 1.0)
@@ -81,7 +81,7 @@ class IRWSNumberingTests(unittest.TestCase):
         self.assertEqual(env.task_state[2], "unReady")
         env.select_task(12)
         vm_feats = env.get_vm_obs_and_mask()["obs"][7:].reshape(env.num_vms, 6)
-        np.testing.assert_allclose(vm_feats[:, 4], [16.0, 16.0, 12.0])
+        np.testing.assert_allclose(vm_feats[:, 4], [16.0, 18.0, 12.0])
         _, _, _, _, info = env.step(2)
         self.assertEqual(info["dur"], 12.0)
         self.assertEqual(info["start"], 4.0)
@@ -90,7 +90,7 @@ class IRWSNumberingTests(unittest.TestCase):
         scenario = Scenario()
         env = IRWSEnvRouteA(
             dax_paths=scenario.dax_paths(), random_seed=2,
-            deadline_cache_path=str(scenario.cache_path), normalize=False,
+            deadline_mode="none", normalize=False,
         )
         env.reset()
         for _ in range(10000):

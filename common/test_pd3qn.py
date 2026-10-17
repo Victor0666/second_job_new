@@ -102,7 +102,7 @@ class PD3QNCompletionTests(unittest.TestCase):
         scenario = Scenario(task="S", resource="S")
         env = CloudWorkflowEnv_PD3QN_Cost(
             dax_paths=scenario.dax_paths(), random_seed=2,
-            deadline_cache_path=str(scenario.cache_path),
+            deadline_mode="none",
         )
         starts = {}
         for _ in range(10000):

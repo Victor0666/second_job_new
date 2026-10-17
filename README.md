@@ -118,3 +118,20 @@ MARL 额外保留 `--deadline-cache`、`--ckpt-global`、`--ckpt-local`、`--out
 公共函数 `energy_from_records(records, hosts, start_time=..., end_time=...)` 接收明确的共同窗口。主算法及消融的总能耗奖励和分主机奖励使用同一窗口；IRWS、PD3QN 的步骤能耗奖励包含分配增量及推进期间全部主机的空闲能耗，`info.r_energy_total` 对应该分量。原有 `r_energy_host` 保留作所选主机分配增量的诊断字段。
 
 能耗窗口回归检查：`.\.venv\Scripts\python.exe -m unittest common.test_energy`。历史模型、日志和统计图表不应与修正后的新结果混用。
+
+## 统一父子通信规则
+
+全部算法只在父子任务分配到同一 VM 时忽略父子数据传输；同主机的不同 VM 和不同主机均计入传输。外部输入和任务输出仍按原规则计费。实际执行、VM 完成时间预测、HEFT 参考调度和 FCFS/FIFS 截止期基准均使用这一规则。
+
+本次通信模型变更会改变截止期基准 makespan。旧 JSON 缓存没有 `meta.communication_model = "same_vm_only_v1"` 标记，环境会拒绝加载并提示重新生成。旧缓存文件保留，未自动覆盖；正式重跑之前，请在项目根目录为九种任务/资源组合重新预计算：
+
+```powershell
+foreach ($taskSize in 'S', 'M', 'L') {
+    foreach ($resourceSize in 'S', 'M', 'L') {
+        .\run.cmd common/precompute_deadlines.py --task $taskSize --resource $resourceSize
+        if ($LASTEXITCODE -ne 0) { throw "截止期缓存生成失败" }
+    }
+}
+```
+
+上面的预计算覆盖各场景的正式 `seed0-1000` 缓存；仅 Tight/Medium/Loose 不同的实验共用同一任务/资源基准。回归测试：`.\.venv\Scripts\python.exe -m unittest common.test_communication`。

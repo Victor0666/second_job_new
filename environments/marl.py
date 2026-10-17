@@ -6,7 +6,7 @@ MARL 环境（两级）对齐 HRL0.75 公平口径版：
 
 对齐点（A-H）：
 A) deadline_mode=cache_fcfs：wf.deadline = arrival + alpha * makespan_ref（来自离线 FCFS+VM-first cache JSON）
-B) exec_time_components + parents_loc：考虑同 VM/同 Host 近似零传输
+B) exec_time_components + parents_loc：考虑仅同 VM 近似零传输
 C) idle energy：时间推进时写入 host 的 0-load LoadRecord 段
 D) reset(seed) 绑定 RNG；payload seed = episode_seed + wf_index_in_episode
 E) get_episode_metrics()：统一输出能耗/工期/迟交等指标
@@ -33,6 +33,7 @@ try:
 except Exception:
     import gym
 
+from common.workflow_opt import validate_deadline_cache
 from common.workflow_opt import (
     LoadRecord,
     energy_from_records,
@@ -216,6 +217,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         with open(path, "r", encoding="utf-8") as f:
             obj = json.load(f)
+        validate_deadline_cache(obj, path)
 
         data = obj.get("data", [])
         cache = {}
@@ -1015,6 +1017,18 @@ class CloudWorkflowEnv_MARL(gym.Env):
     # =========================================================
     # 分配
     # =========================================================
+    def _task_duration(self, task_id: int, vm_index: int) -> float:
+        wf_id, local_id = self.task_meta[task_id]
+        vm_id = self.vm_ids[vm_index]
+        vm = self.vms[vm_id]
+        return float(exec_time_components(
+            self.workflows[int(wf_id)].tasks[int(local_id)],
+            vm_pc_mi_s=float(vm.pc), vm_bw_Mb_s=float(vm.bw),
+            parents_loc=self.parents_loc_by_wf.get(int(wf_id), {}),
+            child_vm_id=int(vm_id), child_host_id=int(vm.host_id),
+            zero_if_same_vm=True, zero_if_same_host=False,
+        )[-1])
+
     def _assign_task_to_vm(self, gid: int, vm_index_global: int) -> float:
         vid = int(self.vm_ids[vm_index_global])
         now = float(self.current_time)
@@ -1026,21 +1040,9 @@ class CloudWorkflowEnv_MARL(gym.Env):
         wf_id = int(wf_id)
         local_task_id = int(local_task_id)
 
-        wf = self.workflows[wf_id]
-        task_obj = wf.tasks[local_task_id]
 
-        parents_loc = self.parents_loc_by_wf.get(wf_id, {})
 
-        tau_in, tau_comp, tau_out, tau_exec = exec_time_components(
-            task_obj,
-            vm_pc_mi_s=float(vm.pc),
-            vm_bw_Mb_s=float(vm.bw),
-            parents_loc=parents_loc,
-            child_vm_id=int(vid),
-            child_host_id=int(host_id),
-            zero_if_same_vm=True,
-            zero_if_same_host=True,
-        )
+        tau_exec = self._task_duration(gid, vm_index_global)
 
         start_time = max(now, float(self.vm_available_at[vm_index_global]))
         end_time = float(start_time + float(tau_exec))
@@ -1104,9 +1106,6 @@ class CloudWorkflowEnv_MARL(gym.Env):
         host_load_mean = float(np.mean(host_load_list)) if host_load_list else 0.0
         host_running_ratio_mean = float(np.mean(host_running_ratio_list)) if host_running_ratio_list else 0.0
 
-        pc_mean = float(np.mean([self.vms[v].pc for v in self.vms])) if len(self.vms) > 0 else 1.0
-        bw_mean = float(np.mean([self.vms[v].bw for v in self.vms])) if len(self.vms) > 0 else 1.0
-        bw_bps = bw_mean * 1e6
 
         slacks = []
         for tid in self.ready_task_ids:
@@ -1117,11 +1116,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 continue
             task_obj = wf.tasks[int(local_id)]
             in_bits_total = float((task_obj.ext_in_bits or 0.0) + (task_obj.from_parents_bits or 0.0))
-            exp_t = (
-                in_bits_total / max(bw_bps, 1e-9)
-                + float(task_obj.workload_mi) / max(pc_mean, 1.0)
-                + float(task_obj.out_file_size_sum_bits) / max(bw_bps, 1e-9)
-            )
+            exp_t = float(np.mean([self._task_duration(tid, j) for j in range(self.num_vms)]))
             slacks.append(float(dl) - (now + exp_t))
 
         if len(slacks) > 0:
@@ -1160,9 +1155,6 @@ class CloudWorkflowEnv_MARL(gym.Env):
         avg_wait = float(np.mean(waits)) if len(waits) > 0 else 0.0
         max_wait = float(np.max(waits)) if len(waits) > 0 else 0.0
 
-        pc_mean = float(np.mean([self.vms[v].pc for v in self.vms])) if len(self.vms) > 0 else 1.0
-        bw_mean = float(np.mean([self.vms[v].bw for v in self.vms])) if len(self.vms) > 0 else 1.0
-        bw_bps = bw_mean * 1e6
 
         urgent_cnt = 0
         slacks = []
@@ -1174,11 +1166,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 continue
             task_obj = wf.tasks[int(local_id)]
             in_bits_total = float((task_obj.ext_in_bits or 0.0) + (task_obj.from_parents_bits or 0.0))
-            exp_t = (
-                in_bits_total / max(bw_bps, 1e-9)
-                + float(task_obj.workload_mi) / max(pc_mean, 1.0)
-                + float(task_obj.out_file_size_sum_bits) / max(bw_bps, 1e-9)
-            )
+            exp_t = float(np.mean([self._task_duration(x, j) for j in range(self.num_vms)]))
             s = float(dl) - (now + exp_t)
             slacks.append(s)
             if s < 0:
@@ -1220,12 +1208,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
             if self.vm_available_at[vmg] > now + 1e-12:
                 continue
             vm_id = self.vm_ids[vmg]
-            bw_bps_vm = self.vms[vm_id].bw * 1e6
-            pc_mi_s = self.vms[vm_id].pc
-            t_upload = in_bits / max(bw_bps_vm, 1e-9)
-            t_compute = mi / max(pc_mi_s, 1e-9)
-            t_download = out_bits / max(bw_bps_vm, 1e-9)
-            durations.append(t_upload + t_compute + t_download)
+            durations.append(self._task_duration(tid, vmg))
 
         est_best = float(np.min(durations)) if len(durations) > 0 else 0.0
         est_mean = float(np.mean(durations)) if len(durations) > 0 else 0.0
@@ -1297,11 +1280,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
             idle_flag = 1.0 if self.vm_available_at[vmg] <= now + 1e-12 else 0.0
             avail_delay = max(0.0, float(self.vm_available_at[vmg] - now))
 
-            bw_bps_vm = vm.bw * 1e6
-            t_upload = in_bits / max(bw_bps_vm, 1e-9)
-            t_compute = mi / max(vm.pc, 1e-9)
-            t_download = out_bits / max(bw_bps_vm, 1e-9)
-            pred_finish = max(now, float(self.vm_available_at[vmg])) + t_upload + t_compute + t_download
+            pred_finish = max(now, float(self.vm_available_at[vmg])) + self._task_duration(tid, vmg)
 
             vm_block[slot] = np.array(
                 [

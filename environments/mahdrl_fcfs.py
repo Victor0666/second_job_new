@@ -34,6 +34,7 @@ try:
 except Exception:
     import gym
 
+from common.workflow_opt import validate_deadline_cache
 from common.workflow_opt import Workflow
 from common.read_xml_opt_Tsize import load_workflow_from_dax
 
@@ -140,6 +141,7 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
 
         with open(path, "r", encoding="utf-8") as f:
             obj = json.load(f)
+        validate_deadline_cache(obj, path)
 
         cache = {}
         if isinstance(obj, dict) and "data" in obj and isinstance(obj["data"], list):

@@ -513,6 +513,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
     # ---------------- core loop helpers ----------------
     def _observe_until_decision(self):
         while True:
+            self._process_completions()
             self._add_workflow_if_arrived()
 
             if self._has_decision():
@@ -536,15 +537,18 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         t_candidates = []
         if self.next_arrival_idx < len(self.arrival_times):
             t_candidates.append(float(self.arrival_times[self.next_arrival_idx]))
-        t_candidates.append(float(np.min(self.vm_available_at)))
-        t_candidates = [t for t in t_candidates if t > self.current_time + 1e-12]
+        t_candidates.extend(
+            float(self.task_end_time[gid])
+            for gid, state in enumerate(self.task_state) if state == "Running"
+        )
+        t_candidates = [t for t in t_candidates if t > self.current_time]
         if len(t_candidates) == 0:
-            return self.current_time
+            raise RuntimeError("Unfinished tasks remain but no arrival or completion event is pending")
         return float(min(t_candidates))
 
     def _advance_time(self, new_t: float):
         new_t = float(new_t)
-        if new_t <= self.current_time + 1e-12:
+        if new_t <= self.current_time:
             return
 
         if not self.energy_window_started:
@@ -559,13 +563,22 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         self.current_time = new_t
 
     def _check_done(self) -> bool:
-        if self.workflows_per_episode is not None and self.completed_workflows >= int(self.workflows_per_episode):
-            if len(self.ready_task_ids) == 0:
-                for st in self.task_state:
-                    if st != "Finished":
-                        return False
-                return True
-        return False
+        return (
+            self.next_arrival_idx >= len(self.arrival_times)
+            and not self.ready_task_ids
+            and all(state == "Finished" for state in self.task_state)
+        )
+
+    def _process_completions(self):
+        for gid, state in enumerate(self.task_state):
+            if state != "Running" or self.task_end_time[gid] > self.current_time:
+                continue
+            self.task_state[gid] = "Finished"
+            self._unlock_children(gid)
+            wf_id, _ = self.task_meta[gid]
+            self.wf_remaining_tasks[int(wf_id)] -= 1
+            if self.wf_remaining_tasks[int(wf_id)] == 0:
+                self.completed_workflows += 1
 
     # ---------------- add workflow with cache deadline ----------------
     def _add_workflow_if_arrived(self):
@@ -752,7 +765,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         for c_local in children_local:
             c_local = int(c_local)
             c_gid = int(base + c_local)
-            if self.task_state[c_gid] == "Finished":
+            if self.task_state[c_gid] != "unReady":
                 continue
 
             ok = True
@@ -802,13 +815,19 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
             zero_if_same_host=True,
         )
 
-        start_t = float(max(self.current_time, self.vm_available_at[vm_idx]))
+        wf_id, _ = self.task_meta[gid]
+        base = self.wf_task_base[int(wf_id)]
+        parents_end = max(
+            (self.task_end_time[base + int(p)] for p in self.task_parents[gid]),
+            default=0.0,
+        )
+        start_t = float(max(self.current_time, self.vm_available_at[vm_idx], parents_end))
         end_t = float(start_t + tau_exec)
 
         self.records.append(LoadRecord(start_time=start_t, end_time=end_t, server_id=int(host_id), vm_pc=float(vm.pc)))
         self.vm_available_at[vm_idx] = end_t
 
-        self.task_state[gid] = "Finished"
+        self.task_state[gid] = "Running"
         self.task_end_time[gid] = end_t
 
         self.task_assigned_vm_id[gid] = int(vm_id)
@@ -816,13 +835,6 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
 
         if gid in self.ready_task_ids:
             self.ready_task_ids.remove(gid)
-
-        self._unlock_children(gid)
-
-        wf_id, _ = self.task_meta[gid]
-        self.wf_remaining_tasks[int(wf_id)] -= 1
-        if self.wf_remaining_tasks[int(wf_id)] <= 0:
-            self.completed_workflows += 1
 
         # 浅对齐：仍然使用当前 assignment 执行区间对应的 host 增量能耗
         dE_host = self._add_interval_load(host_id, start_t, end_t, float(vm.pc))

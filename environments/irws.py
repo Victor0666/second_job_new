@@ -269,6 +269,7 @@ class IRWSEnvRouteA(gym.Env):
         self.task_up_rank: List[float] = []
         self.task_down_rank: List[float] = []
 
+        # Workflow-local dependency IDs; runtime arrays and placements use global IDs.
         self.task_parents: List[List[int]] = []
         self.task_children: List[List[int]] = []
         self.ready_task_ids: List[int] = []
@@ -742,12 +743,8 @@ class IRWSEnvRouteA(gym.Env):
                 self.task_up_rank.append(float(getattr(t, "upward_rank", 0.0) or 0.0))
                 self.task_down_rank.append(float(getattr(t, "downward_rank", 0.0) or 0.0))
 
-                parents_local = list(getattr(t, "parents", []))
-                children_local = list(getattr(t, "children", []))
-                parents_g = [base + int(p) for p in parents_local]
-                children_g = [base + int(c) for c in children_local]
-                self.task_parents.append(parents_g)
-                self.task_children.append(children_g)
+                self.task_parents.append([int(p) for p in getattr(t, "parents", [])])
+                self.task_children.append([int(c) for c in getattr(t, "children", [])])
 
                 abs_deadline = float(arr_t + LF[int(local_id)])
                 self.task_baseline_finish.append(abs_deadline)
@@ -772,15 +769,13 @@ class IRWSEnvRouteA(gym.Env):
         t0 = max(t0, float(self.vm_available_at[vm_id]))
         t0 = max(t0, float(self.task_ready_time[gid]))
 
+        base = gid - int(self.task_meta[gid].local_id)
         parents = self.task_parents[gid]
         if parents:
-            pe = [float(self.task_end_time[p]) for p in parents]
+            pe = [float(self.task_end_time[base + p]) for p in parents]
             t0 = max(t0, float(max(pe)))
 
-        parents_loc = {}
-        for p in parents:
-            if p in self.task_placement:
-                parents_loc[p] = self.task_placement[p]
+        parents_loc = self._build_parents_loc(gid)
 
         tau_in, tau_comp, tau_out, tau_exec = exec_time_components(
             self._task_obj_from_gid(gid),
@@ -836,6 +831,13 @@ class IRWSEnvRouteA(gym.Env):
             "reward_mode": "align_modified_pd3qn",
         }
         return float(reward), info
+
+    def _build_parents_loc(self, gid: int) -> Dict[int, Tuple[int, int]]:
+        base = gid - int(self.task_meta[gid].local_id)
+        return {
+            p: self.task_placement[base + p]
+            for p in self.task_parents[gid] if base + p in self.task_placement
+        }
 
     def _task_obj_from_gid(self, gid: int):
         ti = self.task_meta[gid]
@@ -907,12 +909,14 @@ class IRWSEnvRouteA(gym.Env):
 
         for gid in finished_now:
             self.task_state[gid] = "Finished"
-            for c in self.task_children[gid]:
+            base = gid - int(self.task_meta[gid].local_id)
+            for c_local in self.task_children[gid]:
+                c = base + c_local
                 if self.task_state[c] != "unReady":
                     continue
                 ok = True
                 for p in self.task_parents[c]:
-                    if self.task_state[p] != "Finished":
+                    if self.task_state[base + p] != "Finished":
                         ok = False
                         break
                 if ok:
@@ -1118,17 +1122,13 @@ class IRWSEnvRouteA(gym.Env):
         task_feats = self._build_task_features([gid])[0]
         ddl = float(self.task_baseline_finish[gid])
 
+        parents_loc = self._build_parents_loc(gid)
         vm_feats = []
         for vm_id in range(self.num_vms):
             vm = self.vms[vm_id]
             idle = 1.0 if self.vm_available_at[vm_id] <= t + 1e-12 else 0.0
             avail_dt = float(max(0.0, self.vm_available_at[vm_id] - t))
 
-            parents = self.task_parents[gid]
-            parents_loc = {}
-            for p in parents:
-                if p in self.task_placement:
-                    parents_loc[p] = self.task_placement[p]
             _ti, _tc, _to, tau_exec = exec_time_components(
                 self._task_obj_from_gid(gid),
                 vm_pc_mi_s=float(vm.pc),

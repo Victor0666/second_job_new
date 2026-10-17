@@ -141,3 +141,19 @@ foreach ($taskSize in 'S', 'M', 'L') {
 MARL、MAHDRL（含消融和启发式）、PD3QN、IRWS 的缓存截止期环境共同调用 `common.workflow_opt.task_subdeadlines`。每个任务先计算在各个 VM 上的输入传输、计算和输出传输时长，再对 VM 时长取算术平均，使用 Latest-Finish 从后继向前逆推。汇点子截止期等于工作流截止期；不执行 `max(LF, local_EF)` 下界修正，也不替换成平均 PC、平均带宽下的时长。
 
 此修改保持工作流截止期与 alpha 采样方式不变。任务到达时尚未确定 VM 放置，子截止期估算包含全部父任务输入；实际执行仍使用仅同 VM 减免的通信规则。验证命令：`.\.venv\Scripts\python.exe -m unittest common.test_task_deadlines`。
+
+## 配对截止期实例
+
+所有实验算法使用 `common.workflow_opt.sample_deadline_alpha`，由 episode 种子、工作流编号和同一概率分布确定 alpha；不消耗环境随机流。公共采样器保留 MAHDRL 的派生种子公式与逆 CDF 规则，统一偏移量为 `20260316`。相同种子和工作流编号的重复或换序查询始终返回相同 alpha；Tight、Medium、Loose 中 alpha=2 的概率仍分别为 0.8、0.5、0.2。
+
+基准缓存锁定模板、到达时间和参考 makespan，payload 种子统一为 `episode_seed + wf_id`，工作流绝对截止期统一为 `arrival + alpha * makespan_ref`。MARL 使用 reset 的实际 episode 种子；各训练入口从种子 1 开始逐回合加 1，MARL 缓存缺少训练种子时直接报错。PD3QN 不再使用独立偏移量，旧配置中显式传入 `20260317` 会被拒绝，应删除该参数。
+
+验证命令：`.\.venv\Scripts\python.exe -m unittest common.test_paired_instances`。该测试对 SS、seed=2 的三组截止期分布，逐一核对九种算法的 50 个工作流的模板、到达、payload 种子与数据、alpha、绝对截止期和全部任务子截止期。
+
+## 缓存模板名称匹配
+
+模板标识统一为不区分大小写的文件名（`basename_casefold_v1`）；例如 `Ligo_50.xml` 和 `LIGO_50.xml` 指向同一模板，30 节点与 50 节点模板仍严格区分。MARL 只从配置的 `dax_paths` 中解析缓存名称，加载缓存时检查未知模板，并拒绝多个不同路径映射到同一标识的歧义；任务分布使用的同一路径重复权重保留。日志输出使用实际配置文件的名称。
+
+其他缓存环境使用相同的名称比较规则，严格模式下真实名称不匹配会报错，纯大小写差异不会再被警告为模板不同。新预计算缓存记录 `meta.dax_template_id_scheme` 和现有通信模型标识。大小写兼容不改变工作流或基准数值；此前通信模型变更所要求的缓存重新生成仍然适用。
+
+验证命令：`.\.venv\Scripts\python.exe -m unittest common.test_dax_templates`，覆盖 MS/MM/ML、未知/歧义模板，以及九组历史缓存的模板抽样序列。

@@ -88,7 +88,7 @@ def build_env_kwargs(deadline_cache_path: str) -> Dict[str, Any]:
         dax_paths=dax_list,
         horizon=1000000000.0,
         arrival_lambda=0.03,
-        random_seed=0,
+        random_seed=1,
         normalize=True,
         num_hosts=SCENARIO.num_hosts,
         vms_per_host=SCENARIO.vms_per_host,

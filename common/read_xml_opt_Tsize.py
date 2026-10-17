@@ -17,6 +17,23 @@ from xml.etree import ElementTree as ET
 from dataclasses import dataclass, field
 
 
+DAX_TEMPLATE_ID_SCHEME = "basename_casefold_v1"
+
+
+def dax_template_id(path):
+    """A portable, case-insensitive identifier for a configured DAX template."""
+    return str(path).replace("\\", "/").rsplit("/", 1)[-1].casefold()
+
+
+def validate_dax_template_name(cached_name, runtime_name, *, strict=True):
+    if dax_template_id(cached_name) == dax_template_id(runtime_name):
+        return
+    message = f"[deadline-cache] DAX template mismatch: runtime={runtime_name} cache={cached_name}"
+    if strict:
+        raise ValueError(message)
+    print("WARNING:", message)
+
+
 # -----------------------------
 # 基本数据结构
 # -----------------------------

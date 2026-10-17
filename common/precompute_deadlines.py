@@ -10,6 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 from common.scenarios import Scenario, parse_scenario
+from common.read_xml_opt_Tsize import DAX_TEMPLATE_ID_SCHEME
 from common.workflow_opt import COMMUNICATION_MODEL
 from environments.base_fcfs import CloudWorkflowEnv_VMAgents
 
@@ -92,6 +93,7 @@ def main(scenario):
         meta=dict(
             policy="FCFS_task + VM_first_idle",
             communication_model=COMMUNICATION_MODEL,
+            dax_template_id_scheme=DAX_TEMPLATE_ID_SCHEME,
             alpha=1.5,
             arrival_lambda=0.03,
             workflows_per_episode=50,

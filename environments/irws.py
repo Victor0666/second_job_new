@@ -31,7 +31,7 @@ IRWS 环境（Route-A）——对齐 HRL 公平口径版本（6点全对齐）�
 
 新增：
 - 支持“每个 workflow 独立采样 ddlAlpha”
-- 使用独立的 deadline_rng，避免打乱 self.rng 的 DAX 模板抽样序列
+- 使用由 seed 和工作流编号决定的公共 alpha 采样器，不消耗模板随机流
 
 Energy reward uses the full-cluster increment from assignment through the
 next decision or episode end, including idle hosts and gaps between workflows.
@@ -53,8 +53,9 @@ try:
 except Exception:
     import gym
 
+from common.read_xml_opt_Tsize import validate_dax_template_name
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
-from common.workflow_opt import validate_deadline_cache, task_subdeadlines
+from common.workflow_opt import validate_deadline_cache, task_subdeadlines, sample_deadline_alpha
 from common.workflow_opt import Workflow, exec_time_components, LoadRecord, energy_from_records
 from common.resource_opt import create_cluster
 
@@ -212,7 +213,6 @@ class IRWSEnvRouteA(gym.Env):
 
         # runtime state
         self.rng: Optional[np.random.RandomState] = None               # 只用于模板抽样
-        self.deadline_rng: Optional[np.random.RandomState] = None      # 只用于ddlAlpha采样
         self.current_time: float = 0.0
         self.arrival_times: np.ndarray = np.zeros((0,), dtype=np.float64)
         self.next_arrival_idx: int = 0
@@ -310,11 +310,9 @@ class IRWSEnvRouteA(gym.Env):
 
         if dax_name is not None:
             names = rec.get("wf_dax_names", None)
-            if isinstance(names, list) and wf_id < len(names) and str(names[wf_id]) != str(dax_name):
-                print(
-                    f"WARNING: [deadline-cache] seed={episode_seed} wf_id={wf_id} dax mismatch: "
-                    f"runtime={dax_name} cache={names[wf_id]}"
-                )
+            if isinstance(names, list) and wf_id < len(names):
+                validate_dax_template_name(names[wf_id], dax_name, strict=self.deadline_cache_strict)
+
         return float(ms_list[wf_id])
 
     # ---------------- new: deadline alpha helpers ----------------
@@ -353,20 +351,12 @@ class IRWSEnvRouteA(gym.Env):
         probs_arr = probs_arr / s
         return choices_arr, probs_arr
 
-    def _sample_deadline_alpha(self) -> float:
-        """
-        每个 workflow 独立采样 ddlAlpha。
-        注意：必须用独立的 deadline_rng，不能占用 self.rng，
-        否则会破坏 DAX 模板抽样序列，影响 cache 对齐。
-        """
-        if self.deadline_alpha_choices is None or self.deadline_alpha_probs is None:
+    def _sample_deadline_alpha(self, wf_id: int) -> float:
+        if self.deadline_alpha_choices is None:
             return float(self.deadline_alpha)
-
-        if self.deadline_rng is None:
-            raise RuntimeError("deadline_rng 尚未初始化，请先 reset()")
-
-        idx = int(self.deadline_rng.choice(len(self.deadline_alpha_choices), p=self.deadline_alpha_probs))
-        return float(self.deadline_alpha_choices[idx])
+        return sample_deadline_alpha(
+            self.random_seed, wf_id, self.deadline_alpha_choices, self.deadline_alpha_probs,
+        )
 
     # ---------------- config helpers ----------------
 
@@ -480,9 +470,6 @@ class IRWSEnvRouteA(gym.Env):
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
         # self.rng 只用于模板抽样
         self.rng = np.random.RandomState(int(self.random_seed))
-
-        # 独立 deadline RNG，避免打乱模板序列
-        self.deadline_rng = np.random.RandomState(int(self.random_seed) + 100003)
 
         self.current_time = 0.0
         self.next_arrival_idx = 0
@@ -642,7 +629,7 @@ class IRWSEnvRouteA(gym.Env):
                     int(wf.workflow_id),
                     dax_name=dax_name,
                 )
-                alpha_used = self._sample_deadline_alpha()
+                alpha_used = self._sample_deadline_alpha(wf.workflow_id)
 
                 wf.ref_makespan = float(makespan_ref)
                 wf.deadline_alpha_used = float(alpha_used)
@@ -650,7 +637,7 @@ class IRWSEnvRouteA(gym.Env):
 
             elif self.deadline_mode == "none":
                 wf.ref_makespan = None
-                wf.deadline_alpha_used = float(self._sample_deadline_alpha())
+                wf.deadline_alpha_used = float(self._sample_deadline_alpha(wf.workflow_id))
                 wf.deadline = float(arr_t + max(self.horizon, 1.0))
             else:
                 raise ValueError(f"Unsupported deadline_mode: {self.deadline_mode}")

@@ -17,9 +17,10 @@ try:
 except Exception:
     import gym
 
+from common.read_xml_opt_Tsize import validate_dax_template_name
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 from common.resource_opt import create_cluster
-from common.workflow_opt import validate_deadline_cache, task_subdeadlines
+from common.workflow_opt import validate_deadline_cache, task_subdeadlines, sample_deadline_alpha, DEADLINE_ALPHA_SEED_OFFSET
 from common.workflow_opt import Workflow, exec_time_components, LoadRecord
 
 
@@ -82,7 +83,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
             deadline_cache_strict: bool = True,
 
             # workflow 级 alpha 独立采样，不污染 self.rng
-            deadline_alpha_seed_offset: int = 20260317,
+            deadline_alpha_seed_offset: int = DEADLINE_ALPHA_SEED_OFFSET,
     ):
         super().__init__()
 
@@ -131,6 +132,8 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         self.deadline_alpha_choices = None if deadline_alpha_choices is None else [float(x) for x in deadline_alpha_choices]
         self.deadline_alpha_probs = None if deadline_alpha_probs is None else [float(x) for x in deadline_alpha_probs]
         self.deadline_alpha_seed_offset = int(deadline_alpha_seed_offset)
+        if self.deadline_alpha_seed_offset != DEADLINE_ALPHA_SEED_OFFSET:
+            raise ValueError("deadline_alpha_seed_offset must use the shared value 20260316 for paired instances")
         self._validate_deadline_alpha_config()
 
         if self.deadline_mode == "cache_fcfs":
@@ -233,22 +236,11 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         self.deadline_alpha_probs = probs.tolist()
 
     def _sample_deadline_alpha(self, wf_id: int) -> float:
-        """
-        若提供离散分布，则按该分布对每个 workflow 独立采样；
-        但不能使用 self.rng，否则会污染 DAX 模板抽样序列，导致与 deadline cache 错位。
-        """
         if self.deadline_alpha_choices is None:
             return float(self.deadline_alpha)
-
-        local_seed = (
-                             int(self.random_seed) * 1000003
-                             + int(wf_id) * 9176
-                             + int(self.deadline_alpha_seed_offset)
-                     ) & 0xFFFFFFFF
-
-        rs = np.random.RandomState(local_seed)
-        idx = int(rs.choice(len(self.deadline_alpha_choices), p=self.deadline_alpha_probs))
-        return float(self.deadline_alpha_choices[idx])
+        return sample_deadline_alpha(
+            self.random_seed, wf_id, self.deadline_alpha_choices, self.deadline_alpha_probs,
+        )
 
     # ---------------- cache IO ----------------
     @staticmethod
@@ -294,11 +286,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         if dax_name is not None:
             names = rec.get("wf_dax_names", None)
             if isinstance(names, list) and wf_id < len(names):
-                if str(names[wf_id]) != str(dax_name):
-                    print(
-                        f"WARNING: [deadline-cache] seed={episode_seed} wf_id={wf_id} dax mismatch: "
-                        f"runtime={dax_name} cache={names[wf_id]}"
-                    )
+                validate_dax_template_name(names[wf_id], dax_name, strict=self.deadline_cache_strict)
 
         return float(ms_list[wf_id])
 

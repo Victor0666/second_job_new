@@ -72,6 +72,7 @@ class ScenarioTests(unittest.TestCase):
                         with self.assertRaises(CapturedConfiguration) as captured:
                             module.train()
                     self.assert_configuration(captured.exception.kwargs, scenario)
+                    self.assertEqual(captured.exception.kwargs["random_seed"], 1)
 
     def test_all_evaluation_configurations(self):
         for algorithm in [*MODEL_NAMES, "ertf_fifs"]:

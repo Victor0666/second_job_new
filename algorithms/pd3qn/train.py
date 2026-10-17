@@ -93,7 +93,6 @@ def train():
         deadline_alpha=1.5,
         deadline_alpha_choices=DEADLINE_ALPHA_CHOICES,
         deadline_alpha_probs=DEADLINE_ALPHA_PROBS,
-        deadline_alpha_seed_offset=20260317,
         deadline_cache_strict=True,
     )
     lr = 0.0003

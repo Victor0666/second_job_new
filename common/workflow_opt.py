@@ -125,6 +125,32 @@ def task_subdeadlines(tasks, vm_pc_mi_s, vm_bw_bps, arrival_time, workflow_deadl
     return float(arrival_time) + latest_finish
 
 
+DEADLINE_ALPHA_SEED_OFFSET = 20260316
+
+
+def sample_deadline_alpha(episode_seed, workflow_id, choices, probabilities):
+    """A paired alpha determined only by seed, workflow ID and distribution.
+
+    Preserve the MAHDRL seed derivation and inverse-CDF draw. Never consume an
+    environment RNG, so lookups are independent of order and scheduling.
+    """
+    values = np.asarray(choices, dtype=np.float64)
+    probs = np.asarray(probabilities, dtype=np.float64)
+    if (values.ndim != 1 or probs.ndim != 1 or len(values) == 0
+            or len(values) != len(probs) or not np.all(np.isfinite(values))
+            or not np.all(np.isfinite(probs)) or np.any(probs < 0)
+            or not np.isfinite(probs.sum()) or probs.sum() <= 0):
+        raise ValueError("Alpha choices and probabilities must be finite, matching non-empty vectors with positive probability mass")
+    order = np.argsort(values, kind="stable")
+    values = values[order]
+    cdf = np.cumsum(probs[order] / probs.sum())
+    local_seed = (int(episode_seed) * 1000003 + int(workflow_id) * 9176
+                  + DEADLINE_ALPHA_SEED_OFFSET) & 0xFFFFFFFF
+    u = float(np.random.RandomState(local_seed).rand())
+    index = min(int(np.searchsorted(cdf, u, side="right")), len(values) - 1)
+    return float(values[index])
+
+
 COMMUNICATION_MODEL = "same_vm_only_v1"
 
 

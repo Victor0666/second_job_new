@@ -30,6 +30,7 @@ except Exception:
 
 from common.workflow_opt import validate_deadline_cache, task_subdeadlines
 from common.workflow_opt import Workflow
+from common.read_xml_opt_Tsize import validate_dax_template_name
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 
 # 继承你已有的 HEFT deadline env（不改动原文件）
@@ -123,11 +124,7 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
         if dax_name is not None:
             names = rec.get("wf_dax_names", None)
             if isinstance(names, list) and wf_id < len(names):
-                if str(names[wf_id]) != str(dax_name):
-                    print(
-                        f"WARNING: [deadline-cache] seed={episode_seed} wf_id={wf_id} dax mismatch: "
-                        f"runtime={dax_name} cache={names[wf_id]}"
-                    )
+                validate_dax_template_name(names[wf_id], dax_name, strict=self.deadline_cache_strict)
 
         return float(ms_list[wf_id])
 

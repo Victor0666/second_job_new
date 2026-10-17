@@ -13,7 +13,7 @@ from unittest.mock import patch
 import networkx as nx
 import numpy as np
 
-from common.read_xml_opt_Tsize import Task
+from common.read_xml_opt_Tsize import Task, DAX_TEMPLATE_ID_SCHEME
 from common.workflow_opt import exec_time_components
 
 
@@ -177,6 +177,7 @@ class CommunicationTests(unittest.TestCase):
             obj = json.loads(output.read_text(encoding="utf-8"))
             validate_deadline_cache(obj, output)
             self.assertEqual(obj["meta"]["communication_model"], COMMUNICATION_MODEL)
+            self.assertEqual(obj["meta"]["dax_template_id_scheme"], DAX_TEMPLATE_ID_SCHEME)
             self.assertEqual(len(obj["data"]), 1)
             self.assertEqual(len(obj["data"][0]["wf_makespans"]), 50)
 

@@ -132,12 +132,16 @@ def evaluate_marl(
 
 
 def train():
-    random_seed = 0
+    random_seed = 1
     set_seed(random_seed)
     dax_dir = os.path.join(ROOT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
     deadline_cache_path = str(SCENARIO.cache_path)
     cache_seeds = _load_cache_seeds(deadline_cache_path)
+    required_seeds = set(range(random_seed, random_seed + SCENARIO.episodes))
+    missing_seeds = sorted(required_seeds - set(cache_seeds))
+    if missing_seeds:
+        raise KeyError(f"Training seeds missing from deadline cache: {missing_seeds}")
     env_kwargs = dict(
         dax_paths=dax_list,
         horizon=1000000000.0,
@@ -166,7 +170,7 @@ def train():
     )
     env = CloudWorkflowEnv_MARL(**env_kwargs)
     obs0, _info0 = env.reset(
-        seed=int(cache_seeds[0]),
+        seed=random_seed,
         options={"episode_id": 0, "tag": "probe", "dump_deadlines": True, "print_deadlines": True},
     )
     global_obs_dim = int(obs0["global_obs"].shape[0])
@@ -254,7 +258,7 @@ def train():
     global_step = 0
     episode_idx = 0
     while episode_idx < max_episodes:
-        train_seed = int(cache_seeds[(random_seed + episode_idx) % len(cache_seeds)])
+        train_seed = random_seed + episode_idx
         obs, _info = env.reset(
             seed=train_seed,
             options={

@@ -210,7 +210,6 @@ def build_agent_and_env_kwargs():
         deadline_alpha=1.5,
         deadline_alpha_choices=[2.0, 3.0],
         deadline_alpha_probs=list(SCENARIO.deadline_probs),
-        deadline_alpha_seed_offset=20260317,
         deadline_cache_strict=True,
     )
     tmp_env = CloudWorkflowEnv_PD3QN_Cost(**env_kwargs_base)

@@ -33,14 +33,14 @@ try:
 except Exception:
     import gym
 
-from common.workflow_opt import validate_deadline_cache, task_subdeadlines
+from common.workflow_opt import validate_deadline_cache, task_subdeadlines, sample_deadline_alpha
 from common.workflow_opt import (
     LoadRecord,
     energy_from_records,
     Workflow,
     exec_time_components,
 )
-from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
+from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times, dax_template_id
 from common.resource_opt import create_cluster
 
 
@@ -85,7 +85,13 @@ class CloudWorkflowEnv_MARL(gym.Env):
     ):
         super().__init__()
         self.dax_paths = list(dax_paths)
-        self.dax_map = {os.path.basename(p): p for p in self.dax_paths}
+        self.dax_map = {}
+        for path in self.dax_paths:
+            key = dax_template_id(path)
+            previous = self.dax_map.get(key)
+            if previous is not None and os.path.normcase(os.path.abspath(previous)) != os.path.normcase(os.path.abspath(path)):
+                raise ValueError(f"Ambiguous DAX template ID '{key}': {previous} and {path}")
+            self.dax_map[key] = path
         self.horizon = float(horizon)
         self.arrival_lambda = float(arrival_lambda)
         self.random_seed = int(random_seed)
@@ -195,16 +201,12 @@ class CloudWorkflowEnv_MARL(gym.Env):
     # =========================================================
     # ddlAlpha sampler
     # =========================================================
-    def _sample_deadline_alpha(self) -> float:
-        """
-        若配置了混合分布，则每个 workflow 独立采样一个 ddlAlpha；
-        否则退回到单一 alpha_deadline。
-        """
-        if self.alpha_deadline_choices is None or self.alpha_deadline_probs is None:
+    def _sample_deadline_alpha(self, wf_id: int) -> float:
+        if self.alpha_deadline_choices is None:
             return float(self.alpha_deadline)
-
-        idx = int(self.rng.choice(len(self.alpha_deadline_choices), p=self.alpha_deadline_probs))
-        return float(self.alpha_deadline_choices[idx])
+        return sample_deadline_alpha(
+            self.episode_seed, wf_id, self.alpha_deadline_choices, self.alpha_deadline_probs,
+        )
 
     # =========================================================
     # cache loader (A)
@@ -223,6 +225,9 @@ class CloudWorkflowEnv_MARL(gym.Env):
         cache = {}
         seeds = []
         for rec in data:
+            for name in rec.get("wf_dax_names", []):
+                if dax_template_id(name) not in self.dax_map:
+                    raise FileNotFoundError(f"dax_name '{name}' not found in configured dax_paths")
             s = int(rec["seed"])
             cache[s] = rec
             seeds.append(s)
@@ -808,11 +813,10 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
             if self.deadline_mode == "cache_fcfs":
                 dax_name = str(self._wf_dax_names_episode[self.next_arrival_idx])
-                dax_path = self.dax_map.get(dax_name, None)
+                dax_path = self.dax_map.get(dax_template_id(dax_name))
                 if dax_path is None:
-                    dax_path = dax_name if os.path.isfile(dax_name) else None
-                if dax_path is None:
-                    raise FileNotFoundError(f"dax_name '{dax_name}' not found in dax_paths map.")
+                    raise FileNotFoundError(f"dax_name '{dax_name}' not found in configured dax_paths")
+                dax_name = os.path.basename(str(dax_path))
                 makespan_ref = float(self._wf_makespans_ref_episode[self.next_arrival_idx])
             else:
                 idx = self.rng.randint(len(self.dax_paths))
@@ -845,7 +849,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
             self.wf_remaining_tasks[wf_id] = len(tasks)
 
             # ===== 核心改动：每个 workflow 独立采样 ddlAlpha =====
-            ddl_alpha_i = self._sample_deadline_alpha()
+            ddl_alpha_i = self._sample_deadline_alpha(wf_id)
 
             if self.deadline_mode == "cache_fcfs":
                 wf.deadline = float(arr_t + ddl_alpha_i * makespan_ref)

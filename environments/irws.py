@@ -40,6 +40,8 @@ The selected-host assignment increment is retained in info for diagnostics.
 
 from __future__ import annotations
 
+from common.f18_state_normalization import checked_observation, load_normalizer, queue_features, observe_rr
+
 import os
 import json
 import math
@@ -146,8 +148,10 @@ class IRWSEnvRouteA(gym.Env):
 
         # bookkeeping
         energy_check_on_done: bool = True,
+        normalization_mode='legacy', normalization_config=None, source_train_scene=None,
     ):
         super().__init__()
+        self.state_normalizer = load_normalizer(normalization_mode, normalization_config, source_train_scene)
 
         self.dax_paths = list(dax_paths)
         self.dax_probs = None if dax_probs is None else np.array(dax_probs, dtype=np.float64)
@@ -1014,8 +1018,9 @@ class IRWSEnvRouteA(gym.Env):
 
     def _build_task_features(self, gids: List[int]) -> np.ndarray:
         if len(gids) == 0:
-            return np.zeros((0, 7), dtype=np.float32)
+            return checked_observation(self, np.zeros((0, 7), dtype=np.float32))
 
+        observe_rr(self, len(set(self.ready_task_ids)))
         t = float(self.current_time)
         feats = []
         for gid in gids:
@@ -1028,7 +1033,11 @@ class IRWSEnvRouteA(gym.Env):
             slack = float(ddl - t)
             wait = float(max(0.0, t - float(self.task_ready_time[gid])))
 
-            if self.normalize:
+            if self.state_normalizer:
+                mi, ib, ob, ur, dr, slack, wait = [self.state_normalizer.scale(v, k) for v, k in zip(
+                    (mi, ib, ob, ur, dr, slack, wait),
+                    ('workload_mi_ref', 'input_bits_ref', 'output_bits_ref', 'up_rank_ref', 'down_rank_ref', 'T_ref', 'T_ref'))]
+            elif self.normalize:
                 mi = mi / 3000.0
                 ib = ib / (1024 * 1024 * 8 * 1024)
                 ob = ob / (1024 * 1024 * 8 * 1024)
@@ -1039,7 +1048,7 @@ class IRWSEnvRouteA(gym.Env):
 
             feats.append([mi, ib, ob, ur, dr, slack, wait])
 
-        return np.array(feats, dtype=np.float32)
+        return checked_observation(self, np.array(feats, dtype=np.float32))
 
     def _build_vm_obs_for_task(self, gid: int) -> np.ndarray:
         t = float(self.current_time)
@@ -1070,7 +1079,10 @@ class IRWSEnvRouteA(gym.Env):
             pc = float(vm.pc)
             bw = float(vm.bw)
 
-            if self.normalize:
+            if self.state_normalizer:
+                avail_dt, pc, bw, est_exec, est_slack = [self.state_normalizer.scale(v, k) for v, k in zip(
+                    (avail_dt, pc, bw, est_exec, est_slack), ('T_ref', 'vm_pc_ref', 'vm_bw_ref', 'T_ref', 'T_ref'))]
+            elif self.normalize:
                 avail_dt = avail_dt / 1000.0
                 pc = pc / 10.0
                 bw = bw / 10000.0
@@ -1081,4 +1093,4 @@ class IRWSEnvRouteA(gym.Env):
 
         vm_feats = np.array(vm_feats, dtype=np.float32).reshape(-1)
         obs = np.concatenate([task_feats.astype(np.float32), vm_feats], axis=0).astype(np.float32)
-        return obs
+        return checked_observation(self, obs)

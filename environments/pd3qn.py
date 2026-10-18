@@ -6,6 +6,8 @@ added while advancing to the next decision or episode end. Legacy reward
 parameters remain supported.
 """
 
+from common.f18_state_normalization import checked_observation, load_normalizer, queue_features, observe_rr
+
 import os
 import json
 from typing import Dict, Any, Tuple, List, Optional
@@ -84,8 +86,10 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
 
             # workflow 级 alpha 独立采样，不污染 self.rng
             deadline_alpha_seed_offset: int = DEADLINE_ALPHA_SEED_OFFSET,
+        normalization_mode='legacy', normalization_config=None, source_train_scene=None,
     ):
         super().__init__()
+        self.state_normalizer = load_normalizer(normalization_mode, normalization_config, source_train_scene)
 
         self.dax_paths = list(dax_paths)
         self.horizon = float(horizon)
@@ -626,9 +630,18 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         vm_feat = np.stack([av_in, pc, bw], axis=1).reshape(-1).astype(np.float32)
 
         obs = np.concatenate([np.array([now, qsize], dtype=np.float32), task_feat, vm_feat], axis=0)
-        if self.normalize:
+        if self.state_normalizer:
+            n = self.state_normalizer
+            observe_rr(self, len(set(self.ready_task_ids)))
+            obs[0] = n.scale(now, 'T_ref')  # Episode origin is simulation time zero.
+            obs[1] = n.rr(len(set(self.ready_task_ids)))
+            obs[2:6] = [n.scale(v, k) for v, k in zip(task_feat,
+                ('workload_mi_ref', 'input_bits_ref', 'output_bits_ref', 'T_ref'))]
+            obs[6:] = (np.stack([n.scale(av_in, 'T_ref'), n.scale(pc, 'vm_pc_ref'),
+                                   n.scale(bw, 'vm_bw_ref')], axis=1)).reshape(-1)
+        elif self.normalize:
             obs = obs / (np.linalg.norm(obs) + 1e-6)
-        return obs.astype(np.float32)
+        return checked_observation(self, obs.astype(np.float32))
 
     def get_action_mask(self) -> np.ndarray:
         if self._cur_task_gid is None:

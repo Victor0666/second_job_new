@@ -44,6 +44,8 @@ Deadline 逻辑：
 - Manager reward 保持原逻辑不变
 """
 
+from common.f18_state_normalization import checked_observation, load_normalizer, queue_features
+
 import heapq
 import numpy as np
 
@@ -248,8 +250,10 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         state_include_queue=True,
         combo_weights=None,
         workflows_per_episode=8,
+        normalization_mode='legacy', normalization_config=None, source_train_scene=None,
     ):
         super().__init__()
+        self.state_normalizer = load_normalizer(normalization_mode, normalization_config, source_train_scene)
 
         self.rng = np.random.RandomState(random_seed)
         self.horizon = float(horizon)
@@ -427,22 +431,25 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         if len(slacks) > 0:
             min_slack = float(np.min(slacks))
             avg_slack = float(np.mean(slacks))
-            min_slack_norm = min_slack / max(self.horizon, 1.0)
-            avg_slack_norm = avg_slack / max(self.horizon, 1.0)
+            min_slack_norm = min_slack / self._obs_ref('T_ref', max(self.horizon, 1.0))
+            avg_slack_norm = avg_slack / self._obs_ref('T_ref', max(self.horizon, 1.0))
         else:
             min_slack_norm = 0.0
             avg_slack_norm = 0.0
 
         vec = np.array([
             ready_ratio, waiting_ratio, running_ratio,
-            avg_wait / max(self.horizon, 1.0),
-            max_wait / max(self.horizon, 1.0),
+            avg_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+            max_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
             idle_vm_ratio, host_load_mean, host_running_ratio_mean,
             min_slack_norm, avg_slack_norm
         ], dtype=np.float32)
 
+        if getattr(self, 'state_normalizer', None):
+            q = queue_features(self)
+            vec[[0, 1, 2, 3, 4, 8, 9]] = q[:7]
         w_norm = self.combo_weights.astype(np.float32)
-        return np.concatenate([vec, w_norm], axis=0).astype(np.float32)
+        return checked_observation(self, np.concatenate([vec, w_norm], axis=0).astype(np.float32))
 
     def get_host_state_for_next_assignment(self):
         if self.done_flag:
@@ -1151,17 +1158,21 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             ready_cnt / max(1.0, self.max_ready),
             waiting_cnt / max(1.0, len(self.task_state) if len(self.task_state) > 0 else 1.0),
             running_cnt / max(1.0, self.num_vms),
-            avg_wait / max(self.horizon, 1.0),
-            max_wait / max(self.horizon, 1.0),
+            avg_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+            max_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
             sum_mi / max(1.0, np.mean(self.task_mi) if len(self.task_mi) > 0 else 1.0),
             float(urgent_cnt) / max(1.0, len(self.ready_task_ids)),
-            min_slack / max(self.horizon, 1.0),
-            avg_slack / max(self.horizon, 1.0),
+            min_slack / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+            avg_slack / self._obs_ref('T_ref', max(self.horizon, 1.0)),
             float(len(set([self.task_meta[x][0] for x in self.ready_task_ids]))) / max(
                 1.0, len(self.workflows) if len(self.workflows) > 0 else 1.0
             ),
         ], dtype=np.float32)
-        return block2
+        if getattr(self, 'state_normalizer', None):
+            q = queue_features(self)
+            block2[[0, 1, 2, 3, 4, 7, 8, 6]] = q
+            block2[5] = self.state_normalizer.scale(sum_mi, 'workload_mi_ref')
+        return checked_observation(self, block2)
 
     def _compute_block1(self, tid: int):
         now = self.current_time
@@ -1170,7 +1181,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         mi = float(self.task_mi[tid])
 
         io_ratio = _safe_div(in_bits + out_bits, max(mi, 1.0))
-        wait_norm = (now - self.task_ready_time[tid]) / max(self.horizon, 1.0)
+        wait_norm = (now - self.task_ready_time[tid]) / self._obs_ref('T_ref', max(self.horizon, 1.0))
         children_cnt_n = float(len(self.task_children[tid])) / max(
             1.0, np.mean([len(ch) for ch in self.task_children]) + 1e-6
         )
@@ -1213,12 +1224,16 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             children_cnt_n,
             up_rank_n,
             down_rank_n,
-            est_best / max(self.horizon, 1.0),
-            est_mean / max(self.horizon, 1.0),
-            slack_on_best / max(self.horizon, 1.0),
+            est_best / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+            est_mean / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+            slack_on_best / self._obs_ref('T_ref', max(self.horizon, 1.0)),
             same_wf_ready_frac,
         ], dtype=np.float32)
-        return block1, in_bits, out_bits, mi
+        if getattr(self, 'state_normalizer', None):
+            block1[[0, 1, 2, 6, 7]] = [self.state_normalizer.scale(v, k) for v, k in zip(
+                (mi, in_bits, out_bits, self.task_up_rank[tid], self.task_down_rank[tid]),
+                ('workload_mi_ref', 'input_bits_ref', 'output_bits_ref', 'up_rank_ref', 'down_rank_ref'))]
+        return checked_observation(self, block1), in_bits, out_bits, mi
 
     def _compute_host_block(self):
         now = self.current_time
@@ -1250,14 +1265,16 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             soonest = host_stats["soonest"][h] if host_stats["soonest"][h] is not None else now
             host_soonest_delay = max(0.0, float(soonest - now))
             host_running_ratio = _safe_div(host_stats["running"][h], vm_cnt)
+            if getattr(self, 'state_normalizer', None):
+                total_pc_n = self.state_normalizer.scale(self.hosts[h].total_pc, 'host_pc_ref')
             host_block[hi] = np.array([
                 total_pc_n,
                 host_load,
                 host_idle_vm,
-                host_soonest_delay / max(self.horizon, 1e-9),
+                host_soonest_delay / self._obs_ref('T_ref', max(self.horizon, 1e-9)),
                 host_running_ratio,
             ], dtype=np.float32)
-        return host_block
+        return checked_observation(self, host_block)
 
     def _build_host_obs_for_task(self, tid: int):
         block1, _, _, _ = self._compute_block1(tid)
@@ -1276,7 +1293,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
                     break
             if ok:
                 mask[hi] = 1.0
-        return obs, mask
+        return checked_observation(self, obs), mask
 
     def _build_vm_obs_for_task_host(self, tid: int, host_id: int):
         block1, in_bits, out_bits, mi = self._compute_block1(tid)
@@ -1305,17 +1322,17 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
 
             vm_block[slot] = np.array([
                 idle_flag,
-                avail_delay / max(self.horizon, 1e-9),
-                vm.pc / mean_vm_pc,
-                vm.bw / mean_vm_bw,
-                pred_finish / max(self.horizon, 1e-9),
+                avail_delay / self._obs_ref('T_ref', max(self.horizon, 1e-9)),
+                vm.pc / self._obs_ref('vm_pc_ref', mean_vm_pc),
+                vm.bw / self._obs_ref('vm_bw_ref', mean_vm_bw),
+                (max(0.0, pred_finish - now) if self.state_normalizer else pred_finish) / self._obs_ref('T_ref', max(self.horizon, 1e-9)),
             ], dtype=np.float32)
 
             if idle_flag > 0.5:
                 mask[slot] = 1.0
 
         obs = np.concatenate([block1, block2, host_feat, vm_block.reshape(-1)], axis=0)
-        return obs, mask
+        return checked_observation(self, obs), mask
 
     def _estimate_marginal_energy_proxy(self, host_id: int, start_time: float, duration: float, added_pc: float) -> float:
         if duration <= 0.0:
@@ -1379,3 +1396,6 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         idx = np.arange(self.num_vms, dtype=np.int64)
         order = np.lexsort((idx, neg_pc, avail))
         return order
+    def _obs_ref(self, key, legacy):
+        normalizer = getattr(self, 'state_normalizer', None)
+        return normalizer.scales[key] if normalizer else legacy

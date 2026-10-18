@@ -182,3 +182,20 @@ MAHDRL 及四种消融中保留的资源学习器、PD3QN、MARL Local 已恢复
 TA 直接执行 `Norm(w + delta)`，只维护一套归一化决策权重；默认构造与 reset 为 `[0.2]*5`，替换旧随机 Raw 初始化。Mask 与执行共用合法性检查，非法动作拒绝，全零增量精确保持权重。F15 排序属性、243 个动作与 HA/VA 算法保持不变。
 
 MAHDRL 及四种消融的新模型/日志名称追加 `_f17_normalized_weights_v1`，评测写入独立 F17 子目录。旧 checkpoint 张量虽可兼容读取，不能作为 F17 正式结果，必须重新训练。F17 不要求额外重建缓存，但此前 F07 等版本要求仍有效。验证命令、英文论文补充、审稿回复和完整验收表见 [F17 返修记录](docs/revision_F17.md)。
+
+## F18 共享状态归一化与训练前校准
+
+正式学习算法与四种消融默认使用 `f18_shared_v1`：从固定训练参考配置加载 R_ref/T_ref 和物理属性尺度，配置缺失时明确报错。PD3QN 的新版输入改为逐属性缩放，取消整体 L2；F15/F17 排序与权重转移、奖励、通信、能耗和 Deadline 生成保持原有逻辑。历史观测复现须显式使用 `--normalization-mode legacy`。
+
+先准备三个 S 任务规模、S/M/L 资源规模的新版正式 Deadline Cache，再一条命令完成九场景启发式校准（不进行强化学习训练）：
+
+```powershell
+.\run.cmd common/f18_calibrate_normalization.py --all-nine --seeds 101-130 --dry-run
+.\run.cmd common/f18_calibrate_normalization.py --all-nine --seeds 101-130 --resume
+```
+
+首次在新输出目录运行时省略 `--resume`；本工作区已保留缺失缓存的诊断清单，应使用 `--resume`。默认 101–130 来自训练种子，避开现有验证 seed 1 和默认测试 2–31；如自定义测试集，先核对隔离。禁止在测试集上重拟合尺度。
+
+Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.py --all-nine --seeds 101-130 --resume`。结果位于 `outputs/f18_normalization_calibration/`；支持单场景、断点续跑、重新汇总及按需详细记录。当前缺少新版正式缓存，九场景正式百分位和归一化参数尚未生成，不能直接开始 F18 正式训练。
+
+所有新模型/日志名追加 `_f18_shared_v1`，Checkpoint 保存源训练场景与配置哈希；评测校验一致性。MS/LS 等泛化继续使用源 S 训练配置。四算法及四消融需要重训，旧模型与结果不覆盖。预计算命令、字段映射、物理轨迹对照、测试边界和英文论文公式修改建议见 [F18 完整说明](docs/F18_shared_state_normalization.md)。轻量集成验证：`.\.venv\Scripts\python.exe -m common.smoke_F18 --out docs/F18_smoke.json`。

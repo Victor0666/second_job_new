@@ -16,6 +16,7 @@ A2C with action-mask support.
   * 对线性层做裁剪拷贝：重叠部分复制，新增维度保持当前初始化
   * 评测只加载 net，不加载 optim（避免优化器 state 不匹配）
 """
+from common.f18_state_normalization import checkpoint_metadata, check_checkpoint
 
 from common.f11 import LearningDiagnostics, validate_transition, LEARNING_MODEL
 
@@ -208,6 +209,7 @@ class A2CAgent:
     def save(self, path: str):
         torch.save(
             {
+                "normalization": checkpoint_metadata(self),
                 "learning_model": LEARNING_MODEL,
                 "net": self.net.state_dict(),
                 "optim": self.optim.state_dict(),
@@ -220,6 +222,7 @@ class A2CAgent:
 
     def load(self, path: str, strict: bool = True, require_learning_model: bool = False):
         ckpt = _torch_load_ckpt(path, self.device)
+        check_checkpoint(ckpt.get("normalization") if isinstance(ckpt, dict) else None, checkpoint_metadata(self))
         if require_learning_model and (not isinstance(ckpt, dict) or ckpt.get("learning_model") != LEARNING_MODEL):
             raise ValueError(f"Checkpoint is not an F11-trained model: {path}")
         if isinstance(ckpt, dict) and "net" in ckpt:
@@ -387,6 +390,7 @@ class LocalSharedActorIndependentCriticA2C:
     def save(self, path: str):
         torch.save(
             {
+                "normalization": checkpoint_metadata(self),
                 "learning_model": LEARNING_MODEL,
                 "net": self.net.state_dict(),
                 "optim": self.optim.state_dict(),
@@ -400,6 +404,7 @@ class LocalSharedActorIndependentCriticA2C:
 
     def load(self, path: str, strict: bool = True, require_learning_model: bool = False):
         ckpt = _torch_load_ckpt(path, self.device)
+        check_checkpoint(ckpt.get("normalization") if isinstance(ckpt, dict) else None, checkpoint_metadata(self))
         if require_learning_model and (not isinstance(ckpt, dict) or ckpt.get("learning_model") != LEARNING_MODEL):
             raise ValueError(f"Checkpoint is not an F11-trained model: {path}")
         if isinstance(ckpt, dict) and "net" in ckpt:

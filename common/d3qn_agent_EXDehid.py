@@ -9,6 +9,7 @@ Dueling Double DQN with action-mask support.
 - F11：非终止下一状态必须有合法动作；终止可使用空掩码，学习目标无未来项。
 - 评测时 deterministic=True 且不会影响 ε。
 """
+from common.f18_state_normalization import checkpoint_metadata, check_checkpoint
 
 from common.f11 import LearningDiagnostics, validate_transition, LEARNING_MODEL
 
@@ -237,6 +238,7 @@ class D3QNAgent:
     def save(self, path: str):
         torch.save(
             {
+                "normalization": checkpoint_metadata(self),
                 "learning_model": LEARNING_MODEL,
                 "online": self.online.state_dict(),
                 "target": self.target.state_dict(),
@@ -258,6 +260,7 @@ class D3QNAgent:
             ckpt = torch.load(path, map_location=self.device, weights_only=True)
         except TypeError:
             ckpt = torch.load(path, map_location=self.device)
+        check_checkpoint(ckpt.get("normalization") if isinstance(ckpt, dict) else None, checkpoint_metadata(self))
         if require_learning_model and ckpt.get("learning_model") != LEARNING_MODEL:
             raise ValueError(f"Checkpoint is not an F11-trained model: {path}")
         self.online.load_state_dict(ckpt["online"], strict=strict)

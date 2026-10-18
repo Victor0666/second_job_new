@@ -5,6 +5,7 @@ import importlib
 import json
 from pathlib import Path
 import tempfile
+import sys
 from unittest.mock import patch
 
 import torch
@@ -13,7 +14,8 @@ from common.precompute_deadlines import main as precompute
 from common.f11 import LEARNING_MODEL
 
 
-def run_smoke():
+def run_smoke(normalization_mode='legacy', normalization_config=None, irws_task='L', verify_checkpoints=False):
+    progress=sys.stdout
     torch.set_num_threads(1)
     report = dict(learning_model=LEARNING_MODEL, verification_overrides=dict(hidden_dims=[16, 8],
                   dqn_batch_size=4, dqn_buffer_size=32), algorithms={})
@@ -31,13 +33,14 @@ def run_smoke():
                 # Training scripts that construct paths from ROOT_DIR still write below the temporary root.
                 return str(root / 'logs' / super().model_name(algorithm))
         with (root / 'console.txt').open('w', encoding='utf-8') as console, redirect_stdout(console):
-            for task in ('S', 'L'):
+            for task in sorted({'S', irws_task}):
                 precompute(Scenario(task=task, mode='precompute', seed_spec='1-2',
                                     cache_output=str(root / ('cache_' + task + '.json'))))
             for algorithm in ('mahdrl', 'ablation_hostrand', 'ablation_mgrrand', 'ablation_vmrand',
                               'ablation_nohost', 'pd3qn', 'marl', 'irws'):
                 module = importlib.import_module('algorithms.' + algorithm + '.train')
-                scenario = SmokeScenario(mode='train', episodes=1, task='L' if algorithm == 'irws' else 'S')
+                scenario = SmokeScenario(mode='train', episodes=1, task=irws_task if algorithm == 'irws' else 'S',
+                    normalization_mode=normalization_mode, normalization_config=normalization_config)
                 built = []
                 if algorithm in ('mahdrl', 'ablation_hostrand', 'ablation_mgrrand', 'ablation_vmrand', 'ablation_nohost', 'pd3qn'):
                     original = module.D3QNAgent
@@ -82,9 +85,53 @@ def run_smoke():
                 assert all(v['nonterminal'] > 0 and v['bootstrap_nonzero_ratio'] > 0 for v in learners.values()), algorithm
                 if 'reward_audit' in records[-1]:
                     assert all(abs(value) < 1e-6 for key, value in records[-1]['reward_audit'].items() if key.endswith('balance')), algorithm
-                if algorithm == 'irws':
+                if algorithm == 'irws' and irws_task == 'L':
                     assert learners['VM_PPO']['nonterminal_rollouts'] > 0, algorithm
+                if verify_checkpoints:
+                    from common.f18_state_normalization import check_checkpoint
+                    files=list(scenario.checkpoint_dir(algorithm).glob('*.pth'))
+                    assert files, algorithm
+                    for file in files:
+                        ckpt=torch.load(file,map_location='cpu',weights_only=False)
+                        try:check_checkpoint(ckpt.get('normalization'),scenario.normalization_metadata())
+                        except ValueError as exc:raise ValueError(f'{algorithm}/{file.name}: {exc}') from exc
+                    # Exercise each original evaluation checkpoint loader with matching small networks.
+                    ev=importlib.import_module('algorithms.'+algorithm+'.evaluate')
+                    with ExitStack() as eval_stack:
+                        eval_stack.enter_context(patch.object(ev,'SCENARIO',scenario))
+                        if hasattr(ev,'D3QNAgent'):
+                            original_eval=ev.D3QNAgent
+                            def small_eval(*args,**kwargs):
+                                kwargs.update(hidden_dims=(16,8),batch_size=4,buffer_size=32,device=torch.device('cpu'))
+                                return original_eval(*args,**kwargs)
+                            eval_stack.enter_context(patch.object(ev,'D3QNAgent',side_effect=small_eval))
+                        elif algorithm=='marl':
+                            original_eval_cfg=ev.A2CConfig
+                            def small_eval_cfg(*args,**kwargs):
+                                kwargs.update(hidden_dims=(16,8),device='cpu')
+                                return original_eval_cfg(*args,**kwargs)
+                            eval_stack.enter_context(patch.object(ev,'A2CConfig',side_effect=small_eval_cfg))
+                        else:
+                            original_eval_ppo=ev.PPOVMAgent
+                            def small_eval_ppo(cfg,hidden):return original_eval_ppo(cfg,hidden=(16,8))
+                            eval_stack.enter_context(patch.object(ev,'PPOVMAgent',side_effect=small_eval_ppo))
+                        if algorithm=='marl':
+                            kw=ev.build_env_kwargs(str(scenario.cache_path))
+                            agents=ev.build_agents_and_probe_dims(kw,1,'cpu',str(scenario.checkpoint_dir(algorithm)/'best_global.pth'),
+                                str(scenario.checkpoint_dir(algorithm)/'best_local_actor_critics.pth'))
+                        elif algorithm=='pd3qn':ev.build_agent_and_env_kwargs()
+                        elif algorithm=='irws':ev.build_agents_and_load(ev.build_env_kwargs_irws(random_seed=1))
+                        elif algorithm=='ablation_nohost':ev.build_two_layer_agents_and_load(ev.build_env_kwargs_nohost(random_seed=1))
+                        elif algorithm in ('ablation_hostrand','ablation_mgrrand','ablation_vmrand'):
+                            # Builder names vary with the retained layers.
+                            builder=next(getattr(ev,n) for n in dir(ev) if n.startswith('build_') and n.endswith('agents_and_load'))
+                            kw_builder=next(getattr(ev,n) for n in dir(ev) if n.startswith('build_env_kwargs'))
+                            builder(kw_builder(random_seed=1))
+                        else:ev.build_three_layer_agents_and_load(ev.build_env_kwargs_hrl_mix(random_seed=1))
+                    records[-1]['f18_checkpoints_checked']=len(files)
+                    records[-1]['f18_evaluation_loader_checked']=True
                 report['algorithms'][algorithm] = records[-1]
+                print('smoke passed:',algorithm,file=progress,flush=True)
     return report
 
 

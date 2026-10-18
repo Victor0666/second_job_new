@@ -13,6 +13,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f18_state_normalization import bind_normalization, check_checkpoint, normalization_diagnostics
 from common.f11 import F11Logger, protect_training_outputs, LEARNING_MODEL
 
 SCENARIO = Scenario(mode="train")
@@ -133,6 +134,7 @@ def train():
         task_baseline_norm=TASK_BASELINE_NORM,
         energy_reward_scale=ENERGY_REWARD_SCALE,
     )
+    env_kwargs.update(SCENARIO.normalization_kwargs())
     env = IRWSEnvRouteA(**env_kwargs)
     env.reset()
     task_selector = IRWSTaskSelector(TaskSelectorConfig(feat_dim=7, hidden=128, device=device))
@@ -211,6 +213,7 @@ def train():
                 "intrinsic": intrinsic.state_dict(),
                 "rng": RNGSnapshot.capture().__dict__,
                 "env_kwargs": env_kwargs,
+                "normalization": SCENARIO.normalization_metadata(),
                 "learning_model": LEARNING_MODEL,
                 "meta": {"obs_dim": obs_dim, "act_dim": act_dim, "device": device},
             },
@@ -298,7 +301,7 @@ def train():
             loss = ppo.update(last_value=0.0)
             if loss is not None:
                 ppo_losses.append(float(loss))
-        f11_log.log(episode, {"VM_PPO": ppo}, pending=ppo.buf.size(), truncated=truncated_episode)
+        f11_log.log(episode, {"VM_PPO": ppo}, normalization=normalization_diagnostics(env), pending=ppo.buf.size(), truncated=truncated_episode)
         m = env.get_episode_metrics()
         eval_m = evaluate_irws_multi_seed(
             env_ctor_kwargs=env_kwargs,

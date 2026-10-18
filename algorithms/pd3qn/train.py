@@ -9,6 +9,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f18_state_normalization import bind_normalization, check_checkpoint, normalization_diagnostics
 from common.f11 import pd3qn_transition, F11Logger, protect_training_outputs
 
 SCENARIO = Scenario(mode="train")
@@ -96,6 +97,7 @@ def train():
         deadline_alpha_probs=DEADLINE_ALPHA_PROBS,
         deadline_cache_strict=True,
     )
+    env_kwargs.update(SCENARIO.normalization_kwargs())
     lr = 0.0003
     gamma = 0.99
     batch_size = 256
@@ -148,6 +150,7 @@ def train():
         per_beta_end=per_beta_end,
         per_beta_steps=per_beta_steps,
     )
+    bind_normalization(agent, SCENARIO)
     logger = CSVLogger(
         filepath=log_path,
         fieldnames=[
@@ -208,7 +211,7 @@ def train():
             obs = obs2
             ep_steps += 1
             global_step += 1
-        f11_log.log(episode_idx, {"PD3QN": agent}, pending=0,
+        f11_log.log(episode_idx, {"PD3QN": agent}, normalization=normalization_diagnostics(env), pending=0,
                     terminated=bool(terminated), truncated=bool(truncated))
         m = env.get_episode_metrics()
         ep_energy = float(m["total_energy"])

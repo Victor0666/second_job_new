@@ -24,6 +24,7 @@ env_nohost.py
 """
 
 import numpy as np
+from common.f18_state_normalization import checked_observation
 
 from environments.mahdrl_fcfs import (
     CloudWorkflowEnv_VMAgents as _BaseEnv,
@@ -89,10 +90,10 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
             # [total_pc_n, host_load, host_idle_vm, host_soonest_delay, host_running_ratio]
             vm_block[j] = np.array([
                 idle_flag,
-                avail_delay / max(self.horizon, 1e-9),
-                vm.pc / mean_vm_pc,
-                vm.bw / mean_vm_bw,
-                pred_finish / max(self.horizon, 1e-9),
+                avail_delay / self._obs_ref('T_ref', max(self.horizon, 1e-9)),
+                vm.pc / self._obs_ref('vm_pc_ref', mean_vm_pc),
+                vm.bw / self._obs_ref('vm_bw_ref', mean_vm_bw),
+                (max(0.0, pred_finish - now) if self.state_normalizer else pred_finish) / self._obs_ref('T_ref', max(self.horizon, 1e-9)),
                 float(host_block[hi, 1]),  # host_load
                 float(host_block[hi, 2]),  # host_idle_vm ratio
                 float(host_block[hi, 4]),  # host_running ratio
@@ -102,7 +103,7 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
                 mask[j] = 1.0
 
         obs = np.concatenate([block1, block2, vm_block.reshape(-1)], axis=0).astype(np.float32)
-        return obs, mask.astype(np.float32)
+        return checked_observation(self, obs), mask.astype(np.float32)
 
     # ------------------------------------------------------------------
     # 直接给“下一次分配”的全局VM状态

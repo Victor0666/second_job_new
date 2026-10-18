@@ -11,6 +11,7 @@ if ROOT_DIR in sys.path:
     sys.path.remove(ROOT_DIR)
 sys.path.insert(0, ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 
 SCENARIO = Scenario(mode="eval")
@@ -213,6 +214,7 @@ def build_agent_and_env_kwargs():
         deadline_alpha_probs=list(SCENARIO.deadline_probs),
         deadline_cache_strict=True,
     )
+    env_kwargs_base.update(SCENARIO.normalization_kwargs())
     tmp_env = CloudWorkflowEnv_PD3QN_Cost(**env_kwargs_base)
     ret = tmp_env.reset()
     obs = ret[0] if isinstance(ret, tuple) else ret
@@ -246,6 +248,7 @@ def build_agent_and_env_kwargs():
         per_beta_end=1.0,
         per_beta_steps=80000,
     )
+    bind_normalization(agent, SCENARIO)
     ckpt_path = os.path.join(str(SCENARIO.checkpoint_dir("pd3qn")), "best_pd3qn.pth")
     if not os.path.exists(ckpt_path):
         raise FileNotFoundError(f"ckpt 不存在：{ckpt_path}")
@@ -257,7 +260,7 @@ def build_agent_and_env_kwargs():
 def main():
     num_runs = len(SCENARIO.seeds)
     seeds = list(SCENARIO.seeds)
-    result_dir = os.path.join(ROOT_DIR, "outputs", "run", LEARNING_MODEL, "pd3qn_wfInfo_rn")
+    result_dir = os.path.join(ROOT_DIR, "outputs", "run", SCENARIO.normalization_mode, LEARNING_MODEL, "pd3qn_wfInfo_rn")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,

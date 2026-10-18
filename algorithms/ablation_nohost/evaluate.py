@@ -9,6 +9,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 from common.ta_weights import TA_WEIGHT_MODEL
 
@@ -526,6 +527,7 @@ def build_env_kwargs_nohost(random_seed=1):
         energy_norm_per_mi_ref=float(ENERGY_NORM_PER_MI_REF),
         alpha_delay_vm=float(ALPHA_DELAY_VM),
     )
+    env_kwargs.update(SCENARIO.normalization_kwargs())
     return env_kwargs
 
 
@@ -631,6 +633,7 @@ def build_two_layer_agents_and_load(env_kwargs: dict):
         hidden_dims=(1024, 1024, 512, 512, 256),
         device=device,
     )
+    bind_normalization(vm_agent, SCENARIO)
     manager_agent = D3QNAgent(
         input_dim=mgr_state_dim,
         output_dim=NUM_OPTIONS,
@@ -646,6 +649,7 @@ def build_two_layer_agents_and_load(env_kwargs: dict):
         hidden_dims=(512, 512, 256, 128),
         device=device,
     )
+    bind_normalization(manager_agent, SCENARIO)
     ckpt_dir_default = str(SCENARIO.checkpoint_dir("ablation_nohost"))
     ckpt_vm = os.path.join(ckpt_dir_default, "best_vm.pth")
     ckpt_mgr = os.path.join(ckpt_dir_default, "best_manager.pth")
@@ -668,7 +672,7 @@ def build_two_layer_agents_and_load(env_kwargs: dict):
 def main():
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_nohost(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_nohost_ddlMix")
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.normalization_mode, LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_nohost_ddlMix")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,

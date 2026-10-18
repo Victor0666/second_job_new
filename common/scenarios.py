@@ -8,6 +8,7 @@ import json
 
 from common.read_xml_opt_Tsize import DATA_MODEL
 from common.f11 import LEARNING_MODEL
+from common.f18_state_normalization import VERSION, DEFAULT_CONFIG, scene_id, load_normalizer
 from common.ta_weights import TA_WEIGHT_MODEL, TA_ALGORITHMS
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -67,6 +68,22 @@ class Scenario:
     cache_output: str | None = None
     marl_options: dict | None = None
 
+    normalization_mode: str = VERSION
+    normalization_config: str = str(DEFAULT_CONFIG)
+    train_resource: str | None = None
+    train_deadline: str | None = None
+
+    def normalization_kwargs(self):
+        source = scene_id(self.task if self.mode == 'train' else self.train_task,
+                          self.resource if self.mode == 'train' else (self.train_resource or self.resource),
+                          self.deadline if self.mode == 'train' else (self.train_deadline or self.deadline))
+        return dict(normalization_mode=self.normalization_mode, normalization_config=self.normalization_config, source_train_scene=source)
+
+    def normalization_metadata(self):
+        kw = self.normalization_kwargs()
+        n = load_normalizer(kw['normalization_mode'], kw['normalization_config'], kw['source_train_scene'])
+        return dict(n.metadata) if n else {'normalization_version':'legacy'}
+
     def __post_init__(self):
         if (
             self.task not in VM_COUNTS
@@ -80,6 +97,12 @@ class Scenario:
             or self.episodes < 1
         ):
             raise ValueError("Invalid deadline, mode or episode count")
+        if self.train_resource is not None and self.train_resource not in VM_COUNTS:
+            raise ValueError('Invalid source resource')
+        if self.train_deadline is not None and self.train_deadline not in SMALL_PROBABILITY:
+            raise ValueError('Invalid source deadline')
+        if self.normalization_mode not in ('legacy', VERSION):
+            raise ValueError('Unknown observation normalization mode')
         parse_seeds(self.seed_spec)
 
     @property
@@ -139,8 +162,9 @@ class Scenario:
     def model_name(self, algorithm):
         task = self.task if self.mode == "train" else self.train_task
         return MODEL_NAMES[algorithm].format(
-            task=task, resource=self.resource, deadline=self.deadline
-        ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "")
+            task=task, resource=(self.train_resource or self.resource) if self.mode == "eval" else self.resource,
+            deadline=(self.train_deadline or self.deadline) if self.mode == "eval" else self.deadline
+        ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "") + ("_" + VERSION if self.normalization_mode == VERSION else "")
 
     def checkpoint_dir(self, algorithm):
         if self.mode == "eval" and self.checkpoint_override:
@@ -156,6 +180,7 @@ class Scenario:
             resource=self.resource,
             deadline=self.deadline,
             mode=self.mode,
+            normalization=self.normalization_kwargs() if self.mode != 'precompute' else None,
             num_hosts=self.num_hosts,
             vms_per_host=self.vms_per_host,
             dax_weights=dict(Counter(Path(p).name for p in self.dax_paths())),
@@ -215,9 +240,18 @@ def parse_scenario(mode, algorithm=None):
     if algorithm == "marl" and mode == "eval":
         for flag in ("--deadline-cache", "--ckpt-global", "--ckpt-local", "--out", "--device"):
             parser.add_argument(flag)
+    if mode != 'precompute' and algorithm != 'ertf_fifs':
+        parser.add_argument('--normalization-mode', choices=(VERSION, 'legacy'), default=VERSION)
+        parser.add_argument('--normalization-config', default=str(DEFAULT_CONFIG))
+        if mode == 'eval':
+            parser.add_argument('--train-resource', choices=VM_COUNTS)
+            parser.add_argument('--train-deadline', choices=SMALL_PROBABILITY)
     args = parser.parse_args()
     try:
         scenario = Scenario(
+            normalization_mode=getattr(args, 'normalization_mode', VERSION),
+            normalization_config=getattr(args, 'normalization_config', str(DEFAULT_CONFIG)),
+            train_resource=getattr(args, 'train_resource', None), train_deadline=getattr(args, 'train_deadline', None),
             task=args.task,
             resource=args.resource,
             deadline=getattr(args, "deadline", "Tight"),

@@ -9,6 +9,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 from common.ta_weights import TA_WEIGHT_MODEL
 
@@ -553,6 +554,7 @@ def build_env_kwargs_mgrrand(random_seed=1):
         alpha_delay_host=float(ALPHA_DELAY_HOST),
         alpha_delay_vm=float(ALPHA_DELAY_VM),
     )
+    env_kwargs.update(SCENARIO.normalization_kwargs())
     return env_kwargs
 
 
@@ -674,6 +676,7 @@ def build_two_agents_and_load(env_kwargs: dict):
         hidden_dims=(1024, 1024, 512, 512, 256),
         device=device,
     )
+    bind_normalization(vm_agent, SCENARIO)
     host_agent = D3QNAgent(
         input_dim=host_state_dim,
         output_dim=host_act_dim,
@@ -689,6 +692,7 @@ def build_two_agents_and_load(env_kwargs: dict):
         hidden_dims=(1024, 1024, 512, 512, 256),
         device=device,
     )
+    bind_normalization(host_agent, SCENARIO)
     ckpt_dir_default = str(SCENARIO.checkpoint_dir("ablation_mgrrand"))
     ckpt_vm = os.path.join(ckpt_dir_default, "best_vm.pth")
     ckpt_host = os.path.join(ckpt_dir_default, "best_host.pth")
@@ -711,7 +715,7 @@ def build_two_agents_and_load(env_kwargs: dict):
 def main():
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_mgrrand(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_mgrrand_ddlMix")
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.normalization_mode, LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_mgrrand_ddlMix")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,

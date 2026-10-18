@@ -63,7 +63,7 @@ def run():
                     def make_logger(*args,**kwargs):
                         logger=original_logger(*args,**kwargs);stack.callback(logger.close);return logger
                     stack.enter_context(patch.object(module,'CSVLogger',side_effect=make_logger))
-                    stack.enter_context(patch.object(module,'SCENARIO',SmokeScenario(mode='train',episodes=1)))
+                    stack.enter_context(patch.object(module,'SCENARIO',SmokeScenario(mode='train',episodes=1,normalization_mode='legacy')))
                     stack.enter_context(patch.object(module,'D3QNAgent',side_effect=make_agent))
                     stack.enter_context(patch.object(Base,'apply_manager_delta',apply))
                     stack.enter_context(patch.object(Base,'reset',reset))

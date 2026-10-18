@@ -20,6 +20,8 @@ H) alpha_delay=0.75（默认）
     wf.deadline = arrival + ddlAlpha_i * makespan_ref
 """
 
+from common.f18_state_normalization import checked_observation, load_normalizer, queue_features
+
 import os
 import json
 import heapq
@@ -82,8 +84,10 @@ class CloudWorkflowEnv_MARL(gym.Env):
         print_deadlines: bool = True,
         deadlines_out_dir: Optional[str] = None,
         deadlines_file_prefix: str = "marl",
+        normalization_mode='legacy', normalization_config=None, source_train_scene=None,
     ):
         super().__init__()
+        self.state_normalizer = load_normalizer(normalization_mode, normalization_config, source_train_scene)
         self.dax_paths = list(dax_paths)
         self.dax_map = {}
         for path in self.dax_paths:
@@ -1068,8 +1072,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
         if len(slacks) > 0:
             min_slack = float(np.min(slacks))
             avg_slack = float(np.mean(slacks))
-            min_slack_norm = min_slack / max(self.horizon, 1.0)
-            avg_slack_norm = avg_slack / max(self.horizon, 1.0)
+            min_slack_norm = min_slack / self._obs_ref('T_ref', max(self.horizon, 1.0))
+            avg_slack_norm = avg_slack / self._obs_ref('T_ref', max(self.horizon, 1.0))
         else:
             min_slack_norm = 0.0
             avg_slack_norm = 0.0
@@ -1079,8 +1083,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 ready_ratio,
                 waiting_ratio,
                 running_ratio,
-                avg_wait / max(self.horizon, 1.0),
-                max_wait / max(self.horizon, 1.0),
+                avg_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+                max_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
                 idle_vm_ratio,
                 host_load_mean,
                 host_running_ratio_mean,
@@ -1089,7 +1093,10 @@ class CloudWorkflowEnv_MARL(gym.Env):
             ],
             dtype=np.float32,
         )
-        return vec
+        if getattr(self, 'state_normalizer', None):
+            q = queue_features(self)
+            vec[[0, 1, 2, 3, 4, 8, 9]] = q[:7]
+        return checked_observation(self, vec)
 
     def _build_local_obs(self, tid: int, host_id: int, vm_map):
         now = self.current_time
@@ -1126,16 +1133,20 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 ready_cnt / max(1.0, self.max_ready),
                 waiting_cnt / max(1.0, len(self.task_state) if len(self.task_state) > 0 else 1.0),
                 running_cnt / max(1.0, self.num_vms),
-                avg_wait / max(self.horizon, 1.0),
-                max_wait / max(self.horizon, 1.0),
+                avg_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+                max_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
                 0.0,
                 float(urgent_cnt) / max(1.0, len(self.ready_task_ids)),
-                min_slack / max(self.horizon, 1.0),
-                avg_slack / max(self.horizon, 1.0),
+                min_slack / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+                avg_slack / self._obs_ref('T_ref', max(self.horizon, 1.0)),
                 float(len(set([self.task_meta[x][0] for x in self.ready_task_ids]))) / max(1.0, len(self.workflows) if len(self.workflows) > 0 else 1.0),
             ],
             dtype=np.float32,
         )
+
+        if getattr(self, 'state_normalizer', None):
+            q = queue_features(self)
+            block_queue[[0, 1, 2, 3, 4, 7, 8, 6]] = q
 
         wf_id, local_id = self.task_meta[tid]
         wf = self.workflows[int(wf_id)]
@@ -1145,7 +1156,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         mi = float(task_obj.workload_mi)
 
         io_ratio = _safe_div(in_bits + out_bits, max(mi, 1.0))
-        wait_norm = (now - self.task_ready_time[tid]) / max(self.horizon, 1.0)
+        wait_norm = (now - self.task_ready_time[tid]) / self._obs_ref('T_ref', max(self.horizon, 1.0))
 
         durations = []
         for slot, vmg in enumerate(vm_map):
@@ -1173,13 +1184,17 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 io_ratio,
                 wait_norm,
                 0.0, 0.0, 0.0,
-                est_best / max(self.horizon, 1.0),
-                est_mean / max(self.horizon, 1.0),
-                slack_on_best / max(self.horizon, 1.0),
+                est_best / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+                est_mean / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+                slack_on_best / self._obs_ref('T_ref', max(self.horizon, 1.0)),
                 same_wf_ready_frac,
             ],
             dtype=np.float32,
         )
+
+        if getattr(self, 'state_normalizer', None):
+            block_task[:3] = [self.state_normalizer.scale(v, k) for v, k in zip(
+                (mi, in_bits, out_bits), ('workload_mi_ref', 'input_bits_ref', 'output_bits_ref'))]
 
         idxs = self.host_vm_indices[int(host_id)]
         active_pc = 0.0
@@ -1203,12 +1218,14 @@ class CloudWorkflowEnv_MARL(gym.Env):
         total_pc_n = self.hosts[int(host_id)].total_pc / max(
             1.0, np.mean([self.hosts[x].total_pc for x in self.host_ids])
         )
+        if getattr(self, 'state_normalizer', None):
+            total_pc_n = self.state_normalizer.scale(self.hosts[int(host_id)].total_pc, 'host_pc_ref')
         block_host = np.array(
             [
                 total_pc_n,
                 host_load,
                 host_idle_vm,
-                host_soonest_delay / max(self.horizon, 1.0),
+                host_soonest_delay / self._obs_ref('T_ref', max(self.horizon, 1.0)),
                 host_running_ratio,
             ],
             dtype=np.float32,
@@ -1231,10 +1248,10 @@ class CloudWorkflowEnv_MARL(gym.Env):
             vm_block[slot] = np.array(
                 [
                     idle_flag,
-                    avail_delay / max(self.horizon, 1.0),
-                    vm.pc / mean_vm_pc,
-                    vm.bw / mean_vm_bw,
-                    pred_finish / max(self.horizon, 1.0),
+                    avail_delay / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+                    vm.pc / self._obs_ref('vm_pc_ref', mean_vm_pc),
+                    vm.bw / self._obs_ref('vm_bw_ref', mean_vm_bw),
+                    (max(0.0, pred_finish - now) if self.state_normalizer else pred_finish) / self._obs_ref('T_ref', max(self.horizon, 1.0)),
                 ],
                 dtype=np.float32,
             )
@@ -1244,4 +1261,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
         onehot[hi] = 1.0
 
         obs = np.concatenate([block_task, block_queue, block_host, vm_block.reshape(-1), onehot], axis=0)
-        return obs
+        return checked_observation(self, obs)
+
+    def _obs_ref(self, key, legacy):
+        normalizer = getattr(self, 'state_normalizer', None)
+        return normalizer.scales[key] if normalizer else legacy

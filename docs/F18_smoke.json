@@ -1,0 +1,840 @@
+{
+  "learning_model": "f11_real_decisions_v1",
+  "verification_overrides": {
+    "hidden_dims": [
+      16,
+      8
+    ],
+    "dqn_batch_size": 4,
+    "dqn_buffer_size": 32
+  },
+  "algorithms": {
+    "mahdrl": {
+      "learning_model": "f11_real_decisions_v1",
+      "episode": 0,
+      "learners": {
+        "TA": {
+          "transitions": 302,
+          "nonterminal": 301,
+          "nonterminal_ratio": 0.9966887417218543,
+          "gradient_updates": 299,
+          "sampled_targets": 1196,
+          "last_loss": 0.035681601613759995,
+          "max_abs_loss": 1.3280476331710815,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 0.588232322082073,
+          "target_mean": 0.2993739367428432,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        },
+        "HA": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1361,
+          "sampled_targets": 5444,
+          "last_loss": 246583.09375,
+          "max_abs_loss": 964725.25,
+          "bootstrap_nonzero_ratio": 0.9998163115356355,
+          "future_abs_mean": 173371.46534889328,
+          "target_mean": 173371.40542053178,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        },
+        "VA": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1361,
+          "sampled_targets": 5444,
+          "last_loss": 35295.21484375,
+          "max_abs_loss": 966016.5625,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 191735.51973215927,
+          "target_mean": 190386.70028356908,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        }
+      },
+      "normalization": {
+        "normalization_version": "f18_shared_v1",
+        "source_train_scene": "SS_T",
+        "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\F18_integration_cra88xnw\\f18_shared_normalization_v1.json",
+        "normalization_config_hash": "026a5ed3310168a896c5fe77afd593bb085db5f3e68e0fc5eb2a2f9f5b7af941",
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "rr_observations": 1364,
+        "rr_saturated": 220,
+        "rr_saturation_ratio": 0.16129032258064516
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": -4.547473508864641e-13,
+        "team_energy_reward": -337.62816305599756,
+        "selected_host_energy_reward": -114.41628143840991,
+        "HA_reward_formula_balance": 0.0,
+        "VA_reward_formula_balance": 0.0
+      },
+      "pending": 0,
+      "reward_balance": {
+        "HA": 0.0,
+        "VA": 0.0
+      },
+      "cutoffs": 0,
+      "f18_checkpoints_checked": 6,
+      "f18_evaluation_loader_checked": true
+    },
+    "ablation_hostrand": {
+      "learning_model": "f11_real_decisions_v1",
+      "episode": 0,
+      "learners": {
+        "TA": {
+          "transitions": 332,
+          "nonterminal": 331,
+          "nonterminal_ratio": 0.9969879518072289,
+          "gradient_updates": 329,
+          "sampled_targets": 1316,
+          "last_loss": 0.035668209195137024,
+          "max_abs_loss": 1.3994364738464355,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 0.5546179403831168,
+          "target_mean": 0.2982048196859635,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        },
+        "VA": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1361,
+          "sampled_targets": 5444,
+          "last_loss": 247160.234375,
+          "max_abs_loss": 1181514.0,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 200620.00385458762,
+          "target_mean": 199193.0250045922,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        }
+      },
+      "normalization": {
+        "normalization_version": "f18_shared_v1",
+        "source_train_scene": "SS_T",
+        "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\F18_integration_cra88xnw\\f18_shared_normalization_v1.json",
+        "normalization_config_hash": "026a5ed3310168a896c5fe77afd593bb085db5f3e68e0fc5eb2a2f9f5b7af941",
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "rr_observations": 1364,
+        "rr_saturated": 201,
+        "rr_saturation_ratio": 0.14736070381231672
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": -7.389644451905042e-13,
+        "team_energy_reward": -340.41551507720317,
+        "selected_host_energy_reward": -115.24486246375311,
+        "VA_reward_formula_balance": 0.0
+      },
+      "pending": 0,
+      "reward_balance": {
+        "VA": 0.0
+      },
+      "cutoffs": 0,
+      "f18_checkpoints_checked": 4,
+      "f18_evaluation_loader_checked": true
+    },
+    "ablation_mgrrand": {
+      "learning_model": "f11_real_decisions_v1",
+      "episode": 0,
+      "learners": {
+        "HA": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1361,
+          "sampled_targets": 5444,
+          "last_loss": 38507.22265625,
+          "max_abs_loss": 603914.9375,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 146461.12824037933,
+          "target_mean": 146461.0701087206,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        },
+        "VA": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1361,
+          "sampled_targets": 5444,
+          "last_loss": 25287.36328125,
+          "max_abs_loss": 1282332.75,
+          "bootstrap_nonzero_ratio": 0.9998163115356355,
+          "future_abs_mean": 195288.80095632808,
+          "target_mean": 194478.2569055382,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        }
+      },
+      "normalization": {
+        "normalization_version": "f18_shared_v1",
+        "source_train_scene": "SS_T",
+        "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\F18_integration_cra88xnw\\f18_shared_normalization_v1.json",
+        "normalization_config_hash": "026a5ed3310168a896c5fe77afd593bb085db5f3e68e0fc5eb2a2f9f5b7af941",
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "rr_observations": 1364,
+        "rr_saturated": 115,
+        "rr_saturation_ratio": 0.08431085043988269
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": -1.1368683772161603e-13,
+        "team_energy_reward": -347.4787339275512,
+        "selected_host_energy_reward": -117.97570968097763,
+        "HA_reward_formula_balance": 0.0,
+        "VA_reward_formula_balance": -3.552713678800501e-15
+      },
+      "pending": 0,
+      "reward_balance": {
+        "HA": 0.0,
+        "VA": 0.0
+      },
+      "cutoffs": 0,
+      "f18_checkpoints_checked": 4,
+      "f18_evaluation_loader_checked": true
+    },
+    "ablation_vmrand": {
+      "learning_model": "f11_real_decisions_v1",
+      "episode": 0,
+      "learners": {
+        "TA": {
+          "transitions": 368,
+          "nonterminal": 367,
+          "nonterminal_ratio": 0.9972826086956522,
+          "gradient_updates": 365,
+          "sampled_targets": 1460,
+          "last_loss": 0.07715767621994019,
+          "max_abs_loss": 0.989558219909668,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 0.27848714961581034,
+          "target_mean": 0.05903850580527358,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        },
+        "HA": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1361,
+          "sampled_targets": 5444,
+          "last_loss": 33683.56640625,
+          "max_abs_loss": 1351141.75,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 103511.30635661645,
+          "target_mean": -14438.952427871782,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        }
+      },
+      "normalization": {
+        "normalization_version": "f18_shared_v1",
+        "source_train_scene": "SS_T",
+        "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\F18_integration_cra88xnw\\f18_shared_normalization_v1.json",
+        "normalization_config_hash": "026a5ed3310168a896c5fe77afd593bb085db5f3e68e0fc5eb2a2f9f5b7af941",
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "rr_observations": 1364,
+        "rr_saturated": 120,
+        "rr_saturation_ratio": 0.08797653958944282
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": 2.8421709430404007e-13,
+        "team_energy_reward": -339.25598170917544,
+        "selected_host_energy_reward": -115.14955101300323,
+        "HA_reward_formula_balance": 0.0
+      },
+      "pending": 0,
+      "reward_balance": {
+        "HA": 0.0
+      },
+      "cutoffs": 0,
+      "f18_checkpoints_checked": 4,
+      "f18_evaluation_loader_checked": true
+    },
+    "ablation_nohost": {
+      "learning_model": "f11_real_decisions_v1",
+      "episode": 0,
+      "learners": {
+        "TA": {
+          "transitions": 329,
+          "nonterminal": 328,
+          "nonterminal_ratio": 0.9969604863221885,
+          "gradient_updates": 326,
+          "sampled_targets": 1304,
+          "last_loss": 0.1353212296962738,
+          "max_abs_loss": 1.4719280004501343,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 0.5665435417115323,
+          "target_mean": 0.3132926436838197,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        },
+        "VA": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1361,
+          "sampled_targets": 5444,
+          "last_loss": 0.13686247169971466,
+          "max_abs_loss": 1135441.75,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 43181.885102044,
+          "target_mean": 16880.097659556897,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        }
+      },
+      "normalization": {
+        "normalization_version": "f18_shared_v1",
+        "source_train_scene": "SS_T",
+        "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\F18_integration_cra88xnw\\f18_shared_normalization_v1.json",
+        "normalization_config_hash": "026a5ed3310168a896c5fe77afd593bb085db5f3e68e0fc5eb2a2f9f5b7af941",
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "rr_observations": 1364,
+        "rr_saturated": 159,
+        "rr_saturation_ratio": 0.11656891495601172
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": 3.979039320256561e-13,
+        "team_energy_reward": -334.35526327451527,
+        "selected_host_energy_reward": -112.625863255924,
+        "VA_reward_formula_balance": 3.552713678800501e-15
+      },
+      "pending": 0,
+      "reward_balance": {
+        "VA": 0.0
+      },
+      "cutoffs": 0,
+      "f18_checkpoints_checked": 4,
+      "f18_evaluation_loader_checked": true
+    },
+    "pd3qn": {
+      "learning_model": "f11_real_decisions_v1",
+      "episode": 0,
+      "learners": {
+        "PD3QN": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1361,
+          "sampled_targets": 5444,
+          "last_loss": 0.009156257845461369,
+          "max_abs_loss": 0.29264509677886963,
+          "bootstrap_nonzero_ratio": 1.0,
+          "future_abs_mean": 0.17425954144127792,
+          "target_mean": -0.013746652315240039,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        }
+      },
+      "normalization": {
+        "normalization_version": "f18_shared_v1",
+        "source_train_scene": "SS_T",
+        "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\F18_integration_cra88xnw\\f18_shared_normalization_v1.json",
+        "normalization_config_hash": "026a5ed3310168a896c5fe77afd593bb085db5f3e68e0fc5eb2a2f9f5b7af941",
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "rr_observations": 1364,
+        "rr_saturated": 144,
+        "rr_saturation_ratio": 0.10557184750733138
+      },
+      "pending": 0,
+      "terminated": true,
+      "truncated": false,
+      "f18_checkpoints_checked": 2,
+      "f18_evaluation_loader_checked": true
+    },
+    "marl": {
+      "learning_model": "f11_real_decisions_v1",
+      "episode": 0,
+      "learners": {
+        "Global": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1364,
+          "sampled_targets": 1364,
+          "last_loss": 0.012382732704281807,
+          "max_abs_loss": 0.9270654916763306,
+          "bootstrap_nonzero_ratio": 0.999266862170088,
+          "future_abs_mean": 0.8070532698457367,
+          "target_mean": -0.8677490501940425,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        },
+        "Local": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 1364,
+          "sampled_targets": 1364,
+          "last_loss": -0.6148665547370911,
+          "max_abs_loss": 242464208191488.0,
+          "bootstrap_nonzero_ratio": 0.999266862170088,
+          "future_abs_mean": 225620.51284814999,
+          "target_mean": 178096.9381673225,
+          "last_rollout_value": null,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        }
+      },
+      "normalization": {
+        "normalization_version": "f18_shared_v1",
+        "source_train_scene": "SS_T",
+        "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\F18_integration_cra88xnw\\f18_shared_normalization_v1.json",
+        "normalization_config_hash": "026a5ed3310168a896c5fe77afd593bb085db5f3e68e0fc5eb2a2f9f5b7af941",
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "rr_observations": 1364,
+        "rr_saturated": 82,
+        "rr_saturation_ratio": 0.060117302052785926
+      },
+      "pending": 0,
+      "local_reward_balance": 0.0,
+      "f18_checkpoints_checked": 4,
+      "f18_evaluation_loader_checked": true
+    },
+    "irws": {
+      "learning_model": "f11_real_decisions_v1",
+      "episode": 0,
+      "learners": {
+        "VM_PPO": {
+          "transitions": 1364,
+          "nonterminal": 1363,
+          "nonterminal_ratio": 0.999266862170088,
+          "gradient_updates": 24,
+          "sampled_targets": 1364,
+          "last_loss": 0.5630402565002441,
+          "max_abs_loss": 0.6153296828269958,
+          "bootstrap_nonzero_ratio": 0.999266862170088,
+          "future_abs_mean": 0.047937499463033814,
+          "target_mean": -0.8623301038993768,
+          "last_rollout_value": 0.0,
+          "nonterminal_rollouts": 0,
+          "last_nonterminal_rollout_value": null,
+          "truncation_cutoffs": 0,
+          "terminal_transitions": 1
+        }
+      },
+      "normalization": {
+        "normalization_version": "f18_shared_v1",
+        "source_train_scene": "SS_T",
+        "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\F18_integration_cra88xnw\\f18_shared_normalization_v1.json",
+        "normalization_config_hash": "026a5ed3310168a896c5fe77afd593bb085db5f3e68e0fc5eb2a2f9f5b7af941",
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "rr_observations": 1364,
+        "rr_saturated": 70,
+        "rr_saturation_ratio": 0.051319648093841645
+      },
+      "pending": 0,
+      "truncated": false,
+      "f18_checkpoints_checked": 2,
+      "f18_evaluation_loader_checked": true
+    }
+  },
+  "normalization_version": "f18_shared_v1",
+  "calibration_verification_only": true,
+  "calibration_seeds": [
+    101
+  ],
+  "calibration_summary": [
+    {
+      "scene": "SS_L",
+      "task": "S",
+      "resource": "S",
+      "deadline": "Loose",
+      "seed_count": 1,
+      "ready_sample_count": 317,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 21.0,
+      "ready_P99": 45.879999999999825,
+      "ready_Max": 71.0,
+      "deadline_P50": 1118.7304670688868,
+      "deadline_P95": 1872.5791346360415,
+      "deadline_P99": 2169.4716150026757,
+      "deadline_Max": 2215.947568515019,
+      "R_ref": 46,
+      "T_ref": 1872.5791346360415,
+      "status": "ok"
+    },
+    {
+      "scene": "SS_M",
+      "task": "S",
+      "resource": "S",
+      "deadline": "Medium",
+      "seed_count": 1,
+      "ready_sample_count": 317,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 21.0,
+      "ready_P99": 45.879999999999825,
+      "ready_Max": 71.0,
+      "deadline_P50": 1036.6860179186635,
+      "deadline_P95": 1711.412710568039,
+      "deadline_P99": 1867.912942293209,
+      "deadline_Max": 1925.0737984929083,
+      "R_ref": 46,
+      "T_ref": 1711.412710568039,
+      "status": "ok"
+    },
+    {
+      "scene": "SS_T",
+      "task": "S",
+      "resource": "S",
+      "deadline": "Tight",
+      "seed_count": 1,
+      "ready_sample_count": 317,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 21.0,
+      "ready_P99": 45.879999999999825,
+      "ready_Max": 71.0,
+      "deadline_P50": 824.3419784769015,
+      "deadline_P95": 1448.8437135942922,
+      "deadline_P99": 1841.6468187206258,
+      "deadline_Max": 1925.0737984929083,
+      "R_ref": 46,
+      "T_ref": 1448.8437135942922,
+      "status": "ok"
+    },
+    {
+      "scene": "SM_L",
+      "task": "S",
+      "resource": "M",
+      "deadline": "Loose",
+      "seed_count": 1,
+      "ready_sample_count": 592,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 7.449999999999932,
+      "ready_P99": 21.0,
+      "ready_Max": 39.0,
+      "deadline_P50": 881.5828749641166,
+      "deadline_P95": 1707.0483055412733,
+      "deadline_P99": 2417.4610344816833,
+      "deadline_Max": 2676.4822170988045,
+      "R_ref": 21,
+      "T_ref": 1707.0483055412733,
+      "status": "ok"
+    },
+    {
+      "scene": "SM_M",
+      "task": "S",
+      "resource": "M",
+      "deadline": "Medium",
+      "seed_count": 1,
+      "ready_sample_count": 592,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 7.449999999999932,
+      "ready_P99": 21.0,
+      "ready_Max": 39.0,
+      "deadline_P50": 826.6827071617599,
+      "deadline_P95": 1707.0483055412733,
+      "deadline_P99": 1969.7299791875,
+      "deadline_Max": 2147.8675586965187,
+      "R_ref": 21,
+      "T_ref": 1707.0483055412733,
+      "status": "ok"
+    },
+    {
+      "scene": "SM_T",
+      "task": "S",
+      "resource": "M",
+      "deadline": "Tight",
+      "seed_count": 1,
+      "ready_sample_count": 592,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 7.449999999999932,
+      "ready_P99": 21.0,
+      "ready_Max": 39.0,
+      "deadline_P50": 704.5129069400294,
+      "deadline_P95": 1347.8475274251916,
+      "deadline_P99": 1969.7299791875,
+      "deadline_Max": 2147.8675586965187,
+      "R_ref": 21,
+      "T_ref": 1347.8475274251916,
+      "status": "ok"
+    },
+    {
+      "scene": "SL_L",
+      "task": "S",
+      "resource": "L",
+      "deadline": "Loose",
+      "seed_count": 1,
+      "ready_sample_count": 678,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 7.0,
+      "ready_P99": 21.0,
+      "ready_Max": 21.0,
+      "deadline_P50": 953.0891276436387,
+      "deadline_P95": 1662.371363065112,
+      "deadline_P99": 1931.654967958342,
+      "deadline_Max": 2029.799230778368,
+      "R_ref": 21,
+      "T_ref": 1662.371363065112,
+      "status": "ok"
+    },
+    {
+      "scene": "SL_M",
+      "task": "S",
+      "resource": "L",
+      "deadline": "Medium",
+      "seed_count": 1,
+      "ready_sample_count": 678,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 7.0,
+      "ready_P99": 21.0,
+      "ready_Max": 21.0,
+      "deadline_P50": 859.0618276019725,
+      "deadline_P95": 1504.960936435235,
+      "deadline_P99": 1798.2899222154667,
+      "deadline_Max": 1829.5048168599485,
+      "R_ref": 21,
+      "T_ref": 1504.960936435235,
+      "status": "ok"
+    },
+    {
+      "scene": "SL_T",
+      "task": "S",
+      "resource": "L",
+      "deadline": "Tight",
+      "seed_count": 1,
+      "ready_sample_count": 678,
+      "workflow_count": 50,
+      "ready_P50": 1.0,
+      "ready_P95": 7.0,
+      "ready_P99": 21.0,
+      "ready_Max": 21.0,
+      "deadline_P50": 753.7596195301358,
+      "deadline_P95": 1218.1947936098416,
+      "deadline_P99": 1563.626233342597,
+      "deadline_Max": 1765.8009502385576,
+      "R_ref": 21,
+      "T_ref": 1218.1947936098416,
+      "status": "ok"
+    }
+  ],
+  "calibration_parameters": {
+    "normalization_version": "f18_shared_v1",
+    "units": {
+      "R_ref": "tasks",
+      "T_ref": "s",
+      "workload_mi_ref": "MI",
+      "input_bits_ref": "bit",
+      "output_bits_ref": "bit",
+      "up_rank_ref": "s",
+      "down_rank_ref": "s",
+      "vm_pc_ref": "MI/s",
+      "vm_bw_ref": "Mb/s",
+      "host_pc_ref": "MI/s"
+    },
+    "scenes": {
+      "SS_L": {
+        "R_ref": 46,
+        "T_ref": 1872.5791346360415,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      },
+      "SS_M": {
+        "R_ref": 46,
+        "T_ref": 1711.412710568039,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      },
+      "SS_T": {
+        "R_ref": 46,
+        "T_ref": 1448.8437135942922,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      },
+      "SM_L": {
+        "R_ref": 21,
+        "T_ref": 1707.0483055412733,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      },
+      "SM_M": {
+        "R_ref": 21,
+        "T_ref": 1707.0483055412733,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      },
+      "SM_T": {
+        "R_ref": 21,
+        "T_ref": 1347.8475274251916,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      },
+      "SL_L": {
+        "R_ref": 21,
+        "T_ref": 1662.371363065112,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      },
+      "SL_M": {
+        "R_ref": 21,
+        "T_ref": 1504.960936435235,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      },
+      "SL_T": {
+        "R_ref": 21,
+        "T_ref": 1218.1947936098416,
+        "workload_mi_ref": 88.56309921997254,
+        "input_bits_ref": 73817505161.89034,
+        "output_bits_ref": 21384953872.69541,
+        "up_rank_ref": 284.81506666343137,
+        "down_rank_ref": 204.22661919829002,
+        "vm_pc_ref": 8.0,
+        "vm_bw_ref": 8000.0,
+        "host_pc_ref": 34.0
+      }
+    },
+    "generation": {
+      "percentile_method": "linear",
+      "R_ref": "ceil(ready P99), minimum 1",
+      "T_ref": "relative workflow deadline P95",
+      "physical": "task-weighted P95; VM/host capacity maxima",
+      "decision_weighting": "equal distinct decision timestamps",
+      "rank_definition": "Workflow.compute_upward_ranks / compute_downward_ranks (mean PC/BW)",
+      "calibration_seeds": {
+        "SS_L": [
+          101
+        ],
+        "SS_M": [
+          101
+        ],
+        "SS_T": [
+          101
+        ],
+        "SM_L": [
+          101
+        ],
+        "SM_M": [
+          101
+        ],
+        "SM_T": [
+          101
+        ],
+        "SL_L": [
+          101
+        ],
+        "SL_M": [
+          101
+        ],
+        "SL_T": [
+          101
+        ]
+      }
+    }
+  }
+}

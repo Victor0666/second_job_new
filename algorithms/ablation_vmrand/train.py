@@ -9,6 +9,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f18_state_normalization import bind_normalization, check_checkpoint, normalization_diagnostics
 from common.f11 import DQNDecisionTrace, F11Logger, protect_training_outputs, snapshot_decision, finish_lower_phase, LowerRewardAudit
 
 SCENARIO = Scenario(mode="train")
@@ -262,6 +263,7 @@ def train():
         manager_alpha_delay=MGR_ALPHA_DELAY,
         manager_delay_mode=MGR_DELAY_MODE,
     )
+    env_kwargs.update(SCENARIO.normalization_kwargs())
     env = EnvCls(**env_kwargs)
     env.reset()
     env.energy_reward_scale = ENERGY_REWARD_SCALE
@@ -317,6 +319,7 @@ def train():
         hidden_dims=hid_host,
         device=device,
     )
+    bind_normalization(host_agent, SCENARIO)
     sH0 = env.get_manager_state()
     state_dim_mgr = int(sH0.shape[0])
     manager_agent = D3QNAgent(
@@ -334,6 +337,7 @@ def train():
         hidden_dims=hid_mgr,
         device=device,
     )
+    bind_normalization(manager_agent, SCENARIO)
     vm_selector = RandomVMSelector(_vm_random_seed_from_episode_seed(env.random_seed))
     logger = CSVLogger(
         filepath=log_path,
@@ -395,7 +399,7 @@ def train():
     HARD_MAX_STEPS = 10**9
     while episode_idx < MAX_EPISODES and global_step < HARD_MAX_STEPS:
         if env.done_flag:
-            f11_log.log(episode_idx, {'TA': manager_agent, 'HA': host_agent},
+            f11_log.log(episode_idx, {'TA': manager_agent, 'HA': host_agent}, normalization=normalization_diagnostics(env),
                         reward_audit=reward_audit.summary(env, host_trace, vm_trace),
                         pending=sum(t.pending is not None for t in (host_trace, vm_trace) if t is not None),
                         reward_balance={name: t.recorded_reward - t.emitted_reward for name, t in
@@ -561,7 +565,7 @@ def train():
         if trace is not None:
             trace.finish(truncated=not env.done_flag)
     if global_step >= HARD_MAX_STEPS and not env.done_flag:
-        f11_log.log(episode_idx, {'TA': manager_agent, 'HA': host_agent}, pending=0,
+        f11_log.log(episode_idx, {'TA': manager_agent, 'HA': host_agent}, normalization=normalization_diagnostics(env), pending=0,
                     end_reason="training_step_cap_no_successor",
                     cutoffs=sum(t.cutoffs for t in (host_trace, vm_trace) if t is not None))
     host_final = os.path.join(save_dir, "host_final.pth")

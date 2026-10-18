@@ -10,6 +10,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f18_state_normalization import bind_normalization, check_checkpoint, normalization_diagnostics
 from common.f11 import LocalDecisionTrace, F11Logger, protect_training_outputs, LEARNING_MODEL, valid_decision
 
 SCENARIO = Scenario(mode="train")
@@ -169,6 +170,7 @@ def train():
         deadlines_out_dir=os.path.join(str(SCENARIO.log_dir("marl")), "deadlines"),
         deadlines_file_prefix="marl",
     )
+    env_kwargs.update(SCENARIO.normalization_kwargs())
     protect_training_outputs(SCENARIO.checkpoint_dir("marl"), SCENARIO.log_dir("marl"))
     env = CloudWorkflowEnv_MARL(**env_kwargs)
     obs0, _info0 = env.reset(
@@ -209,9 +211,11 @@ def train():
         hidden_dims=hid_vm,
     )
     global_agent = A2CAgent(global_obs_dim, global_act_dim, cfg_global)
+    bind_normalization(global_agent, SCENARIO)
     local_agent = LocalSharedActorIndependentCriticA2C(
         local_obs_dim, local_act_dim, num_hosts=SCENARIO.num_hosts, cfg=cfg_local
     )
+    bind_normalization(local_agent, SCENARIO)
     save_dir = str(SCENARIO.checkpoint_dir("marl"))
     log_path = os.path.join(
         ROOT_DIR, "outputs", "logs", SCENARIO.model_name("marl"), "train_metrics_marl.csv"
@@ -342,7 +346,7 @@ def train():
             global_step += 1
         ep_energy = float(env.total_energy - ep_energy0)
         local_trace.finish()
-        f11_log.log(episode_idx, {"Global": global_agent, "Local": local_agent},
+        f11_log.log(episode_idx, {"Global": global_agent, "Local": local_agent}, normalization=normalization_diagnostics(env),
                     pending=int(local_trace.pending is not None),
                     local_reward_balance=local_trace.recorded_reward - local_trace.emitted_reward)
         ep_total_late, ep_avg_late, ep_wf_avg_late = _finalize_lateness_stats(

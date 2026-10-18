@@ -13,6 +13,7 @@ Dueling Double DQN with action-mask support + Prioritized Experience Replay (PER
     * 抽样概率 P(i) ∝ priority_i^α
     * 重要性采样权重 w_i ∝ (1 / (N·P(i)))^β，归一化到 [0,1]
 """
+from common.f18_state_normalization import checkpoint_metadata, check_checkpoint
 
 from common.f11 import LearningDiagnostics, validate_transition, LEARNING_MODEL
 
@@ -297,6 +298,7 @@ class D3QNAgent:
     def save(self, path: str):
         torch.save(
             {
+                "normalization": checkpoint_metadata(self),
                 "learning_model": LEARNING_MODEL,
                 "online": self.online.state_dict(),
                 "target": self.target.state_dict(),
@@ -326,6 +328,7 @@ class D3QNAgent:
         except TypeError:
             ckpt = torch.load(path, map_location=self.device)
 
+        check_checkpoint(ckpt.get("normalization"), checkpoint_metadata(self))
         if require_learning_model and ckpt.get("learning_model") != LEARNING_MODEL:
             raise ValueError(f"Checkpoint is not an F11-trained model: {path}")
         self.online.load_state_dict(ckpt["online"], strict=strict)

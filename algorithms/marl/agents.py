@@ -135,6 +135,7 @@ class A2CAgent:
 
         self.net = ActorCriticNet(obs_dim, act_dim, hidden_dims=cfg.hidden_dims).to(self.device)
         self.optim = torch.optim.Adam(self.net.parameters(), lr=cfg.lr)
+        self.f11.numerics.inputs(self.net)
 
     def _masked_logits(self, logits: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         masked = logits.clone()
@@ -197,9 +198,13 @@ class A2CAgent:
         entropy_loss = -ent.mean()
         loss = policy_loss + self.cfg.vf_coef * value_loss + self.cfg.ent_coef * entropy_loss
 
+        self.f11.numerics.observe("value", v, scalar=True)
+        self.f11.numerics.observe("return", target, scalar=True)
+        self.f11.numerics.observe("advantage", adv, scalar=True)
         loss_value = self.f11.loss(loss)
         self.optim.zero_grad()
         loss.backward()
+        self.f11.numerics.gradients(self.net.parameters(), self.cfg.grad_clip)
         if self.cfg.grad_clip is not None and self.cfg.grad_clip > 0:
             nn.utils.clip_grad_norm_(self.net.parameters(), self.cfg.grad_clip)
         self.optim.step()
@@ -307,6 +312,7 @@ class LocalSharedActorIndependentCriticA2C:
 
         self.net = SharedActorMultiCriticNet(obs_dim, act_dim, num_hosts, hidden_dims=cfg.hidden_dims).to(self.device)
         self.optim = torch.optim.Adam(self.net.parameters(), lr=cfg.lr)
+        self.f11.numerics.inputs(self.net)
 
     def _masked_logits(self, logits: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         masked = logits.clone()
@@ -378,9 +384,13 @@ class LocalSharedActorIndependentCriticA2C:
         entropy_loss = -ent.mean()
         loss = policy_loss + self.cfg.vf_coef * value_loss + self.cfg.ent_coef * entropy_loss
 
+        self.f11.numerics.observe("value", v, scalar=True)
+        self.f11.numerics.observe("return", target, scalar=True)
+        self.f11.numerics.observe("advantage", adv, scalar=True)
         loss_value = self.f11.loss(loss)
         self.optim.zero_grad()
         loss.backward()
+        self.f11.numerics.gradients(self.net.parameters(), self.cfg.grad_clip)
         if self.cfg.grad_clip is not None and self.cfg.grad_clip > 0:
             nn.utils.clip_grad_norm_(self.net.parameters(), self.cfg.grad_clip)
         self.optim.step()

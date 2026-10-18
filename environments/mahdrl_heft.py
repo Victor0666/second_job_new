@@ -1232,6 +1232,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             same_wf_ready_frac,
         ], dtype=np.float32)
         if getattr(self, 'state_normalizer', None):
+            block1[3] = self.state_normalizer.io_ratio(io_ratio)
             block1[[0, 1, 2, 6, 7]] = [self.state_normalizer.scale(v, k) for v, k in zip(
                 (mi, in_bits, out_bits, self.task_up_rank[tid], self.task_down_rank[tid]),
                 ('workload_mi_ref', 'input_bits_ref', 'output_bits_ref', 'up_rank_ref', 'down_rank_ref'))]

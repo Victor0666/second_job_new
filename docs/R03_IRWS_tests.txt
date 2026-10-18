@@ -1,0 +1,7 @@
+R03 IRWS common cloud objective adaptation
+Focused: common.test_scenarios common.test_irws_paper common.test_f19
+Ran 31 tests in 5.088s: OK
+Full: unittest discover -s common -p test_*.py -q
+Ran 169 tests in 79.307s: OK
+Real DAX smoke: docs/R03_IRWS_smoke.json
+No formal 600-episode training or 30-seed performance evaluation.

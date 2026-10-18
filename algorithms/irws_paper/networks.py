@@ -62,7 +62,7 @@ class WorkflowEmbedding(nn.Module):
 class TaskPolicy(nn.Module):
     def __init__(self,config):
         super().__init__();self.embedding=WorkflowEmbedding(config.embedding_dim,config.message_passes)
-        self.score=mlp(config.embedding_dim,(config.embedding_dim,),1)
+        self.score=mlp(config.embedding_dim+3,(config.embedding_dim,),1)
 
     def embeddings(self,graphs):
         result={}
@@ -71,10 +71,13 @@ class TaskPolicy(nn.Module):
             result.update({gid:tensor[i] for i,gid in enumerate(graph.gids)})
         return result
 
-    def distribution(self,embeddings,candidates):
+    def distribution(self,embeddings,candidates,context):
         if not candidates or len(set(candidates))!=len(candidates):raise ValueError('Ready candidates must be unique and nonempty')
         matrix=torch.stack([embeddings[g] for g in candidates])
-        return torch.distributions.Categorical(logits=self.score(matrix).squeeze(-1))
+        context=torch.as_tensor(context,dtype=matrix.dtype,device=matrix.device)
+        if context.shape!=(len(candidates),3) or not torch.isfinite(context).all():
+            raise ValueError("Invalid current task deadline context")
+        return torch.distributions.Categorical(logits=self.score(torch.cat((matrix,context),dim=-1)).squeeze(-1))
 
 
 class HistoryReward(nn.Module):

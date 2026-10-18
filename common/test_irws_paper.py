@@ -18,9 +18,9 @@ from common.scenarios import Scenario
 from common.experiment_protocol import ExperimentProtocol,DEFAULT_PROTOCOL
 from common.f18_state_normalization import VERSION,SCALE_UNITS
 from environments.irws import IRWSEnvRouteA
-from algorithms.irws_paper.config import PaperConfig
+from algorithms.irws_paper.config import PaperConfig,MODEL_VERSION,REWARD_PROTOCOL,COMMON_REWARD
 from algorithms.irws_paper.environment import PaperCloudEnv,GraphData,paper_ranks,fusion_weight
-from algorithms.irws_paper.learner import PaperLearner,gae,clipped_loss
+from algorithms.irws_paper.learner import PaperLearner,gae,clipped_loss,fuse_reward
 from algorithms.irws_paper.networks import WorkflowEmbedding,masked_distribution
 from algorithms.irws_paper.runner import run_episode,save_checkpoint,load_checkpoint
 
@@ -91,7 +91,7 @@ class PaperIRWSTests(unittest.TestCase):
         with synthetic_env(self.path) as env:
             env.reset();learner=PaperLearner(3,PaperConfig());c=env.get_ready_task_candidates()['gids']
             self.assertEqual(len(c),2) # configured cap=1 is intentionally not used
-            dist=learner.task.distribution(learner.task.embeddings(env.graphs()),c)
+            dist=learner.task.distribution(learner.task.embeddings(env.graphs()),c,env.task_context(c))
             self.assertTrue(torch.all(dist.probs>0));self.assertAlmostEqual(float(dist.probs.sum()),1.,places=6)
             self.assertEqual(len(env.graphs()),1) # second workflow has not arrived
             with self.assertRaises(ValueError):env.select_task(2)
@@ -109,10 +109,44 @@ class PaperIRWSTests(unittest.TestCase):
             sizes.add(len(tasks))
         self.assertGreater(len(sizes),5)
 
-    def test_dynamic_fusion_literal_and_boundaries(self):
-        self.assertEqual(fusion_weight(2,4),(.5,False));self.assertEqual(fusion_weight(2,1),(2.,False))
+    def test_dynamic_fusion_bounded_and_external_never_reversed(self):
+        self.assertEqual(fusion_weight(2,4),(1/3,False));self.assertEqual(fusion_weight(2,1),(2/3,False))
         self.assertEqual(fusion_weight(2,0),(1.,True));self.assertEqual(fusion_weight(0,0),(0.,True))
         with self.assertRaises(ValueError):fusion_weight(np.nan,1)
+        for reference,rank in ((0,0),(0,3),(3,0),(1e308,1e308)):
+            weight,_=fusion_weight(reference,rank)
+            self.assertGreaterEqual(weight,0);self.assertLessEqual(weight,1)
+            self.assertEqual(fuse_reward(-5.,0.,weight),-5.)
+            self.assertLess(fuse_reward(-6.,2.,weight),fuse_reward(-5.,2.,weight))
+        with self.assertRaises(ValueError):fuse_reward(-1.,2.,2.)
+
+    def test_deadline_context_reaches_task_and_vm_policies_and_refreshes(self):
+        with synthetic_env(self.path) as env:
+            env.reset();learner=PaperLearner(3,PaperConfig())
+            # The synthetic simulator is unconstrained; supply finite deadlines for this observation test.
+            env.deadline_mode='observation_test'
+            for wf in env.workflows:wf.deadline=60.
+            env.task_baseline_finish[:]=[20.]*len(env.task_state)
+            first=learner.prepare(env,True)
+            before=first.task_context.copy();resource=first.resources.copy()
+            gid=first.candidates[0];env.task_baseline_finish[gid]-=10.
+            second=learner.prepare(env,True)
+            self.assertFalse(np.array_equal(before,second.task_context))
+            self.assertAlmostEqual(second.task_context[0,0],before[0,0]-.5)
+            env.select_task(gid)
+            vm=env.get_vm_obs_and_mask()
+            self.assertAlmostEqual(vm['obs'][1],.5)
+            self.assertAlmostEqual(vm['obs'][2],3.)
+            # Graph embedding remains cached, but context changes at every actual decision.
+            self.assertEqual(len(learner._embedding_cache),1)
+            self.assertEqual(len(second.obs),learner.obs_dim)
+            self.assertEqual(len(resource),4+6*env.num_vms)
+
+    def test_common_reward_coefficients_guard(self):
+        with synthetic_env(self.path) as env:
+            env.alpha_delay_vm=.5
+            with self.assertRaisesRegex(ValueError,'shared energy-tardiness'):
+                run_episode(env,PaperLearner(3,PaperConfig()),32,False)
 
     def test_gae_bootstrap_clip_mse_and_masks(self):
         rewards=torch.tensor([1.,2.]);values=torch.tensor([.2,.3]);done=torch.tensor([0.,0.])
@@ -173,7 +207,7 @@ class PaperIRWSTests(unittest.TestCase):
             self.assertTrue(torch.any(learner.hidden!=0))
             with self.assertRaises(ValueError):learner.update(None)
             segments=deepcopy(env._host_segments);energy=env.total_energy
-            env.reference_cost(env.ready_task_ids[0])
+            env.task_context(env.ready_task_ids)
             self.assertEqual(segments,env._host_segments);self.assertEqual(energy,env.total_energy)
             learner.update(tail);learner.reset_history();self.assertTrue(torch.all(learner.hidden==0))
 
@@ -194,7 +228,14 @@ class PaperIRWSTests(unittest.TestCase):
                 self.assertEqual(a.current_time,b.current_time)
                 gid=min(a.ready_task_ids,key=lambda i:(a.task_ready_time[i],i));a.select_task(gid);b.select_task(gid)
                 mask=a.get_vm_obs_and_mask()['mask'];action=int(np.flatnonzero(mask)[0])
-                _,_,ia=a.paper_step(action);_,_,_,_,ib=b.step(action)
+                # Force a real task-level deadline violation without changing execution.
+                for env in (a,b):env.task_baseline_finish[gid]=float(env.current_time)
+                reward,_,ia=a.paper_step(action);_,common_reward,_,_,ib=b.step(action)
+                self.assertEqual(reward,common_reward)
+                self.assertEqual(ia['outer_cost'],-reward)
+                expected=.25*(-.001*ia['delta_energy_total'])+.75*ia['r_delay']
+                self.assertAlmostEqual(reward,expected)
+                self.assertEqual(ia['reward_protocol'],REWARD_PROTOCOL)
                 for field in ('start','end','dur','ddl_task','delta_energy_total'):self.assertEqual(ia[field],ib[field])
                 self.assertEqual(a.task_state,b.task_state);self.assertEqual(a.task_start_time,b.task_start_time)
                 self.assertEqual(a.task_end_time,b.task_end_time);np.testing.assert_array_equal(a.vm_available_at,b.vm_available_at)
@@ -222,7 +263,9 @@ class PaperIRWSTests(unittest.TestCase):
             scenario=Scenario(mode='train',episodes=1,experiment_protocol=str(DEFAULT_PROTOCOL))
             context=patch.object(module,'_load_cache_seeds',return_value=list(range(1001))) if algorithm=='marl' else contextlib.nullcontext()
             with context,patch.object(module,'SCENARIO',scenario),patch.object(module,ENVIRONMENTS[algorithm],side_effect=capture_environment), patch('os.path.exists',return_value=True),patch('os.makedirs'),contextlib.redirect_stdout(io.StringIO()):
-                with self.assertRaises(CapturedConfiguration) as captured:module.train()
+                with self.assertRaises(CapturedConfiguration) as captured:
+                    if algorithm=="ablation_nohost":module.train(env_cls=capture_environment)
+                    else:module.train()
             self.assertEqual(captured.exception.kwargs['random_seed'],0)
             self.assertEqual(module.SCENARIO.validation_seeds(),[600]) # restoration preserves the default F22 configuration
 
@@ -243,6 +286,10 @@ class PaperIRWSTests(unittest.TestCase):
             torch.save(historical,self.root/'historical.pth')
             _,restored=load_checkpoint(self.root/'historical.pth',scenario)
             self.assertEqual(restored['protocol'],obj['protocol'])
+            for changes in ({'model_version':'irws_paper_cloud_v1'},
+                            {'reward_protocol':'old_makespan_energy'}, {'reward_settings':{}}):
+                incompatible=dict(obj,**changes);torch.save(incompatible,self.root/'incompatible.pth')
+                with self.assertRaises(ValueError):load_checkpoint(self.root/'incompatible.pth',scenario)
             torch.save({'model_version':'old_irws'},self.root/'old.pth')
             with self.assertRaises(ValueError):load_checkpoint(self.root/'old.pth',scenario)
 

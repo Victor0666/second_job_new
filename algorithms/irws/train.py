@@ -304,7 +304,8 @@ def train():
             loss = ppo.update(last_value=0.0)
             if loss is not None:
                 ppo_losses.append(float(loss))
-        f11_log.log(episode, {"VM_PPO": ppo}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO), pending=ppo.buf.size(), truncated=truncated_episode)
+        f11_log.log(episode, {"VM_PPO": ppo}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO), pending=ppo.buf.size(), truncated=truncated_episode,
+                    task_selector_numerics=task_selector.numerics.snapshot(), intrinsic_numerics=intrinsic.numerics.snapshot())
         m = env.get_episode_metrics()
         eval_m = evaluate_irws_multi_seed(
             env_ctor_kwargs=env_kwargs,

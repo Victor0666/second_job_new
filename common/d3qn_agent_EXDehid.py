@@ -105,6 +105,8 @@ class D3QNAgent:
 
         self.target.load_state_dict(self.online.state_dict())
         self.optim = torch.optim.Adam(self.online.parameters(), lr=lr)
+        self.f11.numerics.inputs(self.online, "online_input")
+        self.f11.numerics.inputs(self.target, "target_input")
 
         # ε 线性衰减（按“成功 update 次数”推进）
         self._eps_start = float(eps_start)
@@ -213,9 +215,13 @@ class D3QNAgent:
 
         loss = F.smooth_l1_loss(q_sa, target)
 
+        self.f11.numerics.observe("Q_selected", q_sa, scalar=True)
+        self.f11.numerics.observe("TD_target", target, scalar=True)
+        self.f11.numerics.observe("TD_error", target-q_sa, scalar=True)
         loss_value = self.f11.loss(loss)
         self.optim.zero_grad()
         loss.backward()
+        self.f11.numerics.gradients(self.online.parameters(), self.grad_clip)
         if self.grad_clip is not None and self.grad_clip > 0:
             nn.utils.clip_grad_norm_(self.online.parameters(), self.grad_clip)
         self.optim.step()

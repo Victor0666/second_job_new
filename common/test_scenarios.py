@@ -21,6 +21,7 @@ EVAL_BUILDERS = {
     "ablation_mgrrand": "build_env_kwargs_mgrrand",
     "ablation_vmrand": "build_env_kwargs_vm_random",
     "ablation_nohost": "build_env_kwargs_nohost",
+    "ablation_tl2": "build_env_kwargs_nohost",
     "irws": "build_env_kwargs_irws",
 }
 ENVIRONMENTS = dict.fromkeys(MODEL_NAMES, "CloudWorkflowEnv_VMAgents")
@@ -67,7 +68,8 @@ class ScenarioTests(unittest.TestCase):
     def test_all_training_configurations(self):
         # Intercept the first environment constructor before agents, logs or models are created.
         for algorithm in MODEL_NAMES:
-            module = importlib.import_module(f"algorithms.{algorithm}.train")
+            entry = "ablation_nohost" if algorithm == "ablation_tl2" else algorithm
+            module = importlib.import_module(f"algorithms.{entry}.train")
             for task, resource, deadline in itertools.product(
                 "SML", "SML", ("Tight", "Medium", "Loose")
             ):
@@ -82,13 +84,17 @@ class ScenarioTests(unittest.TestCase):
                         module, ENVIRONMENTS[algorithm], side_effect=capture_environment
                     ), patch("os.makedirs"), contextlib.redirect_stdout(io.StringIO()):
                         with self.assertRaises(CapturedConfiguration) as captured:
-                            module.train()
+                            if algorithm in ("ablation_nohost", "ablation_tl2"):
+                                module.train(scenario, algorithm=algorithm, env_cls=capture_environment)
+                            else:
+                                module.train()
                     self.assert_configuration(captured.exception.kwargs, scenario)
                     self.assertEqual(captured.exception.kwargs["random_seed"], 0)
 
     def test_all_evaluation_configurations(self):
         for algorithm in [*MODEL_NAMES, "ertf_fifs"]:
-            module = importlib.import_module(f"algorithms.{algorithm}.evaluate")
+            entry = "ablation_nohost" if algorithm == "ablation_tl2" else algorithm
+            module = importlib.import_module(f"algorithms.{entry}.evaluate")
             for task, resource, deadline in itertools.product(
                 "SML", "SML", ("Tight", "Medium", "Loose")
             ):

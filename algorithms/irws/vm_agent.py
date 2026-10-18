@@ -92,6 +92,7 @@ class PPOVMAgent:
         self.device = torch.device(cfg.device)
         self.net = ActorCritic(cfg.obs_dim, cfg.act_dim, hidden=hidden).to(self.device)
         self.opt = torch.optim.Adam(self.net.parameters(), lr=cfg.lr)
+        self.f11.numerics.inputs(self.net)
         self.buf = RolloutBuffer()
 
     @torch.no_grad()
@@ -174,6 +175,8 @@ class PPOVMAgent:
 
         future = self.cfg.gamma * (1.0 - done) * torch.cat((old_val[1:], old_val.new_tensor([last_value])))
         self.f11.target(future, ret)
+        self.f11.numerics.observe("return", ret, scalar=True)
+        self.f11.numerics.observe("advantage_raw", adv, scalar=True)
         std = adv.std() if adv.numel() > 1 else adv.new_zeros(())
         adv = (adv - adv.mean()) / (std + 1e-8)
 
@@ -205,9 +208,12 @@ class PPOVMAgent:
 
                 loss = pi_loss + self.cfg.vf_coef * v_loss - self.cfg.ent_coef * ent
 
+                self.f11.numerics.observe("value", val, scalar=True)
+                self.f11.numerics.observe("advantage_used", adv[mb], scalar=True)
                 loss_value = self.f11.loss(loss)
                 self.opt.zero_grad()
                 loss.backward()
+                self.f11.numerics.gradients(self.net.parameters(), self.cfg.max_grad_norm)
                 nn.utils.clip_grad_norm_(self.net.parameters(), self.cfg.max_grad_norm)
                 self.opt.step()
                 self.f11.updates += 1

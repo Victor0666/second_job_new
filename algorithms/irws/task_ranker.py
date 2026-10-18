@@ -67,6 +67,9 @@ class IRWSTaskSelector:
         self.cfg = cfg
         self.device = torch.device(cfg.device)
         self.net = TaskRankNet(cfg.feat_dim, cfg.hidden).to(self.device)
+        from common.f19_numerics import NumericalDiagnostics
+        self.numerics = NumericalDiagnostics()
+        self.numerics.inputs(self.net)
 
     @torch.no_grad()
     def select(

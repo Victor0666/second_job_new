@@ -61,6 +61,7 @@ class F22Tests(unittest.TestCase):
                     with self.assertRaises(SystemExit) as caught: parse_scenario(mode,algorithm)
                 self.assertEqual(caught.exception.code,0)
                 obj=json.loads(out.getvalue())
+                self.assertEqual(obj['model_seed'],1)
                 self.assertEqual(obj['experiment_protocol']['train'],list(range(600)))
                 self.assertEqual(obj['experiment_protocol']['validation'],[600])
                 self.assertEqual(obj['experiment_protocol']['test'],list(range(700,730)))
@@ -71,7 +72,9 @@ class F22Tests(unittest.TestCase):
             for mode in ('train','eval'):
                 with patch('sys.argv',['entry','--dry-run']),redirect_stdout(io.StringIO()) as out:
                     with self.assertRaises(SystemExit):parse_scenario(mode,algorithm)
-                self.assertEqual(json.loads(out.getvalue())['experiment_protocol']['validation'],[600])
+                obj=json.loads(out.getvalue())
+                self.assertEqual(obj['experiment_protocol']['validation'],[600])
+                self.assertEqual(obj['model_seed'],1)
 
     def snapshot(self, algorithm, seed, model_seed=1, deadline='Tight'):
         if algorithm=='irws_paper':

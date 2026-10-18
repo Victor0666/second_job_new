@@ -199,15 +199,15 @@ MAHDRL 及四种消融的新模型/日志名称追加 `_f17_normalized_weights_v
 Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.py --all-nine --seeds 101-130 --resume`。结果位于 `outputs/f18_normalization_calibration/`；支持单场景、断点续跑、重新汇总及按需详细记录。当前缺少新版正式缓存，九场景正式百分位和归一化参数尚未生成，不能直接开始 F18 正式训练。
 
 所有新模型/日志名追加 `_f18_shared_v1`，Checkpoint 保存源训练场景与配置哈希；评测校验一致性。MS/LS 等泛化继续使用源 S 训练配置。四算法及四消融需要重训，旧模型与结果不覆盖。预计算命令、字段映射、物理轨迹对照、测试边界和英文论文公式修改建议见 [F18 完整说明](docs/F18_shared_state_normalization.md)。轻量集成验证：`.\.venv\Scripts\python.exe -m common.smoke_F18 --out docs/F18_smoke.json`。
-## 原论文 IRWS 独立复现版本
+## IRWS 公共环境适配版本
 
-新的正式实现位于 `algorithms/irws_paper/`，原 `algorithms/irws/` 和历史模型保持不变。新版本包含双向 DAG/Bi-GRU、全 Ready Softmax、Table III PPO、历史 GRU、动态融合和可微元梯度；使用公共云物理环境与冻结的 F18 尺度。原文聚合、池化、零 Rank 和元更新存在未充分规定的细节，采用的工程近似及全部验收结果见 [IRWS 原文对应报告](docs/IRWS_paper_reproduction.md)，不能据短程验证声称精确复制原论文结果。
+正式适配实现位于 `algorithms/irws_paper/`，原 `algorithms/irws/` 和历史模型保留。当前 v2 使用公共能耗—超期外部奖励及相同元学习物理成本，保留双向 DAG/Bi-GRU、全 Ready Softmax、PPO、历史 GRU与元梯度；动态内在奖励采用有界加法补充，任务和VM策略增加当前截止期上下文。共同问题适配与当前验收见 [R03 说明](docs/R03_IRWS_common_objective.md)；[原文对应报告](docs/IRWS_paper_reproduction.md)记录此前阶段，不能据短程验证声称精确复制原论文数值结果。
 
-以下为 IRWS 初次适配时的历史协议，已由下文 F22 默认协议替代。历史公共无重叠协议位于 `configs/paired_cloud_protocol_v1.json`：训练 32–631（600 回合）、验证 632、最终测试仍 2–31。新 IRWS 默认使用它；MAHDRL、MARL、PD3QN 及四个既有消融通过 `--experiment-protocol configs/paired_cloud_protocol_v1.json` 显式启用同一协议。不传该参数的旧入口仍保留历史行为，不能与新协议结果混作正式配对比较。选模规则仍为验证总能耗最小。
+以下为 IRWS 初次适配时的历史协议，已由下文 F22 默认协议替代。历史公共无重叠协议位于 `configs/paired_cloud_protocol_v1.json`：训练 32–631（600 回合）、验证 632、最终测试仍 2–31。当时新 IRWS 默认使用它；需要复现该历史协议时，各学习算法通过 `--experiment-protocol configs/paired_cloud_protocol_v1.json` 显式启用同一协议。当前不传该参数时，所有学习入口默认使用 F22 协议，不能将两份协议结果混作正式配对比较。选模规则仍为验证总能耗最小。
 
 ```powershell
 # 最小完整流程：临时缓存、1 Episode、2 工作流；无正式训练或消融
-.\run.cmd common/smoke_irws_paper.py --out docs/IRWS_paper_smoke.json
+.\run.cmd common/smoke_irws_paper.py --out docs/R03_IRWS_smoke.json
 # 正式参数预览
 .\run.cmd algorithms/irws_paper/train.py --task S --resource S --deadline Tight --dry-run
 ```
@@ -216,11 +216,23 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 
 ## F22 统一实例划分
 
-所有学习算法、四个 MAHDRL 消融及启发式评测默认使用 `configs/f22_split_v1.json`：训练 0–599（600 Episode）、验证仅 600、测试 700–729（30 个实例）。`--model-seed` 与实例种子分离；新结果保存协议与实例哈希，旧 Checkpoint 不会被标记为 F22。历史种子评测需显式 `--legacy-split --seeds 2-31`。正式启动会严格审计新版 Deadline Cache；当前九组缓存缺失、F18 校准场景为空，尚不能直接启动正式训练。
+所有学习算法、四个 MAHDRL 消融及启发式评测默认使用 `configs/f22_split_v1.json`：训练 0–599（600 Episode）、验证仅 600、测试 700–729（30 个实例）。所有学习入口的 `--model-seed` 默认统一为 1，与实例种子分离；新结果保存协议与实例哈希，旧 Checkpoint 不会被标记为 F22。历史种子评测需显式 `--legacy-split --seeds 2-31`。正式启动会严格审计新版 Deadline Cache；当前九组缓存缺失、F18 校准场景为空，尚不能直接启动正式训练。
 
 验收、修改清单及各算法 PowerShell 命令见 [F22 报告](docs/F22_data_split.md)。仅检查缓存：`.\run.cmd common/f22_cache.py --all`；仅预览配置：`.\run.cmd algorithms/mahdrl/train.py --dry-run`。本次没有运行正式训练或 30 种子正式测试。
+
+
+## F19 输入尺度与数值诊断
+
+正式学习入口默认采用 `f19_shared_v1`，将 MAHDRL/MARL 及相关消融保留的 I/O ratio 除以 `(input_bits_ref + output_bits_ref) / workload_mi_ref`。参考尺度继续复用 F18 校准文件和源训练场景，未改变网络维度、物理模型或奖励。显式 `--normalization-mode f18_shared_v1` 可复现原 F18 编码，新旧模型版本隔离。
+
+新增按网络字段统计的有界分位数、损失和裁剪前梯度诊断。完整说明、实际输入样本及测试见 [F19 验收报告](docs/F19_numerical_scaling.md)。只运行临时真实输入检查：`.\run.cmd common/smoke_f19.py --out docs/F19_real_input_smoke.json`；不训练策略、不写正式缓存。正式九场景缓存和校准仍需准备。
 
 
 ### TL_2 消融
 
 新增 `algorithms/ablation_tl2/`，在原 TL 两层结构基础上将 VA 的能耗奖励改为全局能耗；原 TL 保留。模型和评测结果独立保存。设计、泛化关系和训练评测命令见 [TL_2 说明](docs/TL_2_ablation.md)。
+
+
+### 新版 IRWS 的共同目标适配
+
+新版 `irws_paper` 已按公共问题使用能耗—超期外部奖励及同一元学习物理成本，保留图嵌入、PPO、动态内在奖励和元梯度；新增动态截止期上下文，采用独立 `irws_cloud_energy_tardiness_v2` 模型目录。旧目标权重必须重训。设计、类似问题排查和验证见 [R03 适配说明](docs/R03_IRWS_common_objective.md)。

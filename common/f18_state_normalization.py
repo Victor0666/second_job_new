@@ -3,8 +3,11 @@ import hashlib
 import json
 from pathlib import Path
 import numpy as np
+from common.f19_numerics import NumericalDiagnostics
 
 VERSION = 'f18_shared_v1'
+CURRENT_VERSION = 'f19_shared_v1'
+SHARED_VERSIONS = (VERSION, CURRENT_VERSION)
 DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / 'outputs/f18_normalization_calibration/f18_shared_normalization_v1.json'
 SCALE_UNITS = dict(R_ref='tasks', T_ref='s', workload_mi_ref='MI', input_bits_ref='bit',
                    output_bits_ref='bit', up_rank_ref='s', down_rank_ref='s',
@@ -16,11 +19,13 @@ def scene_id(task, resource, deadline):
 
 
 class StateNormalizer:
-    def __init__(self, path, source_scene):
+    def __init__(self, path, source_scene, version=VERSION):
+        if version not in SHARED_VERSIONS:
+            raise ValueError("Unknown shared observation version")
         path = Path(path).resolve()
         raw = path.read_bytes()
         obj = json.loads(raw)
-        if obj.get('normalization_version') != VERSION:
+        if obj.get('normalization_version') not in SHARED_VERSIONS:
             raise ValueError('F18 normalization version mismatch')
         if obj.get('units') != SCALE_UNITS:
             raise ValueError('F18 physical units mismatch')
@@ -31,10 +36,28 @@ class StateNormalizer:
             value = self.scales.get(key)
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not np.isfinite(value) or value <= 0:
                 raise ValueError('Invalid F18 positive reference: ' + key)
-        self.metadata = dict(normalization_version=VERSION, source_train_scene=source_scene,
+        self.numerics = NumericalDiagnostics()
+        self.version = version
+        self.metadata = dict(normalization_version=version, source_train_scene=source_scene,
                              normalization_config_path=str(path),
                              normalization_config_hash=hashlib.sha256(raw).hexdigest(),
                              R_ref=self.scales['R_ref'], T_ref=self.scales['T_ref'])
+        if version == CURRENT_VERSION:
+            self.io_ratio_ref = (self.scales['input_bits_ref']+self.scales['output_bits_ref'])/self.scales['workload_mi_ref']
+            if not np.isfinite(self.io_ratio_ref) or self.io_ratio_ref <= 0:
+                raise ValueError('Invalid I/O ratio reference')
+            self.metadata.update(io_ratio_encoding='bits_per_MI_divided_by_reference_v1',
+                                 io_ratio_ref=self.io_ratio_ref,
+                                 scale_config_version=obj['normalization_version'])
+
+    def io_ratio(self, raw_ratio):
+        if self.version == VERSION:
+            return raw_ratio
+        reference = self.io_ratio_ref
+        normalized = float(raw_ratio / reference)
+        self.numerics.observe('io_ratio_raw_bits_per_MI', [raw_ratio], scalar=True)
+        self.numerics.observe('io_ratio_dimensionless', [normalized], scalar=True)
+        return normalized
 
     def scale(self, value, key):
         result = np.asarray(value, dtype=np.float64) / self.scales[key]
@@ -49,9 +72,9 @@ class StateNormalizer:
 def load_normalizer(mode='legacy', path=None, source_scene=None):
     if mode == 'legacy':
         return None
-    if mode != VERSION or not source_scene:
-        raise ValueError('Specify f18_shared_v1 and a source training scene, or explicit legacy')
-    return StateNormalizer(path or DEFAULT_CONFIG, source_scene)
+    if mode not in SHARED_VERSIONS or not source_scene:
+        raise ValueError('Specify f19_shared_v1/f18_shared_v1 and a source training scene, or explicit legacy')
+    return StateNormalizer(path or DEFAULT_CONFIG, source_scene, version=mode)
 
 
 def counts(env):
@@ -102,7 +125,7 @@ def checkpoint_metadata(agent):
 def check_checkpoint(actual, expected):
     actual = actual or {'normalization_version':'legacy'}
     expected = expected or {'normalization_version':'legacy'}
-    for key in ('normalization_version', 'source_train_scene', 'normalization_config_hash', 'R_ref', 'T_ref', 'experiment_protocol_hash'):
+    for key in ('normalization_version', 'source_train_scene', 'normalization_config_hash', 'R_ref', 'T_ref', 'experiment_protocol_hash', 'io_ratio_encoding', 'io_ratio_ref', 'scale_config_version'):
         if actual.get(key) != expected.get(key):
             raise ValueError('Checkpoint normalization mismatch: ' + key)
 
@@ -133,7 +156,8 @@ def normalization_diagnostics(env):
         return {'normalization_version':'legacy'}
     total = getattr(env, '_f18_rr_total', 0)
     return dict(n.metadata, rr_observations=total, rr_saturated=getattr(env, '_f18_rr_saturated', 0),
-                rr_saturation_ratio=getattr(env, '_f18_rr_saturated', 0) / max(1, total))
+                rr_saturation_ratio=getattr(env, '_f18_rr_saturated', 0) / max(1, total),
+                numerics=n.numerics.snapshot())
 
 
 def checked_observation(env, obs):

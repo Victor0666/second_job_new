@@ -1193,6 +1193,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         )
 
         if getattr(self, 'state_normalizer', None):
+            block_task[3] = self.state_normalizer.io_ratio(io_ratio)
             block_task[:3] = [self.state_normalizer.scale(v, k) for v, k in zip(
                 (mi, in_bits, out_bits), ('workload_mi_ref', 'input_bits_ref', 'output_bits_ref'))]
 

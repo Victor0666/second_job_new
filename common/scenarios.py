@@ -9,7 +9,7 @@ import json
 from common.read_xml_opt_Tsize import DATA_MODEL
 from common.f11 import LEARNING_MODEL
 from common.experiment_protocol import ExperimentProtocol, protocol_hash, DEFAULT_PROTOCOL
-from common.f18_state_normalization import VERSION, DEFAULT_CONFIG, scene_id, load_normalizer
+from common.f18_state_normalization import VERSION, CURRENT_VERSION, SHARED_VERSIONS, DEFAULT_CONFIG, scene_id, load_normalizer
 from common.ta_weights import TA_WEIGHT_MODEL, TA_ALGORITHMS
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -90,7 +90,7 @@ class Scenario:
     def validation_seeds(self):
         return list(self.protocol().validation) if self.protocol() else [1]
 
-    normalization_mode: str = VERSION
+    normalization_mode: str = CURRENT_VERSION
     normalization_config: str = str(DEFAULT_CONFIG)
     train_resource: str | None = None
     train_deadline: str | None = None
@@ -135,7 +135,7 @@ class Scenario:
             raise ValueError('Invalid source resource')
         if self.train_deadline is not None and self.train_deadline not in SMALL_PROBABILITY:
             raise ValueError('Invalid source deadline')
-        if self.normalization_mode not in ('legacy', VERSION):
+        if self.normalization_mode not in ('legacy', *SHARED_VERSIONS):
             raise ValueError('Unknown observation normalization mode')
         if not self.legacy_split and not self.experiment_protocol:
             raise ValueError("Use explicit --legacy-split for historical overlapping protocols")
@@ -206,7 +206,7 @@ class Scenario:
         name = MODEL_NAMES[algorithm].format(
             task=task, resource=(self.train_resource or self.resource) if self.mode == "eval" else self.resource,
             deadline=(self.train_deadline or self.deadline) if self.mode == "eval" else self.deadline
-        ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "") + ("_" + VERSION if self.normalization_mode == VERSION else "") + ("_protocol_" + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else "")
+        ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "") + ("_" + self.normalization_mode if self.normalization_mode in SHARED_VERSIONS else "") + ("_protocol_" + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else "")
         return name.replace("_seed1_", "_seed" + str(self.first_training_seed()) + "_") if self.protocol() else name
 
     @property
@@ -292,9 +292,9 @@ def parse_scenario(mode, algorithm=None):
     if mode != 'precompute':
         parser.add_argument('--experiment-protocol', default=str(DEFAULT_PROTOCOL))
         parser.add_argument('--legacy-split', action='store_true', help='Explicit historical data split; never labelled F22')
-        parser.add_argument('--model-seed', type=int, default=32 if algorithm == 'irws_paper' else 1)
+        parser.add_argument('--model-seed', type=int, default=1)
     if mode != 'precompute' and algorithm != 'ertf_fifs':
-        parser.add_argument('--normalization-mode', choices=(VERSION, 'legacy'), default=VERSION)
+        parser.add_argument('--normalization-mode', choices=(*SHARED_VERSIONS, 'legacy'), default=CURRENT_VERSION)
         parser.add_argument('--normalization-config', default=str(DEFAULT_CONFIG))
         if mode == 'eval':
             parser.add_argument('--train-resource', choices=VM_COUNTS)
@@ -309,7 +309,7 @@ def parse_scenario(mode, algorithm=None):
             experiment_protocol=getattr(args, 'experiment_protocol', str(DEFAULT_PROTOCOL)),
             legacy_split=getattr(args, 'legacy_split', False),
             model_seed=getattr(args, 'model_seed', 1),
-            normalization_mode=getattr(args, 'normalization_mode', VERSION),
+            normalization_mode=getattr(args, 'normalization_mode', CURRENT_VERSION),
             normalization_config=getattr(args, 'normalization_config', str(DEFAULT_CONFIG)),
             train_resource=getattr(args, 'train_resource', None), train_deadline=getattr(args, 'train_deadline', None),
             task=args.task,

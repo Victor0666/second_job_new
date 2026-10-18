@@ -1,4 +1,4 @@
-"""One genuine small paper-IRWS training run, validation, checkpoint and test; no ablations."""
+"""One small common-objective IRWS train/validation/save/load/test, no formal run."""
 import argparse
 from contextlib import redirect_stdout
 import io
@@ -12,7 +12,7 @@ from common.workflow_opt import energy_from_records, exec_time_components
 from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents as CommonEnv
 from common.precompute_deadlines import main as precompute
 from common.f18_calibrate_normalization import sample_episode,summarize
-from algorithms.irws_paper.config import PaperConfig
+from algorithms.irws_paper.config import PaperConfig,COMMON_REWARD
 from algorithms.irws_paper.environment import PaperCloudEnv
 from algorithms.irws_paper.learner import PaperLearner
 from algorithms.irws_paper.runner import train,evaluate,env_kwargs,seed_everything,load_checkpoint
@@ -26,7 +26,10 @@ def verify_common_trace(scenario,kwargs,seed=32):
     kw=dict(kwargs,random_seed=seed)
     kw.pop('deadline_alpha_choices');kw.pop('deadline_alpha_probs')
     kw['deadline_alpha_small_prob']=scenario.small_probability
-    b=CommonEnv(**kw);a.reset(seed=seed);b.reset(seed=seed)
+    for key in COMMON_REWARD:kw.pop(key,None)
+    b=CommonEnv(**kw)
+    for key,value in COMMON_REWARD.items():setattr(b,key,value)
+    a.reset(seed=seed);b.reset(seed=seed)
     steps=0;maximum_energy_gap=0.;maximum_duration_gap=0.
     while not a.done_flag:
         assert abs(a.current_time-b.current_time)<1e-9
@@ -79,7 +82,7 @@ def run():
         scene=LocalScenario(mode='train',episodes=1,experiment_protocol=str(protocol),normalization_config=str(root/'f18_shared_normalization_v1.json'))
         kwargs=env_kwargs(scene,32);kwargs['workflows_per_episode']=2
         physical_trace=verify_common_trace(scene,kwargs)
-        cfg=PaperConfig();seed_everything(32);initial=PaperLearner(sum(scene.vms_per_host),cfg)
+        cfg=PaperConfig();seed_everything(scene.model_seed);initial=PaperLearner(sum(scene.vms_per_host),cfg)
         before={n:parameters(m) for n,m in [('embedding',initial.task.embedding),('selector',initial.task.score),
             ('actor',initial.actor),('critic',initial.critic),('intrinsic',initial.intrinsic)]}
         learner,out=train(scene,cfg,kwargs,root/'models')
@@ -96,11 +99,11 @@ def run():
             parameter_max_changes=changes,checkpoint_deterministic_roundtrip=True,test_rows=rows,test_summary=summary,
             normalization=obj['normalization'],protocol=obj['protocol'],
             verification_overrides=dict(episodes=1,workflows_per_episode=2,normalization_calibration_seeds=[101],
-                temporary_caches=True,network_dimensions='published Table III, unchanged'),
+                temporary_caches=True,network_dimensions='published hidden widths, current deadline context added'),
             formal_training_executed=False,ablations_executed=False)
 
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__);p.add_argument('--out',default='docs/IRWS_paper_smoke.json');args=p.parse_args()
     result=run();Path(args.out).write_text(json.dumps(result,indent=2),encoding='utf-8')
-    print('Paper IRWS: all five network groups changed; physical episode, validation, checkpoint and test passed')
+    print('Adapted IRWS: all five network groups changed; shared reward/physics, validation, checkpoint and test passed')

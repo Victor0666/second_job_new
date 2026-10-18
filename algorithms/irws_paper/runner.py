@@ -8,10 +8,10 @@ import random
 import subprocess
 import numpy as np
 import torch
-from common.f18_state_normalization import VERSION,check_checkpoint
+from common.f18_state_normalization import VERSION,CURRENT_VERSION,SHARED_VERSIONS,check_checkpoint
 from common.f11 import protect_training_outputs
 from common.scenarios import ROOT,parse_scenario
-from .config import MODEL_VERSION,PaperConfig
+from .config import MODEL_VERSION,REWARD_PROTOCOL,COMMON_REWARD,PaperConfig
 from .environment import PaperCloudEnv
 from .learner import PaperLearner
 
@@ -26,7 +26,7 @@ def env_kwargs(scenario,seed):
         pc_tiers=(1.,2.,4.,6.,8.),bw_tiers=(1000.,2000.,4000.,6000.,8000.),
         deadline_mode='cache_fcfs',deadline_cache_path=str(scenario.cache_path),deadline_cache_strict=True,
         deadline_alpha_choices=[2.,3.],deadline_alpha_probs=list(scenario.deadline_probs),
-        max_ready_tasks='auto',**scenario.normalization_kwargs())
+        max_ready_tasks='auto',**COMMON_REWARD,**scenario.normalization_kwargs())
 
 
 def output_dir(scenario,kind):
@@ -35,19 +35,24 @@ def output_dir(scenario,kind):
     if protocol is None:raise ValueError('Formal paper IRWS requires the explicit disjoint common protocol')
     digest=hashlib.sha256(json.dumps(protocol.metadata(),sort_keys=True).encode()).hexdigest()[:12]
     norm=scenario.normalization_metadata()
-    if norm['normalization_version']!=VERSION:raise ValueError('Formal IRWS must use the existing F18 shared configuration')
-    return ROOT/'outputs'/kind/MODEL_VERSION/(source+'_'+digest+'_'+norm['normalization_config_hash'][:12])
+    if norm['normalization_version'] not in SHARED_VERSIONS:raise ValueError('Formal IRWS must use the existing F18 shared configuration')
+    encoding = '_'+norm['normalization_version'] if norm['normalization_version'] != VERSION else ''
+    return ROOT/'outputs'/kind/MODEL_VERSION/(source+'_'+digest+'_'+norm['normalization_config_hash'][:12]+encoding)
 
 
 def run_episode(env,learner,seed,training=False):
+    if any(getattr(env,k)!=v for k,v in COMMON_REWARD.items()):
+        raise ValueError("Adapted IRWS must use the shared energy-tardiness coefficients")
+    learner.numerics.reset()
     env.reset(seed=seed);learner.reset_history();updates=[];weights=[];boundaries=0
-    pending=None
+    pending=None;external_return=0.;physical_cost=0.
     if not env.done_flag:
         decision=learner.prepare(env,deterministic=not training)
         pending=(decision,*learner.act(decision,deterministic=not training))
     while pending is not None:
         decision,action,logp,value=pending
-        reward,done,info=env.paper_step(action,learner.cfg.alpha)
+        reward,done,info=env.paper_step(action)
+        external_return+=reward;physical_cost+=info['outer_cost']
         weights.append(info['fusion_weight']);boundaries+=int(info['fusion_boundary'])
         if done:next_decision=None;pending=None
         else:
@@ -66,7 +71,9 @@ def run_episode(env,learner,seed,training=False):
     if env.completed_workflows!=env.workflows_per_episode or any(s!='Finished' for s in env.task_state):
         raise RuntimeError('Paper IRWS ended before actual physical completion')
     if not np.isfinite(list(metrics.values())).all():raise FloatingPointError('Nonfinite common physical metrics')
-    return dict(metrics=metrics,updates=updates,assignments=len(weights),fusion=dict(
+    return dict(metrics=metrics,objective=dict(protocol=REWARD_PROTOCOL,settings=COMMON_REWARD,
+        external_return=float(external_return),physical_cost=float(physical_cost)),
+        updates=updates,numerics=learner.numerics.snapshot(),assignments=len(weights),fusion=dict(
         minimum=min(weights,default=0.),maximum=max(weights,default=0.),mean=float(np.mean(weights)) if weights else 0.,
         outside_unit_interval=sum(w<0 or w>1 for w in weights),zero_rank_boundaries=boundaries))
 
@@ -81,7 +88,7 @@ def save_checkpoint(path,learner,scenario,episode,best_energy,environment_config
     optimizers={n:getattr(learner,n+'_opt').state_dict() for n in ('task','actor','critic','intrinsic')}
     rng=dict(python=random.getstate(),numpy=np.random.get_state(),torch=torch.get_rng_state(),
              cuda=torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None)
-    obj=dict(model_version=MODEL_VERSION,modules=modules,optimizers=optimizers,paper_config=learner.cfg.as_dict(),
+    obj=dict(model_version=MODEL_VERSION,reward_protocol=REWARD_PROTOCOL,reward_settings=COMMON_REWARD,modules=modules,optimizers=optimizers,paper_config=learner.cfg.as_dict(),
         episode=episode,steps=learner.steps,updates=learner.updates,best_validation_energy=best_energy,
         normalization=scenario.normalization_metadata(),protocol=scenario.protocol().metadata(),
         environment=environment_config,scenario=scenario.describe(),rng=rng,git_commit=git_commit(),
@@ -94,6 +101,8 @@ def load_checkpoint(path,scenario,device='cpu',restore_training=False):
     # Locally produced training files contain RNG/optimizer state, not weights alone.
     obj=torch.load(path,map_location=device,weights_only=False)
     if obj.get('model_version')!=MODEL_VERSION:raise ValueError('Historical IRWS checkpoint is not a paper-model checkpoint')
+    if obj.get('reward_protocol')!=REWARD_PROTOCOL or obj.get('reward_settings')!=COMMON_REWARD:
+        raise ValueError('Checkpoint reward objective mismatch; retrain adapted IRWS')
     expected=scenario.normalization_metadata()
     # Before F22, paper checkpoints stored the protocol separately from normalization.
     if scenario.protocol().version != 'f22_split_v1' and not (obj.get('normalization') or {}).get('experiment_protocol_hash'):
@@ -130,7 +139,7 @@ def evaluate(learner,scenario,seeds,split='test',kwargs=None):
 def train(scenario,config=None,kwargs=None,out=None,resume=None):
     protocol=scenario.protocol()
     if protocol is None or scenario.episodes>protocol.episodes:raise ValueError('A valid fixed experiment budget is required')
-    if scenario.normalization_mode!=VERSION:raise ValueError('Paper training requires f18_shared_v1')
+    if scenario.normalization_mode not in SHARED_VERSIONS:raise ValueError('Paper training requires f18_shared_v1')
     directory=Path(out) if out is not None else output_dir(scenario,'ckpts')
     if resume:
         if Path(resume).name != 'final.pth':raise ValueError('Resume from final.pth to preserve the latest run state')
@@ -178,4 +187,5 @@ def evaluate_main():
     with (out/'episodes.csv').open('w',encoding='utf-8',newline='') as f:
         writer=csv.DictWriter(f,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
     (out/'summary.json').write_text(json.dumps(dict(summary=summary,normalization=scenario.normalization_metadata(),
-        protocol=scenario.protocol().metadata(),source_checkpoint=str(directory/'best.pth')),indent=2),encoding='utf-8')
+        protocol=scenario.protocol().metadata(),reward_protocol=REWARD_PROTOCOL,
+        reward_settings=COMMON_REWARD,source_checkpoint=str(directory/'best.pth')),indent=2),encoding='utf-8')

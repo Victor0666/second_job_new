@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 
 import numpy as np
+from common.f19_numerics import NumericalDiagnostics
 
 LEARNING_MODEL = 'f11_real_decisions_v1'
 
@@ -35,6 +36,7 @@ def validate_transition(state, mask, action, reward, next_state, next_mask, done
 class LearningDiagnostics:
     def __init__(self):
         self.enabled = os.environ.get('F11_DIAGNOSTICS', '1') != '0'
+        self.numerics = NumericalDiagnostics()
         self.transitions = self.nonterminal = self.updates = 0
         self.targets = self.bootstrap_nonzero = 0
         self.future_abs_sum = self.target_sum = 0.0
@@ -58,6 +60,7 @@ class LearningDiagnostics:
             self.target_sum += float(t.sum())
 
     def loss(self, loss):
+        self.numerics.observe("loss", loss, scalar=True)
         value = float(loss.detach().item())
         if not np.isfinite(value):
             raise FloatingPointError('Non-finite learning loss')
@@ -89,7 +92,8 @@ class F11Logger:
         if os.environ.get('F11_DIAGNOSTICS', '1') == '0':
             return
         record = dict(learning_model=LEARNING_MODEL, episode=episode,
-                      learners={k: v.f11.snapshot() for k, v in agents.items()}, **fields)
+                      learners={k: v.f11.snapshot() for k, v in agents.items()},
+                      numerics={k: v.f11.numerics.snapshot() for k,v in agents.items()}, **fields)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open('a', encoding='utf-8') as stream:
             stream.write(json.dumps(record, allow_nan=False) + '\n')

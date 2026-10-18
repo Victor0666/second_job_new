@@ -31,7 +31,7 @@
 
 `instance_seed` 通过环境原有 `random_seed`/MARL `episode_seed` 接口传入。DAX 抽样使用环境独立 RandomState，到达使用局部 default_rng，payload 使用局部 random.Random；Alpha 保持 F06 独立派生规则。没有改变生成分布。修复 MAHDRL/base、PD3QN、IRWS 的 `reset(seed=...)` 忽略参数问题，尤其确保 paper IRWS 连续训练复用同一环境时能够切换实例。MARL 原有活动 episode seed 接口保持不变。
 
-`model_seed` 独立控制模型初始化和全局算法 RNG。CLI 默认保持此前初始化值：MAHDRL、PD3QN、MARL、旧 IRWS 和消融为 1，paper IRWS 为 32。训练回合切换只更换实例 seed，不重建网络、优化器、经验回放或探索状态。消融原有独立随机选择器仍保持其既有规则，不消耗环境实例 RNG。
+`model_seed` 独立控制模型初始化和全局算法 RNG。CLI 默认初始化种子已统一为 1，覆盖 MAHDRL、PD3QN、MARL、新旧 IRWS 和全部消融；仍可通过 `--model-seed` 显式指定其他值。训练回合切换只更换实例 seed，不重建网络、优化器、经验回放或探索状态。消融原有独立随机选择器仍保持其既有规则，不消耗环境实例 RNG。
 
 `common/f22_instances.py` 对已全部到达的实例记录规范模板、DAG/MI/输入输出文件内容哈希、到达、绝对截止期、全部主机/VM 配置；同时生成场景/种子完整标识。哈希不含排序、调度状态、Rank 或强化学习状态。每轮 F11 诊断/IRWS training.jsonl 记录实例标识；提前截断时标记未完整到达，不冒充完整实例。设置 `F11_DIAGNOSTICS=0` 会关闭现有 F11 逐回合诊断及其哈希记录，独立 `data_split.json` 和 checkpoint 协议元信息仍保存。
 
@@ -82,7 +82,7 @@ foreach ($resource in @('S','M','L')) {
 ```powershell
 # MAHDRL、PD3QN、MARL、正式 paper IRWS：各九种 S 任务训练配置
 foreach ($algorithm in @('mahdrl','pd3qn','marl','irws_paper')) {
-    $modelSeed = if ($algorithm -eq 'irws_paper') { 32 } else { 1 }
+    $modelSeed = 1
     foreach ($resource in @('S','M','L')) {
         foreach ($deadline in @('Loose','Medium','Tight')) {
             .\run.cmd "algorithms/$algorithm/train.py" --task S --resource $resource --deadline $deadline --episodes 600 --model-seed $modelSeed
@@ -108,7 +108,7 @@ foreach ($algorithm in @('ablation_hostrand','ablation_mgrrand','ablation_vmrand
 ```powershell
 # 正式测试：训练模型完成后再执行；九种源模型场景使用相同 30 个 seed
 foreach ($algorithm in @('mahdrl','pd3qn','marl','irws_paper','ablation_hostrand','ablation_mgrrand','ablation_vmrand','ablation_nohost')) {
-    $modelSeed = if ($algorithm -eq 'irws_paper') { 32 } else { 1 }
+    $modelSeed = 1
     foreach ($resource in @('S','M','L')) {
         foreach ($deadline in @('Loose','Medium','Tight')) {
             .\run.cmd "algorithms/$algorithm/evaluate.py" --task S --resource $resource --deadline $deadline --train-task S --seeds 700-729 --model-seed $modelSeed
@@ -124,7 +124,7 @@ foreach ($algorithm in @('mahdrl','pd3qn','marl','irws_paper','ablation_hostrand
 # 历史模型示例：必须显式 Legacy，且使用该模型实际归一化方式
 .\run.cmd algorithms/mahdrl/evaluate.py --legacy-split --seeds 2-31 --normalization-mode legacy --checkpoint-dir '你的历史模型目录'
 # IRWS 上一版显式无重叠协议复现：保留原协议和原测试种子
-.\run.cmd algorithms/irws_paper/evaluate.py --experiment-protocol configs/paired_cloud_protocol_v1.json --seeds 2-31 --checkpoint-dir '上一版IRWS模型目录'
+.\run.cmd algorithms/irws_paper/evaluate.py --experiment-protocol configs/paired_cloud_protocol_v1.json --seeds 2-31 --normalization-mode f18_shared_v1 --checkpoint-dir '上一版IRWS模型目录'
 ```
 
 旧 paper IRWS checkpoint 的协议 hash 仍匹配旧协议，但其早期连续环境 reset 未正确更换 seed 的训练结果不能视为通过 F22 验收；相关结果应按实际生成版本处理。所有 F22 前的模型均不符合新正式划分，需重新训练。
@@ -140,3 +140,5 @@ foreach ($algorithm in @('mahdrl','pd3qn','marl','irws_paper','ablation_hostrand
 测试和文档：`common/test_f22.py`、`common/test_scenarios.py`、`common/test_irws_paper.py`、`common/test_f18.py`、README 及本目录的 F22 报告/测试记录/审计。四个用户 Word 文件未修改。
 
 测试范围：T01–T14、旧 132 项回归及末次聚焦检查；没有运行 600 Episode 训练、完整 30 seed 测试、正式缓存生成、正式校准或参数搜索。F22 默认数据划分不存在训练/验证/测试重叠；显式 Legacy 不提供该保证。正式重训须先完成上述缓存和校准准备。
+
+F19 后续说明：学习入口默认编码已升级为 `f19_shared_v1`，F22 实例划分不变。需要加载旧 F18 模型时，应显式传入 `--normalization-mode f18_shared_v1`，不能仅切换种子协议。

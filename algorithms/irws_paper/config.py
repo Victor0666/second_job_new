@@ -1,7 +1,9 @@
-"""Published algorithm parameters and explicitly identified engineering defaults."""
+"""IRWS learning parameters and the fixed common cloud reward settings."""
 from dataclasses import dataclass, asdict
 
-MODEL_VERSION = 'irws_paper_cloud_v1'
+MODEL_VERSION = 'irws_cloud_energy_tardiness_v2'
+REWARD_PROTOCOL = 'common_energy_tardiness_additive_intrinsic_v2'
+COMMON_REWARD = dict(alpha_delay_vm=.75, energy_reward_scale=.001, task_baseline_norm=300.)
 
 
 @dataclass(frozen=True)
@@ -18,7 +20,6 @@ class PaperConfig:
     batch_size: int = 64
     actor_hidden: tuple = (128,64)
     critic_hidden: tuple = (64,64,32)
-    alpha: float = .5
     # Not specified by the paper: one topological pass, TD(0)=Eq.(31),
     # one update round, GRU width equal to embedding width, repo entropy setting.
     message_passes: int = 1
@@ -29,7 +30,7 @@ class PaperConfig:
     device: str = 'cpu'
 
     def __post_init__(self):
-        if not (0<=self.gamma<=1 and 0<=self.gae_lambda<=1 and 0<self.clip<1 and 0<=self.alpha<=1):
+        if not (0<=self.gamma<=1 and 0<=self.gae_lambda<=1 and 0<self.clip<1):
             raise ValueError('Invalid paper algorithm coefficients')
         if min(self.actor_lr,self.critic_lr,self.intrinsic_lr,self.embedding_lr)<=0:
             raise ValueError('Learning rates must be positive')

@@ -38,6 +38,9 @@ class IntrinsicRewardNet(nn.Module):
         self.fc_out = nn.Linear(cfg.hidden_dim, 1)
 
         self.to(self.device)
+        from common.f19_numerics import NumericalDiagnostics
+        self.numerics = NumericalDiagnostics()
+        self.numerics.inputs(self)
 
     def forward(self, obs_seq: torch.Tensor, h0: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """

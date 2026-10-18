@@ -24,12 +24,19 @@ def clipped_loss(logp,old_logp,adv,epsilon):
     return -torch.minimum(ratio*adv,ratio.clamp(1-epsilon,1+epsilon)*adv).mean()
 
 
+def fuse_reward(external,intrinsic,weight):
+    if not np.isfinite(weight) or not 0<=weight<=1:
+        raise ValueError('Intrinsic weight must be within [0,1]')
+    return external+weight*intrinsic
+
+
 @dataclass
 class Decision:
     graphs: tuple
     candidates: tuple
     gid: int
     task_logp: float
+    task_context: np.ndarray
     resources: np.ndarray
     mask: np.ndarray
     obs: np.ndarray
@@ -38,7 +45,7 @@ class Decision:
 class PaperLearner:
     def __init__(self,vm_count,config):
         self.cfg=config;self.device=torch.device(config.device);self.vm_count=vm_count
-        self.obs_dim=config.embedding_dim+1+6*vm_count
+        self.obs_dim=config.embedding_dim+4+6*vm_count
         self.dtype=torch.float64  # second-order meta-gradients can be below float32 parameter resolution
         self.task=TaskPolicy(config).to(device=self.device,dtype=self.dtype)
         self.actor=mlp(self.obs_dim,config.actor_hidden,vm_count).to(device=self.device,dtype=self.dtype)
@@ -48,6 +55,11 @@ class PaperLearner:
         self.critic_opt=torch.optim.Adam(self.critic.parameters(),lr=config.critic_lr)
         self.intrinsic_opt=torch.optim.Adam(self.intrinsic.parameters(),lr=config.intrinsic_lr)
         self.task_opt=torch.optim.Adam(self.task.parameters(),lr=config.embedding_lr)
+        from common.f19_numerics import NumericalDiagnostics
+        self.numerics=NumericalDiagnostics()
+        for name in ('actor','critic','intrinsic'):
+            self.numerics.inputs(getattr(self,name),name+'_input')
+        self.numerics.inputs(self.task.score,'selector_embedding_input')
         self.updates=0;self.steps=0;self.buffer=[];self.reset_history()
 
     def tensor(self,value):return torch.as_tensor(value,dtype=self.dtype,device=self.device)
@@ -58,18 +70,21 @@ class PaperLearner:
 
     @torch.no_grad()
     def prepare(self,env,deterministic=False):
-        graphs=env.graphs();candidates=tuple(env.get_ready_task_candidates()['gids'])
+        graphs=env.graphs()
+        candidates=tuple(env.get_ready_task_candidates()['gids'])
         needed=set(candidates)
         for graph in graphs:
             if needed.isdisjoint(graph.gids):continue
             if graph.wf_id not in self._embedding_cache:
+                self.numerics.observe('task_rank_input',graph.features)
                 self._embedding_cache[graph.wf_id]=self.task.embedding(graph)
         embeddings={gid:self._embedding_cache[g.wf_id][i] for g in graphs if g.wf_id in self._embedding_cache for i,gid in enumerate(g.gids)}
-        dist=self.task.distribution(embeddings,candidates)
+        context=env.task_context(candidates)
+        dist=self.task.distribution(embeddings,candidates,context)
         chosen=dist.logits.argmax() if deterministic else dist.sample();gid=candidates[int(chosen)]
         env.select_task(gid);vm=env.get_vm_obs_and_mask()
         obs=torch.cat((embeddings[gid],self.tensor(vm['obs']))).cpu().numpy()
-        return Decision(graphs,candidates,gid,float(dist.log_prob(chosen)),vm['obs'].copy(),vm['mask'].copy(),obs.copy())
+        return Decision(graphs,candidates,gid,float(dist.log_prob(chosen)),context.copy(),vm['obs'].copy(),vm['mask'].copy(),obs.copy())
 
     @torch.no_grad()
     def act(self,decision,deterministic=False):
@@ -87,6 +102,8 @@ class PaperLearner:
     def remember(self,decision,action,logp,value,reward,done,info,next_decision,time_ref=1.,energy_ref=1.):
         if decision.mask[action]<=0 or not np.isfinite([reward,logp,value,info['outer_cost']]).all():
             raise ValueError('Invalid real policy transition')
+        if not np.isclose(info['outer_cost'],-reward,rtol=0,atol=1e-12):
+            raise ValueError('Intrinsic meta objective must match the common external cost')
         # RNN feedback uses fixed source scales only; rewards/costs themselves are unscaled.
         duration=float(info['dur'])/time_ref;energy=float(info['delta_energy_total'])/energy_ref
         nxt=self.tensor(next_decision.obs) if next_decision else torch.zeros(self.obs_dim,device=self.device,dtype=self.dtype)
@@ -97,7 +114,7 @@ class PaperLearner:
             done=done,info=dict(info),next_decision=next_decision,history_before=before,
             duration=duration,energy=energy))
         self.steps+=1
-        return float(intrinsic),float(info['fusion_weight']*intrinsic+(1-info['fusion_weight'])*reward)
+        return float(intrinsic),float(fuse_reward(reward,intrinsic,info['fusion_weight']))
 
     def losses(self,bootstrap):
         records=self.buffer
@@ -116,13 +133,13 @@ class PaperLearner:
             next_obs=state(r['next_decision']) if r['next_decision'] else torch.zeros_like(observations[i])
             token=self.history_token(observations[i],r['action'],r['step_reward'],r['duration'],r['energy'],r['done'],next_obs)
             ri,hidden=self.intrinsic(token,hidden);intrinsics.append(ri)
-            weight=r['info']['fusion_weight'];fused.append(weight*ri+(1-weight)*r['step_reward'])
+            weight=r['info']['fusion_weight'];fused.append(fuse_reward(r['step_reward'],ri,weight))
         fused=torch.stack(fused);values=self.tensor([r['value'] for r in records]);dones=self.tensor([r['done'] for r in records])
         advantage=gae(fused,values,dones,float(bootstrap or 0.),self.cfg.gamma,self.cfg.gae_lambda)
         old_logp=self.tensor([r['logp']+r['decision'].task_logp for r in records])
         logp=[];entropies=[]
         for i,r in enumerate(records):
-            decision=r['decision'];td=self.task.distribution(embeddings,decision.candidates)
+            decision=r['decision'];td=self.task.distribution(embeddings,decision.candidates,decision.task_context)
             vd=masked_distribution(self.actor(observations[i]),decision.mask)
             logp.append(td.log_prob(torch.tensor(decision.candidates.index(decision.gid),device=self.device))+
                         vd.log_prob(torch.tensor(r['action'],device=self.device)))
@@ -138,12 +155,14 @@ class PaperLearner:
             dist=masked_distribution(functional_call(self.actor,fast,(observations[i].detach(),)),r['decision'].mask)
             fast_logp.append(dist.log_prob(torch.tensor(r['action'],device=self.device)))
         fast_logp=torch.stack(fast_logp);old_vm=self.tensor([r['logp'] for r in records])
-        # Outer phi objective: a likelihood-ratio estimate of the physical Eq.(25)-(27) cost.
+        # Outer phi uses exactly the common energy-tardiness cost, with no workflow-size weighting.
         costs=self.tensor([r['info']['outer_cost'] for r in records])
         cost_to_go=gae(costs,torch.zeros_like(costs),dones,0.,self.cfg.gamma,1.)
         intrinsic_meta=(torch.exp(fast_logp-old_vm)*cost_to_go.detach()).mean()
         # Eq.(37)/(38): embedding meta-objective is the fused PPO surrogate.
         embedding_meta=clipped_loss(fast_logp,old_vm,advantage.detach(),self.cfg.clip)
+        self.numerics.observe('advantage',advantage,scalar=True)
+        self.numerics.observe('return',values+advantage,scalar=True)
         return dict(actor=actor_loss,critic=critic_loss,intrinsic_meta=intrinsic_meta,
                     embedding_meta=embedding_meta,inner_grad=inner_grad,intrinsics=torch.stack(intrinsics),fused=fused)
 
@@ -170,6 +189,11 @@ class PaperLearner:
                     (self.intrinsic_opt,intrinsic_params,phi),(self.task_opt,task_params,eta)):
                 opt.zero_grad()
                 for p,g in zip(params,grads):p.grad=None if g is None else g.detach().clone()
+            for name in ('actor','critic','intrinsic','task'):
+                self.numerics.gradients(getattr(self,name).parameters(),name=name+'_gradient')
+            norms['critic']=float(torch.linalg.vector_norm(torch.stack([p.grad.detach().norm().double() for p in self.critic.parameters() if p.grad is not None])))
+            for name in ('actor','critic','intrinsic_meta','embedding_meta'):
+                self.numerics.observe(name+'_loss',losses[name],scalar=True)
             self.critic_opt.step();self.actor_opt.step();self.intrinsic_opt.step();self.task_opt.step();self.updates+=1
             result=dict(losses={k:float(losses[k].detach()) for k in ('actor','critic','intrinsic_meta','embedding_meta')},
                 gradient_norms=norms,bootstrap=float(bootstrap or 0.),terminal=bool(self.buffer[-1]['done']),

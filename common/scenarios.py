@@ -32,6 +32,7 @@ MODEL_NAMES = {
     "ablation_mgrrand": "mahdrl_task{task}_res{resource}_seed1_mgrrand_r075_ddlMix_hv_{deadline}",
     "ablation_vmrand": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_vmrand_hv_{deadline}",
     "ablation_nohost": "hrl2_task{task}_res{resource}_seed1_nohost_r075_ddlMix_{deadline}",
+    "ablation_tl2": "tl2_task{task}_res{resource}_seed1_globalEnergy_r075_ddlMix_{deadline}",
     "marl": "marl_task{task}_res{resource}_eval1_ep1000_mix_{deadline}",
     "pd3qn": "pd3qn_task{task}_res{resource}_warmup_mix_nr_{deadline}",
     "irws": "irws_task{task}_res{resource}_mix_{deadline}_rewardPD3QN_{deadline}",

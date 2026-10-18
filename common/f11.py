@@ -195,7 +195,8 @@ def finish_lower_phase(env, host_trace, vm_trace, info):
         if vm_trace is not None and vm_trace.pending is not None:
             host = vm_trace.pending['host_index']
             local = info.get('r_energy_by_host', {}).get(host, 0.0)
-            vm_trace.add_reward((1 - env.alpha_delay_vm) * local)
+            vm_energy = energy if getattr(env, 'vm_energy_scope', 'selected_host') == 'global' else local
+            vm_trace.add_reward((1 - env.alpha_delay_vm) * vm_energy)
     if env.done_flag:
         truncated = not env._episode_should_end()
         for trace in (host_trace, vm_trace):
@@ -228,7 +229,8 @@ class LowerRewardAudit:
                       team_energy_reward=self.energy, selected_host_energy_reward=self.local_energy)
         for name, trace, start, alpha, energy in (
             ('HA', host_trace, self.host_start, env.alpha_delay_host, self.energy),
-            ('VA', vm_trace, self.vm_start, env.alpha_delay_vm, self.local_energy)):
+            ('VA', vm_trace, self.vm_start, env.alpha_delay_vm,
+             self.energy if getattr(env, 'vm_energy_scope', 'selected_host') == 'global' else self.local_energy)):
             if trace is not None:
                 result[name + '_reward_formula_balance'] = (trace.recorded_reward - start
                                                             - ((1 - alpha) * energy + alpha * self.delay))

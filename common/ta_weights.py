@@ -3,7 +3,7 @@ import numpy as np
 
 TA_WEIGHT_MODEL = 'f17_normalized_weights_v1'
 TA_ALGORITHMS = frozenset(('mahdrl', 'ablation_hostrand', 'ablation_mgrrand',
-                           'ablation_vmrand', 'ablation_nohost'))
+                           'ablation_vmrand', 'ablation_nohost', 'ablation_tl2'))
 WEIGHT_TOLERANCE = 1e-8
 
 

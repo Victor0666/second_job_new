@@ -49,6 +49,8 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
     其余 workflow deadline / manager reward / energy accounting / phase 逻辑都不动。
     """
 
+    vm_energy_scope = "selected_host"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -214,8 +216,8 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
                 int(h): float(r_energy_by_host.get(h, 0.0)) for h in self.host_ids
             }
 
-        # 为了尽量保持“下层口径不变”，仍沿用原始 VMAgent reward
-        r_vm = (1.0 - float(self.alpha_delay_vm)) * float(r_energy_host) + float(self.alpha_delay_vm) * float(r_delay)
+        energy = r_energy_total if self.vm_energy_scope == "global" else r_energy_host
+        r_vm = (1.0 - float(self.alpha_delay_vm)) * float(energy) + float(self.alpha_delay_vm) * float(r_delay)
 
         info = {
             "invalid": 0,
@@ -231,6 +233,7 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
             "r_energy_total": float(r_energy_total),
             "r_energy_host": float(r_energy_host),
             "lower_reward_mode": "nohost_global_vm",
+            "vm_energy_scope": self.vm_energy_scope,
         }
 
         self._cur_tid = None

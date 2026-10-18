@@ -9,6 +9,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.tl_reward_protocol import deferred_vm_phase_mean
 from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 from common.ta_weights import TA_WEIGHT_MODEL
@@ -556,6 +557,7 @@ def evaluate_nohost_one_seed(env_cls, env_kwargs, vm_agent, manager_agent):
     phases = 0
     ret_mgr = 0.0
     ret_vm_phase_mean = 0.0
+    last_assignment_count = 0
     while not done:
         vm_rewards = []
         while True:
@@ -567,7 +569,10 @@ def evaluate_nohost_one_seed(env_cls, env_kwargs, vm_agent, manager_agent):
             )
             r_vm, _info_task = env.vm_assign_global(int(a_vm))
             vm_rewards.append(float(r_vm))
+        if vm_rewards:
+            last_assignment_count = len(vm_rewards)
         r_manager_raw, _pinfo = env.finish_phase_and_advance()
+        ret_vm_phase_mean += deferred_vm_phase_mean(env, _pinfo, last_assignment_count)
         ret_mgr += float(r_manager_raw)
         ret_vm_phase_mean += float(np.mean(vm_rewards)) if len(vm_rewards) > 0 else 0.0
         phases += 1
@@ -593,7 +598,7 @@ def evaluate_nohost_one_seed(env_cls, env_kwargs, vm_agent, manager_agent):
     return metrics
 
 
-def build_two_layer_agents_and_load(env_kwargs: dict):
+def build_two_layer_agents_and_load(env_kwargs: dict, env_cls=EnvNoHost, algorithm="ablation_nohost"):
     ctor_block = {
         "energy_reward_scale",
         "task_baseline_norm",
@@ -601,7 +606,7 @@ def build_two_layer_agents_and_load(env_kwargs: dict):
         "alpha_delay_vm",
     }
     ctor_kwargs = {k: v for k, v in env_kwargs.items() if k not in ctor_block}
-    tmp_env = EnvNoHost(**ctor_kwargs)
+    tmp_env = env_cls(**ctor_kwargs)
     _sync_env_scales(tmp_env, env_kwargs)
     tmp_env.reset()
     st_vm, ok = tmp_env.get_vm_state_for_next_assignment()
@@ -651,12 +656,14 @@ def build_two_layer_agents_and_load(env_kwargs: dict):
         device=device,
     )
     bind_normalization(manager_agent, SCENARIO)
-    ckpt_dir_default = str(SCENARIO.checkpoint_dir("ablation_nohost"))
+    ckpt_dir_default = str(SCENARIO.checkpoint_dir(algorithm))
+    from common.tl_reward_protocol import check_reward_protocol
+    check_reward_protocol(ckpt_dir_default, tmp_env.vm_energy_scope)
     ckpt_vm = os.path.join(ckpt_dir_default, "best_vm.pth")
     ckpt_mgr = os.path.join(ckpt_dir_default, "best_manager.pth")
     if not (os.path.exists(ckpt_vm) and os.path.exists(ckpt_mgr)):
         raise FileNotFoundError(
-            f"Missing model files under {SCENARIO.checkpoint_dir('ablation_nohost')}; train this scenario or use --checkpoint-dir"
+            f"Missing model files under {SCENARIO.checkpoint_dir(algorithm)}; train this scenario or use --checkpoint-dir"
         )
     print(f"[HRL_noHost load] ckpt_dir: {ckpt_dir_default}")
     print(f"[HRL_noHost load] vm     : {ckpt_vm}")
@@ -670,14 +677,19 @@ def build_two_layer_agents_and_load(env_kwargs: dict):
     return (vm_agent, manager_agent)
 
 
-def main():
+def main(scenario=None, *, algorithm="ablation_nohost", env_cls=EnvNoHost):
+    global SCENARIO
+    if scenario is not None:
+        SCENARIO = scenario
+    label = "TL_2" if algorithm == "ablation_tl2" else "NOHOST"
+    print(f"Algorithm: {algorithm}; VA energy scope: {env_cls.vm_energy_scope}")
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_nohost(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_nohost_ddlMix")
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, TA_WEIGHT_MODEL, f"hrl_{label.lower()}_ddlMix")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,
-        f"run_hrl_NOHOST_task{SCENARIO.task}_res{SCENARIO.resource}_{len(SCENARIO.seeds)}seeds_ddlMix_{SCENARIO.deadline}.csv",
+        f"run_hrl_{label}_task{SCENARIO.task}_res{SCENARIO.resource}_{len(SCENARIO.seeds)}seeds_ddlMix_{SCENARIO.deadline}.csv",
     )
     logger = CSVLogger(
         filepath=csv_path,
@@ -711,7 +723,7 @@ def main():
     print(">>> mode: Manager + Global-VMAgent (no HostAgent)")
     print(f">>> ddlAlpha cfg: small=2.0, large=3.0, P(small)={SCENARIO.small_probability}")
     print(">>> manager reward cfg: alpha_delay=0.75, delay_mode=tardiness")
-    vm_agent, manager_agent = build_two_layer_agents_and_load(env_kwargs_base)
+    vm_agent, manager_agent = build_two_layer_agents_and_load(env_kwargs_base, env_cls, algorithm)
     vm_list, host_list, mgr_list, energy_list = ([], [], [], [])
     task_late_list, task_tard_list, task_succ_list, task_pct_list = ([], [], [], [])
     wf_late_list, wf_tard_list, wf_succ_list, wf_pct_list = ([], [], [], [])
@@ -721,7 +733,7 @@ def main():
         set_seed(SCENARIO.model_seed)
         kwargs_i = dict(env_kwargs_base)
         kwargs_i["random_seed"] = int(sd)
-        out = evaluate_nohost_one_seed(EnvNoHost, kwargs_i, vm_agent, manager_agent)
+        out = evaluate_nohost_one_seed(env_cls, kwargs_i, vm_agent, manager_agent)
         logger.log(
             run_idx=idx,
             seed=sd,

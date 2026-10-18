@@ -9,6 +9,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.tl_reward_protocol import deferred_vm_phase_mean
 from common.f18_state_normalization import bind_normalization, check_checkpoint, normalization_diagnostics
 from common.f11 import DQNDecisionTrace, F11Logger, protect_training_outputs, snapshot_decision, finish_lower_phase, LowerRewardAudit
 
@@ -101,6 +102,7 @@ def evaluate_hrl_two_layer_multi_seed(env_cls, env_kwargs, vm_agent, manager_age
         phases = 0
         ret_mgr = 0.0
         ret_vm_phase_mean = 0.0
+        last_assignment_count = 0
         while not done:
             vm_rewards = []
             while True:
@@ -112,7 +114,10 @@ def evaluate_hrl_two_layer_multi_seed(env_cls, env_kwargs, vm_agent, manager_age
                 )
                 r_vm, _info_task = eval_env.vm_assign_global(int(a_vm))
                 vm_rewards.append(float(r_vm))
+            if vm_rewards:
+                last_assignment_count = len(vm_rewards)
             r_manager_raw, _pinfo = eval_env.finish_phase_and_advance()
+            ret_vm_phase_mean += deferred_vm_phase_mean(eval_env, _pinfo, last_assignment_count)
             ret_mgr += float(r_manager_raw)
             ret_vm_phase_mean += float(np.mean(vm_rewards)) if len(vm_rewards) > 0 else 0.0
             phases += 1
@@ -139,7 +144,10 @@ def _warmup_ready(agent: D3QNAgent, frac: float = 0.1) -> bool:
     return len(agent.buffer) >= need
 
 
-def train():
+def train(scenario=None, *, algorithm="ablation_nohost", env_cls=CloudWorkflowEnv_VMAgents):
+    global SCENARIO
+    if scenario is not None:
+        SCENARIO = scenario
     dax_dir = os.path.join(ROOT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
     horizon = 1000000000.0
@@ -179,9 +187,9 @@ def train():
     hid_mgr = (512, 512, 256, 128)
     MAX_EPISODES = SCENARIO.episodes
     save_interval = 2000
-    save_dir = str(SCENARIO.checkpoint_dir("ablation_nohost"))
+    save_dir = str(SCENARIO.checkpoint_dir(algorithm))
     log_path = os.path.join(
-        ROOT_DIR, "outputs", "logs", SCENARIO.model_name("ablation_nohost"), "train_nohost.csv"
+        str(SCENARIO.log_dir(algorithm)), "train_nohost.csv"
     )
     protect_training_outputs(save_dir, os.path.dirname(log_path))
     os.makedirs(save_dir, exist_ok=True)
@@ -195,7 +203,7 @@ def train():
             f"deadline cache 不存在：{DEADLINE_CACHE_PATH}\n请先运行：common/precompute_deadlines.py --task {SCENARIO.task} --resource {SCENARIO.resource} 生成 cache"
         )
     set_seed(SCENARIO.model_seed)
-    EnvCls = CloudWorkflowEnv_VMAgents
+    EnvCls = env_cls
     env_kwargs = dict(
         dax_paths=dax_list,
         horizon=horizon,
@@ -221,7 +229,9 @@ def train():
     env = EnvCls(**env_kwargs)
     from common.f22_instances import write_run_metadata, episode_identity
     write_run_metadata(save_dir, SCENARIO)
-    write_run_metadata(SCENARIO.log_dir("ablation_nohost"), SCENARIO)
+    write_run_metadata(SCENARIO.log_dir(algorithm), SCENARIO)
+    from common.tl_reward_protocol import write_reward_protocol
+    write_reward_protocol(save_dir, env.vm_energy_scope)
     env.reset()
     env.energy_reward_scale = ENERGY_REWARD_SCALE
     env.task_baseline_norm = TASK_BASELINE_NORM

@@ -219,3 +219,8 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 所有学习算法、四个 MAHDRL 消融及启发式评测默认使用 `configs/f22_split_v1.json`：训练 0–599（600 Episode）、验证仅 600、测试 700–729（30 个实例）。`--model-seed` 与实例种子分离；新结果保存协议与实例哈希，旧 Checkpoint 不会被标记为 F22。历史种子评测需显式 `--legacy-split --seeds 2-31`。正式启动会严格审计新版 Deadline Cache；当前九组缓存缺失、F18 校准场景为空，尚不能直接启动正式训练。
 
 验收、修改清单及各算法 PowerShell 命令见 [F22 报告](docs/F22_data_split.md)。仅检查缓存：`.\run.cmd common/f22_cache.py --all`；仅预览配置：`.\run.cmd algorithms/mahdrl/train.py --dry-run`。本次没有运行正式训练或 30 种子正式测试。
+
+
+### TL_2 消融
+
+新增 `algorithms/ablation_tl2/`，在原 TL 两层结构基础上将 VA 的能耗奖励改为全局能耗；原 TL 保留。模型和评测结果独立保存。设计、泛化关系和训练评测命令见 [TL_2 说明](docs/TL_2_ablation.md)。

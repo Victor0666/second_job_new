@@ -36,7 +36,7 @@ except Exception:
 
 from common.workflow_opt import validate_deadline_cache, task_subdeadlines, sample_deadline_alpha
 from common.workflow_opt import Workflow
-from common.read_xml_opt_Tsize import validate_dax_template_name
+from common.read_xml_opt_Tsize import validate_cached_instance, validate_dax_template_name
 from common.read_xml_opt_Tsize import load_workflow_from_dax
 
 # 继承你已有的 HEFT 基类环境
@@ -270,6 +270,9 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
                 seed=self.random_seed + self.next_arrival_idx,
                 randomize_payloads=True,
             )
+            if self.deadline_mode == "cache_fcfs":
+                validate_cached_instance(self._deadline_cache, self.random_seed, len(self.workflows), G, tasks)
+
             wf = Workflow(
                 workflow_id=len(self.workflows),
                 graph=G,

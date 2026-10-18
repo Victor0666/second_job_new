@@ -13,7 +13,7 @@ from unittest.mock import patch
 import networkx as nx
 import numpy as np
 
-from common.read_xml_opt_Tsize import Task, DAX_TEMPLATE_ID_SCHEME
+from common.read_xml_opt_Tsize import data_model_metadata, Task, DAX_TEMPLATE_ID_SCHEME
 from common.workflow_opt import exec_time_components
 
 
@@ -121,7 +121,7 @@ class CommunicationTests(unittest.TestCase):
             path = Path(directory) / "ddl_fcfs_taskS_resS_seed0-1000.json"
             record = dict(seed=1, wf_makespans=[11], wf_dax_names=["synthetic.xml"], arrival_times=[0])
             for model in (None, COMMUNICATION_MODEL):
-                obj = dict(meta=dict(communication_model=model), data=[record])
+                obj = dict(meta=dict(communication_model=model, **data_model_metadata()), data=[record])
                 path.write_text(json.dumps(obj), encoding="utf-8")
                 for name in ("base_fcfs", "mahdrl_fcfs", "pd3qn", "irws", "marl"):
                     with self.subTest(reader=name, model=model):

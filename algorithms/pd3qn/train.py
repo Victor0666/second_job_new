@@ -9,6 +9,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f11 import pd3qn_transition, F11Logger, protect_training_outputs
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
@@ -118,6 +119,7 @@ def train():
     log_path = os.path.join(
         ROOT_DIR, "outputs", "logs", SCENARIO.model_name("pd3qn"), "train_metrics_pd3qn_cost.csv"
     )
+    protect_training_outputs(save_dir, os.path.dirname(log_path))
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     set_seed(random_seed)
@@ -187,24 +189,27 @@ def train():
     print(
         f"[reward shallow-align] alpha_delay_vm={ALPHA_DELAY_VM:.3f}, alpha_energy_vm={1.0 - ALPHA_DELAY_VM:.3f}, task_baseline_norm={TASK_BASELINE_NORM}, energy_reward_scale={ENERGY_REWARD_SCALE}"
     )
+    f11_log = F11Logger(os.path.dirname(log_path))
     HARD_MAX_STEPS = 10**9
     while episode_idx < MAX_EPISODES and global_step < HARD_MAX_STEPS:
         done = False
         ep_steps = 0
         obs, _ = env.reset()
         while not done:
-            mask = env.get_action_mask()
+            obs = np.array(obs, copy=True)
+            mask = np.array(env.get_action_mask(), copy=True)
             act = agent.select_action(obs, mask, deterministic=False, count_step=True)
             obs2, rew, terminated, truncated, info = env.step(int(act))
             done = bool(terminated or truncated)
-            z_s = np.zeros_like(obs, dtype=np.float32)
-            z_m = np.zeros_like(mask, dtype=np.float32)
-            agent.remember(obs, mask, int(act), float(rew), z_s, z_m, 1.0)
+            next_mask = env.get_action_mask()
+            pd3qn_transition(agent, obs, mask, int(act), float(rew), obs2, next_mask, terminated, truncated)
             if _warmup_ready(agent, WARMUP_FRAC):
                 agent.update()
             obs = obs2
             ep_steps += 1
             global_step += 1
+        f11_log.log(episode_idx, {"PD3QN": agent}, pending=0,
+                    terminated=bool(terminated), truncated=bool(truncated))
         m = env.get_episode_metrics()
         ep_energy = float(m["total_energy"])
         eval_m = evaluate_pd3qn(
@@ -248,6 +253,8 @@ def train():
     final_ckpt = os.path.join(save_dir, "pd3qn_final.pth")
     agent.save(final_ckpt)
     print(f"训练结束：final={final_ckpt} \n best={best_ckpt} \n log={log_path}")
+
+    logger.close()
 
 
 if __name__ == "__main__":

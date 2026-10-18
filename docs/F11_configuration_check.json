@@ -1,0 +1,200 @@
+{
+  "base_commit": "012619f6beab40f586b8491b1d8007a979f415ab",
+  "network_classes": {
+    "common/d3qn_agent_EXDehid.py:DuelingQNet": "unchanged",
+    "common/d3qn_agent_PER.py:DuelingQNet": "unchanged",
+    "algorithms/marl/agents.py:A2CConfig": "unchanged",
+    "algorithms/marl/agents.py:ActorCriticNet": "unchanged",
+    "algorithms/marl/agents.py:SharedActorMultiCriticNet": "unchanged",
+    "algorithms/irws/vm_agent.py:PPOConfig": "unchanged",
+    "algorithms/irws/vm_agent.py:ActorCritic": "unchanged"
+  },
+  "training_settings": {
+    "mahdrl": {
+      "unchanged": true,
+      "names": [
+        "EVAL_SEEDS",
+        "WARMUP_FRAC",
+        "batch_host",
+        "batch_mgr",
+        "batch_vm",
+        "buf_host",
+        "buf_mgr",
+        "buf_vm",
+        "eps_decay_host",
+        "eps_decay_mgr",
+        "eps_decay_vm",
+        "eps_end_host",
+        "eps_end_mgr",
+        "eps_end_vm",
+        "eps_start_host",
+        "eps_start_mgr",
+        "eps_start_vm",
+        "gamma_host",
+        "gamma_mgr",
+        "gamma_vm",
+        "grad_host",
+        "grad_mgr",
+        "grad_vm",
+        "hid_host",
+        "hid_mgr",
+        "hid_vm",
+        "lr_host",
+        "lr_mgr",
+        "lr_vm",
+        "tau_host",
+        "tau_mgr",
+        "tau_vm"
+      ]
+    },
+    "ablation_hostrand": {
+      "unchanged": true,
+      "names": [
+        "EVAL_SEEDS",
+        "WARMUP_FRAC",
+        "batch_mgr",
+        "batch_vm",
+        "buf_mgr",
+        "buf_vm",
+        "eps_decay_mgr",
+        "eps_decay_vm",
+        "eps_end_mgr",
+        "eps_end_vm",
+        "eps_start_mgr",
+        "eps_start_vm",
+        "gamma_mgr",
+        "gamma_vm",
+        "grad_mgr",
+        "grad_vm",
+        "hid_mgr",
+        "hid_vm",
+        "lr_mgr",
+        "lr_vm",
+        "tau_mgr",
+        "tau_vm"
+      ]
+    },
+    "ablation_mgrrand": {
+      "unchanged": true,
+      "names": [
+        "EVAL_SEEDS",
+        "WARMUP_FRAC",
+        "batch_host",
+        "batch_vm",
+        "buf_host",
+        "buf_vm",
+        "eps_decay_host",
+        "eps_decay_vm",
+        "eps_end_host",
+        "eps_end_vm",
+        "eps_start_host",
+        "eps_start_vm",
+        "gamma_host",
+        "gamma_vm",
+        "grad_host",
+        "grad_vm",
+        "hid_host",
+        "hid_vm",
+        "lr_host",
+        "lr_vm",
+        "tau_host",
+        "tau_vm"
+      ]
+    },
+    "ablation_vmrand": {
+      "unchanged": true,
+      "names": [
+        "EVAL_SEEDS",
+        "WARMUP_FRAC",
+        "batch_host",
+        "batch_mgr",
+        "buf_host",
+        "buf_mgr",
+        "eps_decay_host",
+        "eps_decay_mgr",
+        "eps_end_host",
+        "eps_end_mgr",
+        "eps_start_host",
+        "eps_start_mgr",
+        "gamma_host",
+        "gamma_mgr",
+        "grad_host",
+        "grad_mgr",
+        "hid_host",
+        "hid_mgr",
+        "lr_host",
+        "lr_mgr",
+        "tau_host",
+        "tau_mgr"
+      ]
+    },
+    "ablation_nohost": {
+      "unchanged": true,
+      "names": [
+        "EVAL_SEEDS",
+        "WARMUP_FRAC",
+        "batch_mgr",
+        "batch_vm",
+        "buf_mgr",
+        "buf_vm",
+        "eps_decay_mgr",
+        "eps_decay_vm",
+        "eps_end_mgr",
+        "eps_end_vm",
+        "eps_start_mgr",
+        "eps_start_vm",
+        "gamma_mgr",
+        "gamma_vm",
+        "grad_mgr",
+        "grad_vm",
+        "hid_mgr",
+        "hid_vm",
+        "lr_mgr",
+        "lr_vm",
+        "tau_mgr",
+        "tau_vm"
+      ]
+    },
+    "pd3qn": {
+      "unchanged": true,
+      "names": [
+        "EVAL_SEEDS",
+        "WARMUP_FRAC",
+        "batch_size",
+        "buffer_size",
+        "eps_decay_steps",
+        "eps_end",
+        "eps_start",
+        "gamma",
+        "grad_clip",
+        "hidden_dims",
+        "lr",
+        "per_alpha",
+        "per_beta_end",
+        "per_beta_start",
+        "per_beta_steps",
+        "target_update_tau",
+        "use_per"
+      ]
+    },
+    "marl": {
+      "unchanged": true,
+      "names": [
+        "eval_interval_episode",
+        "eval_seeds",
+        "hid",
+        "hid_host",
+        "hid_vm"
+      ]
+    },
+    "irws": {
+      "unchanged": true,
+      "names": [
+        "EVAL_SEEDS",
+        "UPDATE_EVERY_ASSIGNMENTS",
+        "intrinsic_weight",
+        "use_intrinsic"
+      ]
+    }
+  }
+}

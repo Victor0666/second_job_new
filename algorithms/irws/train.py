@@ -13,6 +13,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f11 import F11Logger, protect_training_outputs, LEARNING_MODEL
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
@@ -173,6 +174,7 @@ def train():
     )
     save_dir = str(SCENARIO.checkpoint_dir("irws"))
     log_dir = str(SCENARIO.log_dir("irws"))
+    protect_training_outputs(save_dir, log_dir)
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
     log_path = os.path.join(log_dir, "train_metrics_irws.csv")
@@ -209,6 +211,7 @@ def train():
                 "intrinsic": intrinsic.state_dict(),
                 "rng": RNGSnapshot.capture().__dict__,
                 "env_kwargs": env_kwargs,
+                "learning_model": LEARNING_MODEL,
                 "meta": {"obs_dim": obs_dim, "act_dim": act_dim, "device": device},
             },
             path,
@@ -222,12 +225,15 @@ def train():
     episode = 0
     MAX_EPISODES = SCENARIO.episodes
     total_assign = 0
+    f11_log = F11Logger(log_dir)
     while episode < MAX_EPISODES:
         env.random_seed = int(env.random_seed)
         env.reset()
         episode_assign = 0
         ppo_losses = []
         h_int = None
+        update_due = False
+        truncated_episode = False
         while not env.done_flag:
             cand = env.get_ready_task_candidates()
             gids = cand["gids"]
@@ -237,6 +243,13 @@ def train():
             task_gid = int(gids[idx])
             env.select_task(task_gid)
             vm_st = env.get_vm_obs_and_mask()
+            if update_due:
+                # Task Selector has chosen the actual next task; value uses old PPO parameters.
+                last_value = ppo.value(vm_st["obs"], vm_st["mask"])
+                loss = ppo.update(last_value=last_value)
+                if loss is not None:
+                    ppo_losses.append(float(loss))
+                update_due = False
             a_vm, info_a = ppo.select_action(vm_st["obs"], vm_st["mask"], deterministic=False)
             _obs2, r_ext, term, trunc, info = env.step(int(a_vm))
             r_int = 0.0
@@ -259,13 +272,33 @@ def train():
             )
             episode_assign += 1
             total_assign += 1
-            if total_assign % UPDATE_EVERY_ASSIGNMENTS == 0:
-                loss = ppo.update()
+            update_due = total_assign % UPDATE_EVERY_ASSIGNMENTS == 0
+            if trunc and not term:
+                # No GAE is carried into the reset episode. Bootstrap only a real next VM decision.
+                cand_next = env.get_ready_task_candidates()
+                if len(cand_next["gids"]) and not env.done_flag:
+                    idx_next, _ = task_selector.select(cand_next["feats"], cand_next["mask"], deterministic=False)
+                    env.select_task(int(cand_next["gids"][idx_next]))
+                    vm_next = env.get_vm_obs_and_mask()
+                    tail = ppo.value(vm_next["obs"], vm_next["mask"])
+                else:
+                    tail = 0.0  # Explicit no-successor truncation cutoff, not an episode Terminal.
+                    ppo.buf.done[-1] = 1.0
+                    if ppo.f11.enabled:
+                        ppo.f11.nonterminal -= 1
+                    ppo.f11.truncation_cutoffs += 1
+                loss = ppo.update(last_value=tail)
                 if loss is not None:
                     ppo_losses.append(float(loss))
-        loss = ppo.update()
-        if loss is not None:
-            ppo_losses.append(float(loss))
+                truncated_episode = True
+                break
+        if ppo.buf.size():
+            if not ppo.buf.done[-1]:
+                raise RuntimeError("IRWS ended without Terminal or explicit truncation handling")
+            loss = ppo.update(last_value=0.0)
+            if loss is not None:
+                ppo_losses.append(float(loss))
+        f11_log.log(episode, {"VM_PPO": ppo}, pending=ppo.buf.size(), truncated=truncated_episode)
         m = env.get_episode_metrics()
         eval_m = evaluate_irws_multi_seed(
             env_ctor_kwargs=env_kwargs,
@@ -304,6 +337,8 @@ def train():
         episode += 1
     save_joint(final_path)
     print(f"训练结束。\nbest={best_path}\nfinal={final_path}\nlog={log_path}")
+
+    logger.close()
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f11 import LEARNING_MODEL
 
 SCENARIO = Scenario(mode="eval")
 from common.metrics_logger import CSVLogger
@@ -229,6 +230,8 @@ def build_agents_and_load(env_kwargs: dict):
     print(f"[IRWS load] ckpt_dir: {ckpt_dir_default}")
     print(f"[IRWS load] joint   : {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location="cpu")
+    if ckpt.get("learning_model") != LEARNING_MODEL:
+        raise ValueError(f"Checkpoint is not an F11-trained model: {ckpt_path}")
     if "ppo" not in ckpt or "task_selector" not in ckpt:
         raise ValueError("joint ckpt 缺少字段：ppo / task_selector")
     meta = dict(ckpt.get("meta", {}))
@@ -283,7 +286,7 @@ def evaluate_one_seed(env_kwargs: dict, task_selector, ppo, seed: int) -> dict:
 def main():
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_irws(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", "irws_fcfs_wfInfo_Mix_Alpha_rn")
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", LEARNING_MODEL, "irws_fcfs_wfInfo_Mix_Alpha_rn")
     _ensure_dir(result_dir)
     csv_path = os.path.join(
         result_dir, f"eval_task{SCENARIO.task}_res{SCENARIO.resource}_{SCENARIO.deadline}.csv"

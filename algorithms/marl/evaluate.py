@@ -13,6 +13,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f11 import LEARNING_MODEL
 
 SCENARIO = Scenario(mode="eval")
 
@@ -107,7 +108,7 @@ def build_env_kwargs(deadline_cache_path: str) -> Dict[str, Any]:
         strict_cache=True,
         dump_deadlines=True,
         print_deadlines=True,
-        deadlines_out_dir=os.path.join(PROJECT_DIR, "outputs", "run", "marl", "deadlines"),
+        deadlines_out_dir=os.path.join(PROJECT_DIR, "outputs", "run", LEARNING_MODEL, "marl", "deadlines"),
         deadlines_file_prefix="marl",
     )
 
@@ -160,9 +161,9 @@ def build_agents_and_probe_dims(
         local_obs_dim, local_act_dim, num_hosts=SCENARIO.num_hosts, cfg=cfg_local
     )
     print(f"[MARL load] global: {ckpt_global}")
-    global_agent.load(ckpt_global, strict=True)
+    global_agent.load(ckpt_global, strict=True, require_learning_model=True)
     print(f"[MARL load] local : {ckpt_local}")
-    local_agent.load(ckpt_local, strict=True)
+    local_agent.load(ckpt_local, strict=True, require_learning_model=True)
     dims = dict(
         global_obs_dim=global_obs_dim,
         global_act_dim=global_act_dim,
@@ -285,6 +286,7 @@ def main():
         PROJECT_DIR,
         "outputs",
         "run",
+        LEARNING_MODEL,
         "marl_fcfs_mix_ddlAlpha",
         f"run_marl0p75_style_task{SCENARIO.task}_res{SCENARIO.resource}_ddlMix_{SCENARIO.deadline}.csv",
     )

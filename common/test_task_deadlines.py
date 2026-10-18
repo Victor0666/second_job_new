@@ -13,7 +13,7 @@ from unittest.mock import patch
 import networkx as nx
 import numpy as np
 
-from common.read_xml_opt_Tsize import Task
+from common.read_xml_opt_Tsize import data_model_metadata, Task
 from common.scenarios import Scenario
 from common.workflow_opt import COMMUNICATION_MODEL
 
@@ -66,7 +66,7 @@ class TaskDeadlineTests(unittest.TestCase):
             with self.subTest(reference=reference), tempfile.TemporaryDirectory() as directory:
                 cache = Path(directory) / 'ddl_fcfs_taskS_resS_seed2.json'
                 cache.write_text(json.dumps(dict(
-                    meta=dict(communication_model=COMMUNICATION_MODEL),
+                    meta=dict(communication_model=COMMUNICATION_MODEL, **data_model_metadata()),
                     data=[dict(seed=2, arrival_times=[5.0, 5.0],
                                wf_dax_names=['synthetic.xml'] * 2, wf_makespans=[reference] * 2)],
                 )), encoding='utf-8')
@@ -87,7 +87,7 @@ class TaskDeadlineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             cache = Path(directory) / 'ddl_fcfs_taskS_resS_seed2.json'
             cache.write_text(json.dumps(dict(
-                meta=dict(communication_model=COMMUNICATION_MODEL),
+                meta=dict(communication_model=COMMUNICATION_MODEL, **data_model_metadata()),
                 data=[dict(seed=2, arrival_times=[5.0, 5.0], wf_dax_names=['synthetic.xml'] * 2,
                            wf_makespans=[22.5, 22.5])],
             )), encoding='utf-8')

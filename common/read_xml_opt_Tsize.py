@@ -6,10 +6,12 @@ read_xml_opt_Tsize.py
 2) 为每个子任务建立“来自各父任务的输入量”映射：
    - Task.parent_in_bits: {parent_task_id -> bits}
    - Task.from_parents_bits: float（合计）
-   - Task.ext_in_bits: float（外部输入 = in_sum - 来自父任务）
-3) 保留随机 I/O 文件生成；最终统一到 bits。
+   - Task.ext_in_bits: float（仅入口任务具有外部输入）
+3) 每个子任务引用全部直接父输出文件；最终统一到 bits。
 """
 
+import hashlib
+import json
 import random
 import math
 import networkx as nx
@@ -18,6 +20,45 @@ from dataclasses import dataclass, field
 
 
 DAX_TEMPLATE_ID_SCHEME = "basename_casefold_v1"
+
+DATA_MODEL = "dynamic_full_parent_output_v1"
+PAYLOAD_GENERATOR_VERSION = "full_parent_outputs_rng_v1"
+FILE_SIZE_MB_RANGE = (512, 1024)
+FILE_COUNT_RANGE = (1, 3)
+LENGTH_MI_RANGE = (60, 90)
+FILE_SIZE_CONVERSION = "MB * 1024 * 1024 * 8.0"
+
+
+def data_model_metadata():
+    return dict(data_model=DATA_MODEL, file_size_mb_range=list(FILE_SIZE_MB_RANGE),
+                output_file_count_range=list(FILE_COUNT_RANGE),
+                entry_input_file_count_range=list(FILE_COUNT_RANGE),
+                file_size_conversion=FILE_SIZE_CONVERSION,
+                payload_generator_version=PAYLOAD_GENERATOR_VERSION,
+                length_mi_range=list(LENGTH_MI_RANGE))
+
+
+def workflow_instance_hash(graph, tasks):
+    """Hash immutable instance data, scoped to this workflow; omit scheduling state."""
+    def files(values):
+        return sorted((f.name, f.size_bits, f.source_task_id) for f in values)
+    payload = dict(nodes=sorted(graph.nodes), edges=sorted(graph.edges), tasks=[
+        dict(id=t.task_id, workload=t.workload_mi, inputs=files(t.in_files),
+             outputs=files(t.out_files), parents=sorted(t.parent_in_bits.items()),
+             input_bits=t.in_file_size_sum_bits, output_bits=t.out_file_size_sum_bits,
+             parent_bits=t.from_parents_bits, external_bits=t.ext_in_bits)
+        for t in sorted(tasks, key=lambda t: t.task_id)])
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                                     allow_nan=False).encode("utf-8")).hexdigest()
+
+
+def validate_cached_instance(cache, seed, workflow_id, graph, tasks):
+    """Check generated payload against its reference record when hashes are supplied."""
+    record = (cache or {}).get(int(seed), {})
+    hashes = record.get("wf_instance_hashes")
+    if hashes is not None:
+        if workflow_id >= len(hashes) or hashes[workflow_id] != workflow_instance_hash(graph, tasks):
+            raise ValueError(f"Deadline cache instance hash mismatch: seed={seed} workflow={workflow_id}")
 
 
 def dax_template_id(path):
@@ -38,7 +79,7 @@ def validate_dax_template_name(cached_name, runtime_name, *, strict=True):
 # 基本数据结构
 # -----------------------------
 
-@dataclass
+@dataclass(frozen=True)
 class DataFile:
     name: str
     size_bits: float
@@ -65,7 +106,7 @@ class Task:
     # —— 父→子 I/O 映射（由本模块在构图后填充）——
     parent_in_bits: dict = field(default_factory=dict)  # {parent_id: bits}
     from_parents_bits: float = 0.0                      # sum(parent_in_bits.values())
-    ext_in_bits: float = 0.0                            # max(in_sum - from_parents, 0)
+    ext_in_bits: float = 0.0                            # entry input only; zero for non-entry tasks
 
     # 运行期（可选）
     state: str = "unReady"
@@ -116,58 +157,38 @@ def _read_dax_to_graph(xml_path):
 def _randomize_payloads(
     G,
     seed=None,
-    length_mi_range=(60, 90),    # 任务计算量（MI）
-    io_file_count_range=(1, 3),      # 输入/输出文件个数范围
-    file_size_mb_range=(512, 1024),  # 每个文件大小范围（MB）
+    length_mi_range=LENGTH_MI_RANGE,    # 任务计算量（MI）
+    io_file_count_range=FILE_COUNT_RANGE,      # 输入/输出文件个数范围
+    file_size_mb_range=FILE_SIZE_MB_RANGE,  # 每个文件大小范围（MB）
 ):
-    """为图中的每个任务填充随机计算量与输入/输出文件大小（统一到 MI & bits）。"""
+    """Generate unique outputs once; each direct child receives every parent output."""
     rng = random.Random(seed)
-    tasks = [Task(tid) for tid in G.nodes]
+    tasks = [Task(tid, parents=list(G.predecessors(tid)),
+                  children=list(G.successors(tid))) for tid in sorted(G.nodes)]
+
+    def make_files(prefix, tid, producer):
+        return [DataFile(f"{prefix}_{tid}_{i}",
+                         rng.uniform(*file_size_mb_range) * 1024 * 1024 * 8.0, producer)
+                for i in range(rng.randint(*io_file_count_range))]
 
     for t in tasks:
-        # 工作量：MI
-        mi = rng.uniform(*length_mi_range)
-        t.workload_mi = max(abs(mi), 1e-6)
-
-        # 随机生成输入文件
-        t.in_files.clear()
-        num_in = rng.randint(*io_file_count_range)
-        for i in range(num_in):
-            mb = rng.uniform(*file_size_mb_range)
-            bits = mb * 1024 * 1024 * 8.0
-            t.in_files.append(DataFile(name=f"input_{t.task_id}_{i}", size_bits=bits, source_task_id=None))
-
-        # 随机生成输出文件
-        t.out_files.clear()
-        num_out = rng.randint(*io_file_count_range)
-        for i in range(num_out):
-            mb = rng.uniform(*file_size_mb_range)
-            bits = mb * 1024 * 1024 * 8.0
-            t.out_files.append(DataFile(name=f"output_{t.task_id}_{i}", size_bits=bits, source_task_id=t.task_id))
-
-        # 预先记录输入/输出总大小
-        t.in_file_size_sum_bits = sum(f.size_bits for f in t.in_files)
+        t.workload_mi = max(abs(rng.uniform(*length_mi_range)), 1e-6)
+        t.out_files = make_files("output", t.task_id, t.task_id)
         t.out_file_size_sum_bits = sum(f.size_bits for f in t.out_files)
+        if not t.parents:
+            t.in_files = make_files("input", t.task_id, None)
 
-    # 恢复父子列表
-    for u, v in G.edges:
-        tasks[u].children.append(v)
-        tasks[v].parents.append(u)
-
-    # 父→子 I/O 映射：将父任务的输出按出度均分给其每个后继（简化近似）
-    for u in G.nodes:
-        succs = list(G.successors(u))
-        if len(succs) == 0:
-            continue
-        per_child_bits = tasks[u].out_file_size_sum_bits / float(len(succs))
-        for v in succs:
-            tasks[v].parent_in_bits[u] = tasks[v].parent_in_bits.get(u, 0.0) + per_child_bits
-
-    # 计算每个子任务的“来自父任务的数据量”和“外部输入数据量”
     for t in tasks:
-        t.from_parents_bits = sum(t.parent_in_bits.values()) if t.parent_in_bits else 0.0
-        t.ext_in_bits = max(t.in_file_size_sum_bits - t.from_parents_bits, 0.0)
-
+        if t.parents:
+            # File names are unique within the workflow; preserve shared immutable identities.
+            t.in_files = list({f.name: f for p in t.parents for f in tasks[p].out_files}.values())
+            t.parent_in_bits = {p: tasks[p].out_file_size_sum_bits for p in t.parents}
+            t.from_parents_bits = sum(t.parent_in_bits.values())
+            t.ext_in_bits = 0.0
+            t.in_file_size_sum_bits = t.from_parents_bits
+        else:
+            t.in_file_size_sum_bits = sum(f.size_bits for f in t.in_files)
+            t.ext_in_bits = t.in_file_size_sum_bits
     return tasks
 
 
@@ -176,9 +197,9 @@ def load_workflow_from_dax(
     seed=None,
     randomize_payloads=True,
     # length_mi_range=(2000, 3000),
-    length_mi_range=(60, 90),
-    io_file_count_range=(1, 3),
-    file_size_mb_range=(512, 1024),
+    length_mi_range=LENGTH_MI_RANGE,
+    io_file_count_range=FILE_COUNT_RANGE,
+    file_size_mb_range=FILE_SIZE_MB_RANGE,
 ):
     """高层接口：解析 DAG + 可选随机负载 + 建立父→子 I/O 映射。"""
     G, id_map = _read_dax_to_graph(xml_path)

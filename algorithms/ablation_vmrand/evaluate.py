@@ -9,6 +9,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f11 import LEARNING_MODEL
 
 SCENARIO = Scenario(mode="eval")
 from common.metrics_logger import CSVLogger
@@ -713,9 +714,9 @@ def build_host_manager_agents_and_load(env_kwargs: dict):
         )
     print(f"[HRL_VMRANDOM load] ckpt_dir: {ckpt_dir_default}")
     print(f"[HRL_VMRANDOM load] host   : {ckpt_host}")
-    host_agent.load(ckpt_host)
+    host_agent.load(ckpt_host, require_learning_model=True)
     print(f"[HRL_VMRANDOM load] manager: {ckpt_mgr}")
-    manager_agent.load(ckpt_mgr)
+    manager_agent.load(ckpt_mgr, require_learning_model=True)
     host_agent.online.eval()
     host_agent.target.eval()
     manager_agent.online.eval()
@@ -726,7 +727,7 @@ def build_host_manager_agents_and_load(env_kwargs: dict):
 def main():
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_vm_random(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", "hrl_vmrand_ddlMix")
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", LEARNING_MODEL, "hrl_vmrand_ddlMix")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,

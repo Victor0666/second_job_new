@@ -11,6 +11,7 @@ if ROOT_DIR in sys.path:
     sys.path.remove(ROOT_DIR)
 sys.path.insert(0, ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f11 import LEARNING_MODEL
 
 SCENARIO = Scenario(mode="eval")
 from common.metrics_logger import CSVLogger
@@ -249,14 +250,14 @@ def build_agent_and_env_kwargs():
     if not os.path.exists(ckpt_path):
         raise FileNotFoundError(f"ckpt 不存在：{ckpt_path}")
     print(f"[PD3QN-EVAL] load ckpt: {ckpt_path}")
-    agent.load(ckpt_path)
+    agent.load(ckpt_path, require_learning_model=True)
     return (env_kwargs_base, agent)
 
 
 def main():
     num_runs = len(SCENARIO.seeds)
     seeds = list(SCENARIO.seeds)
-    result_dir = os.path.join(ROOT_DIR, "outputs", "run", "pd3qn_wfInfo_rn")
+    result_dir = os.path.join(ROOT_DIR, "outputs", "run", LEARNING_MODEL, "pd3qn_wfInfo_rn")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,

@@ -16,6 +16,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Dict, Any, Tuple, List
 
+from common.f11 import LearningDiagnostics, valid_decision, LEARNING_MODEL
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -85,6 +87,7 @@ class RolloutBuffer:
 
 class PPOVMAgent:
     def __init__(self, cfg: PPOConfig, hidden: Tuple[int, ...] = (256, 256)):
+        self.f11 = LearningDiagnostics()
         self.cfg = cfg
         self.device = torch.device(cfg.device)
         self.net = ActorCritic(cfg.obs_dim, cfg.act_dim, hidden=hidden).to(self.device)
@@ -112,6 +115,10 @@ class PPOVMAgent:
         return act, {"logp": logp, "value": float(val.item()), "probs": probs.squeeze(0).cpu().numpy()}
 
     def remember(self, obs_np, mask_np, act, logp, value, r_step, done):
+        valid_decision(obs_np, mask_np)
+        if mask_np[int(act)] <= 0.5 or not np.isfinite([logp, value, r_step, done]).all():
+            raise ValueError("Invalid PPO transition")
+        self.f11.transition(done)
         self.buf.add(
             obs=np.array(obs_np, dtype=np.float32),
             mask=np.array(mask_np, dtype=np.float32),
@@ -122,10 +129,25 @@ class PPOVMAgent:
             done=float(done),
         )
 
-    def update(self):
-        if self.buf.size() <= 1:
-            self.buf.clear()
+    @torch.no_grad()
+    def value(self, obs_np, mask_np):
+        valid_decision(obs_np, mask_np)
+        obs = torch.tensor(obs_np, dtype=torch.float32, device=self.device).unsqueeze(0)
+        return float(self.net(obs)[1].item())
+
+    def update(self, last_value=None):
+        if self.buf.size() == 0:
             return None
+        if self.buf.done[-1]:
+            last_value = 0.0
+        elif last_value is None:
+            raise ValueError("Non-terminal PPO rollout requires an actual next-decision value")
+        if not np.isfinite(last_value):
+            raise ValueError("Non-finite PPO bootstrap value")
+        self.f11.last_rollout_value = float(last_value)
+        if not self.buf.done[-1]:
+            self.f11.nonterminal_rollouts += 1
+            self.f11.last_nonterminal_rollout_value = float(last_value)
 
         obs = torch.tensor(np.stack(self.buf.obs), dtype=torch.float32, device=self.device)      # [T,obs]
         mask = torch.tensor(np.stack(self.buf.mask), dtype=torch.float32, device=self.device)    # [T,A]
@@ -137,22 +159,23 @@ class PPOVMAgent:
 
         # GAE advantage
         with torch.no_grad():
-            # bootstrap with last value = 0 (bandit-ish assignment rollout; done flags can cut)
+            # The last value comes from the selected next task, before any PPO update.
             T = obs.shape[0]
             adv = torch.zeros((T,), dtype=torch.float32, device=self.device)
             ret = torch.zeros((T,), dtype=torch.float32, device=self.device)
             last_gae = 0.0
-            last_ret = 0.0
             for t in reversed(range(T)):
                 next_non_terminal = 1.0 - done[t]
-                next_value = 0.0 if (t == T - 1) else old_val[t + 1]
+                next_value = last_value if (t == T - 1) else old_val[t + 1]
                 delta = rew[t] + self.cfg.gamma * next_value * next_non_terminal - old_val[t]
                 last_gae = delta + self.cfg.gamma * self.cfg.gae_lambda * next_non_terminal * last_gae
                 adv[t] = last_gae
-                last_ret = rew[t] + self.cfg.gamma * next_non_terminal * (0.0 if (t == T - 1) else last_ret)
                 ret[t] = adv[t] + old_val[t]
 
-        adv = (adv - adv.mean()) / (adv.std() + 1e-8)
+        future = self.cfg.gamma * (1.0 - done) * torch.cat((old_val[1:], old_val.new_tensor([last_value])))
+        self.f11.target(future, ret)
+        std = adv.std() if adv.numel() > 1 else adv.new_zeros(())
+        adv = (adv - adv.mean()) / (std + 1e-8)
 
         # PPO update
         idxs = np.arange(obs.shape[0])
@@ -182,19 +205,26 @@ class PPOVMAgent:
 
                 loss = pi_loss + self.cfg.vf_coef * v_loss - self.cfg.ent_coef * ent
 
+                loss_value = self.f11.loss(loss)
                 self.opt.zero_grad()
                 loss.backward()
                 nn.utils.clip_grad_norm_(self.net.parameters(), self.cfg.max_grad_norm)
                 self.opt.step()
+                self.f11.updates += 1
 
-                losses.append(float(loss.item()))
+                losses.append(loss_value)
 
         self.buf.clear()
         return float(np.mean(losses)) if losses else None
 
     def save(self, path: str):
-        torch.save({"state_dict": self.net.state_dict(), "cfg": self.cfg.__dict__}, path)
+        torch.save({"learning_model": LEARNING_MODEL, "state_dict": self.net.state_dict(), "cfg": self.cfg.__dict__}, path)
 
-    def load(self, path: str, strict: bool = True):
-        ckpt = torch.load(path, map_location=self.device)
+    def load(self, path: str, strict: bool = True, require_learning_model: bool = False):
+        try:
+            ckpt = torch.load(path, map_location=self.device, weights_only=True)
+        except TypeError:
+            ckpt = torch.load(path, map_location=self.device)
+        if require_learning_model and ckpt.get("learning_model") != LEARNING_MODEL:
+            raise ValueError(f"Checkpoint is not an F11-trained model: {path}")
         self.net.load_state_dict(ckpt["state_dict"], strict=strict)

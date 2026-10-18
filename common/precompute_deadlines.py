@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 from common.scenarios import Scenario, parse_scenario
-from common.read_xml_opt_Tsize import DAX_TEMPLATE_ID_SCHEME
+from common.read_xml_opt_Tsize import DAX_TEMPLATE_ID_SCHEME, data_model_metadata, workflow_instance_hash
 from common.workflow_opt import COMMUNICATION_MODEL
 from environments.base_fcfs import CloudWorkflowEnv_VMAgents
 
@@ -78,6 +78,10 @@ def run_baseline_episode_fcfs_vmfirst(env: CloudWorkflowEnv_VMAgents):
 
 
 def main(scenario):
+    output = scenario.precompute_path
+    # Even explicit --out must never overwrite historical or existing cache artifacts.
+    if output.exists():
+        raise FileExistsError(f"Refusing to overwrite deadline cache: {output}")
     env_kwargs = build_env_kwargs(scenario)
     data = []
     for seed in scenario.seeds:
@@ -86,13 +90,15 @@ def main(scenario):
         env.reset()
         makespans, names, arrivals = run_baseline_episode_fcfs_vmfirst(env)
         data.append(
-            dict(seed=seed, wf_makespans=makespans, wf_dax_names=names, arrival_times=arrivals)
+            dict(seed=seed, wf_makespans=makespans, wf_dax_names=names, arrival_times=arrivals,
+                 wf_instance_hashes=[workflow_instance_hash(wf.graph, wf.tasks) for wf in env.workflows])
         )
         print(f"[precompute] seed={seed} avg_makespan={float(np.mean(makespans)):.6f}s", flush=True)
     result = dict(
         meta=dict(
             policy="FCFS_task + VM_first_idle",
             communication_model=COMMUNICATION_MODEL,
+            **data_model_metadata(),
             dax_template_id_scheme=DAX_TEMPLATE_ID_SCHEME,
             alpha=1.5,
             arrival_lambda=0.03,
@@ -107,9 +113,9 @@ def main(scenario):
         ),
         data=data,
     )
-    output = scenario.precompute_path
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    with output.open("x", encoding="utf-8") as stream:
+        json.dump(result, stream, ensure_ascii=False, indent=2)
     print(f"Saved cache: {output}")
 
 

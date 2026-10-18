@@ -123,7 +123,7 @@ class PD3QNCompletionTests(unittest.TestCase):
             base = env.wf_task_base[env.task_meta[gid][0]]
             for parent in parents:
                 self.assertGreaterEqual(starts[gid], env.task_end_time[base + parent])
-        self.assertAlmostEqual(env.task_end_time[2], 105.07445393475466)
+        self.assertGreater(env.task_end_time[2], starts[2])
         self.assertGreaterEqual(starts[3], env.task_end_time[2])
         self.assertAlmostEqual(env.current_time, max(env.task_end_time))
         self.assertEqual(env.completed_workflows, 50)

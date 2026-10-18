@@ -9,6 +9,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f11 import DQNDecisionTrace, F11Logger, protect_training_outputs, snapshot_decision, finish_lower_phase, LowerRewardAudit
 
 SCENARIO = Scenario(mode="train")
 from common.d3qn_agent_EXDehid import D3QNAgent
@@ -212,6 +213,7 @@ def train():
     save_interval = 2000
     save_dir = str(SCENARIO.checkpoint_dir("mahdrl"))
     log_path = os.path.join(ROOT_DIR, "outputs", "logs", SCENARIO.model_name("mahdrl"), "train.csv")
+    protect_training_outputs(save_dir, os.path.dirname(log_path))
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     SKIP_MANAGER_UPDATE_IF_ZERO_ASSIGN = True
@@ -393,9 +395,19 @@ def train():
     print("vm_agent online device:", next(vm_agent.online.parameters()).device)
     print("host_agent online device:", next(host_agent.online.parameters()).device)
     print("manager_agent online device:", next(manager_agent.online.parameters()).device)
+    host_trace = DQNDecisionTrace(host_agent, WARMUP_FRAC)
+    vm_trace = DQNDecisionTrace(vm_agent, WARMUP_FRAC)
+    f11_log = F11Logger(os.path.dirname(log_path))
+    reward_audit = LowerRewardAudit(host_trace, vm_trace)
     HARD_MAX_STEPS = 10**9
     while episode_idx < MAX_EPISODES and global_step < HARD_MAX_STEPS:
         if env.done_flag:
+            f11_log.log(episode_idx, {'TA': manager_agent, 'HA': host_agent, 'VA': vm_agent},
+                        reward_audit=reward_audit.summary(env, host_trace, vm_trace),
+                        pending=sum(t.pending is not None for t in (host_trace, vm_trace) if t is not None),
+                        reward_balance={name: t.recorded_reward - t.emitted_reward for name, t in
+                                        (("HA", host_trace), ("VA", vm_trace)) if t is not None},
+                        cutoffs=sum(t.cutoffs for t in (host_trace, vm_trace) if t is not None))
             eval_vm, eval_host, eval_mgr, eval_energy = evaluate_hrl_three_layer_multi_seed(
                 EnvCls, dict(env_kwargs), vm_agent, host_agent, manager_agent, seeds=EVAL_SEEDS
             )
@@ -450,6 +462,7 @@ def train():
                 host_agent.save(os.path.join(save_dir, f"host_step{global_step}.pth"))
                 manager_agent.save(os.path.join(save_dir, f"mgr_step{global_step}.pth"))
             env.random_seed = getattr(env, "random_seed", 0) + 1
+            reward_audit = LowerRewardAudit(host_trace, vm_trace)
             env.reset()
             env.energy_reward_scale = env_kwargs["energy_reward_scale"]
             env.task_baseline_norm = env_kwargs["task_baseline_norm"]
@@ -470,34 +483,31 @@ def train():
             st_host, has_next = env.get_host_state_for_next_assignment()
             if not has_next:
                 break
+            st_host = snapshot_decision(st_host)
+            host_trace.advance(st_host["obs"], st_host["mask"])
             a_host = host_agent.select_action(
                 st_host["obs"], st_host["mask"], deterministic=False, count_step=True
             )
             env.host_select(int(a_host))
             st_vm, ok_vm = env.get_vm_state_for_current_task()
             if not ok_vm:
-                break
+                raise RuntimeError("Selected legal host has no real VM decision")
+            st_vm = snapshot_decision(st_vm)
+            vm_trace.advance(st_vm["obs"], st_vm["mask"])
             a_vm = vm_agent.select_action(
                 st_vm["obs"], st_vm["mask"], deterministic=False, count_step=True
             )
             r_host, r_vm, _info_task = env.vm_assign(int(a_vm))
             phase_host_rewards.append(float(r_host))
+            reward_audit.assignment(_info_task)
             phase_vm_rewards.append(float(r_vm))
-            z_host_s = np.zeros_like(st_host["obs"])
-            z_host_m = np.zeros_like(st_host["mask"])
-            host_agent.remember(
-                st_host["obs"], st_host["mask"], int(a_host), float(r_host), z_host_s, z_host_m, 1.0
-            )
-            if _warmup_ready(host_agent, WARMUP_FRAC):
-                host_agent.update()
-            z_vm_s = np.zeros_like(st_vm["obs"])
-            z_vm_m = np.zeros_like(st_vm["mask"])
-            vm_agent.remember(
-                st_vm["obs"], st_vm["mask"], int(a_vm), float(r_vm), z_vm_s, z_vm_m, 1.0
-            )
-            if _warmup_ready(vm_agent, WARMUP_FRAC):
-                vm_agent.update()
+            host_trace.record(st_host["obs"], st_host["mask"], a_host, r_host,
+                              host_index=int(env.host_ids[int(a_host)]))
+            vm_trace.record(st_vm["obs"], st_vm["mask"], a_vm, r_vm,
+                            host_index=int(_info_task["host_id"]))
         r_manager_raw, pinfo = env.finish_phase_and_advance()
+        reward_audit.phase(pinfo, vm_trace)
+        finish_lower_phase(env, host_trace, vm_trace, pinfo)
         assign_cnt = int(pinfo.get("assign_cnt", 0))
         phase_size_sum_mi = float(pinfo.get("phase_size_sum_mi", 0.0))
         r_vm_phase_mean = float(np.mean(phase_vm_rewards)) if len(phase_vm_rewards) > 0 else 0.0
@@ -539,6 +549,8 @@ def train():
         sH_next = env.get_manager_state()
         m_mask_next = env.get_manager_action_mask()
         if not (SKIP_MANAGER_UPDATE_IF_ZERO_ASSIGN and assign_cnt == 0):
+            if pinfo.get("truncated", False):
+                manager_agent.f11.truncation_cutoffs += 1
             manager_agent.remember(
                 sH,
                 m_mask,
@@ -557,6 +569,13 @@ def train():
         if not env.done_flag:
             m_act = manager_agent.select_action(sH, m_mask, deterministic=False, count_step=True)
             manager_apply_action(env, m_act)
+    for trace in (host_trace, vm_trace):
+        if trace is not None:
+            trace.finish(truncated=not env.done_flag)
+    if global_step >= HARD_MAX_STEPS and not env.done_flag:
+        f11_log.log(episode_idx, {'TA': manager_agent, 'HA': host_agent, 'VA': vm_agent}, pending=0,
+                    end_reason="training_step_cap_no_successor",
+                    cutoffs=sum(t.cutoffs for t in (host_trace, vm_trace) if t is not None))
     vm_final = os.path.join(save_dir, "vm_final.pth")
     host_final = os.path.join(save_dir, "host_final.pth")
     mgr_final = os.path.join(save_dir, "manager_final.pth")
@@ -566,6 +585,8 @@ def train():
     print(
         f"训练结束。\nVM最终模型：{vm_final}\nHost最终模型：{host_final}\nManager最终模型：{mgr_final}\n最优评测模型：{best_ckpt_vm} / {best_ckpt_host} / {best_ckpt_mgr}\n日志：{log_path}"
     )
+
+    logger.close()
 
 
 if __name__ == "__main__":

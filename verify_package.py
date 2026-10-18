@@ -145,9 +145,10 @@ def main():
                     result = m.evaluate_one_seed(kw, selector, ppo, seed=2)
                     del selector, ppo
                 elif label == "MARL":
-                    cache = ROOT / "data/deadlines/ddl_fcfs_taskS_resS_seed0-1000.json"
+                    from common.scenarios import Scenario
+                    cache = Scenario().cache_path
                     kw = m.build_env_kwargs(str(cache))
-                    ckpt = ROOT / "outputs/ckpts/marl_taskS_resS_eval1_ep1000_mix_Tight"
+                    ckpt = Scenario().checkpoint_dir("marl")
                     device = "cuda" if torch.cuda.is_available() else "cpu"
                     built = m.build_agents_and_probe_dims(
                         kw,

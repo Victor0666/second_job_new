@@ -11,6 +11,8 @@ workflow_opt.py
    - 支持“与父任务同 VM / 同 Host 时通信视为 0”这样的近似策略
 """
 
+from common.read_xml_opt_Tsize import data_model_metadata
+
 import networkx as nx
 import numpy as np
 from dataclasses import dataclass
@@ -155,14 +157,16 @@ COMMUNICATION_MODEL = "same_vm_only_v1"
 
 
 def validate_deadline_cache(obj, path):
-    """Reject reference makespans computed under a different transfer model."""
-    if obj.get("meta", {}).get("communication_model") != COMMUNICATION_MODEL:
+    """Reject caches from incompatible file models, parameters or communication rules."""
+    expected = dict(communication_model=COMMUNICATION_MODEL, **data_model_metadata())
+    mismatched = [key for key, value in expected.items() if obj.get("meta", {}).get(key) != value]
+    if mismatched:
         import re
         match = re.search(r"task([SML])_res([SML])", str(path))
         scenario = f" --task {match[1]} --resource {match[2]}" if match else " --task S --resource S"
         raise ValueError(
-            f"Deadline cache uses an outdated communication model: {path}. "
-            f"Regenerate with: .\\run.cmd common/precompute_deadlines.py{scenario}"
+            f"Incompatible deadline cache ({', '.join(mismatched)}): {path}. "
+            f"Regenerate with: python -m common.precompute_deadlines{scenario}"
         )
 
 

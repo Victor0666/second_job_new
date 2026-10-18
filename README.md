@@ -134,7 +134,7 @@ foreach ($taskSize in 'S', 'M', 'L') {
 }
 ```
 
-上面的预计算覆盖各场景的正式 `seed0-1000` 缓存；仅 Tight/Medium/Loose 不同的实验共用同一任务/资源基准。回归测试：`.\.venv\Scripts\python.exe -m unittest common.test_communication`。
+上面的预计算在当前数据模型的版本目录创建各场景正式 `seed0-1000` 缓存；已有文件会拒绝覆盖。仅 Tight/Medium/Loose 不同的实验共用同一任务/资源基准。回归测试：`.\.venv\Scripts\python.exe -m unittest common.test_communication`。
 
 ## 统一任务子截止期
 
@@ -157,3 +157,21 @@ MARL、MAHDRL（含消融和启发式）、PD3QN、IRWS 的缓存截止期环境
 其他缓存环境使用相同的名称比较规则，严格模式下真实名称不匹配会报错，纯大小写差异不会再被警告为模板不同。新预计算缓存记录 `meta.dax_template_id_scheme` 和现有通信模型标识。大小写兼容不改变工作流或基准数值；此前通信模型变更所要求的缓存重新生成仍然适用。
 
 验证命令：`.\.venv\Scripts\python.exe -m unittest common.test_dax_templates`，覆盖 MS/MM/ML、未知/歧义模板，以及九组历史缓存的模板抽样序列。
+
+
+## F07 文件依赖模型与重跑
+
+文件模型统一为 `dynamic_full_parent_output_v1`：每个任务生成 1–3 个输出文件，仅入口任务生成 1–3 个外部输入文件。每个直接子任务共享父任务的全部输出文件；非入口输入数不限，外部输入为零，父输出不按出度均分。同 VM 仍仅减免网络时间，逻辑边数据量保持正值。
+
+新截止期缓存默认保存在 `data/deadlines/dynamic_full_parent_output_v1/`。旧目录文件保留，缺少新模型及参数标记的缓存会被拒绝。预计算写入工作流实例哈希，各算法到达时校验。必须重新生成九种任务/资源组合的基准后再训练；已有缓存不会被覆盖，历史权重和结果应与新实验分开管理。
+
+详细论文 LaTeX 替换段落、验收表、15 个模板检查、逐工作流修复前后对照及命令见 [F07 返修记录](docs/revision_F07.md)。测试：`.\.venv\Scripts\python.exe -m unittest discover -s common -p "test_*.py" -v`。
+
+
+## F11 真实决策转移与重训
+
+MAHDRL 及四种消融中保留的资源学习器、PD3QN、MARL Local 已恢复真实下一决策 Bootstrap；IRWS PPO 在非终止 Rollout 边界使用更新前 Critic 对下一实际 VM 决策估计的价值。Phase 结束不等于 Episode 终止，待处理经验在真正终止或明确的截断策略下关闭。具体奖励结算、算法差异、论文修改与验证边界见 [F11 返修记录](docs/revision_F11.md)。
+
+新模型/日志名称追加 `_f11_real_decisions_v1`，学习型评测结果进入 `outputs/run/f11_real_decisions_v1/`。默认评测拒绝无 F11 标记的旧 Checkpoint；旧模型保留，但必须重新训练才能报告 F11 结果。训练拒绝复用非空输出目录。最佳模型选择规则保持不变，F07 的新版缓存路径保持不变。
+
+诊断写入对应训练日志目录的 `f11_diagnostics.jsonl`；设置 `$env:F11_DIAGNOSTICS = '0'` 可关闭诊断统计和写入。专项测试：`.\.venv\Scripts\python.exe -m unittest common.test_f11 -v`。八个实际训练入口的轻量验证：`.\.venv\Scripts\python.exe -m common.smoke_F11 --out docs/F11_smoke.json`，仅在该验证脚本内使用小网络和临时输出，不替代正式训练。

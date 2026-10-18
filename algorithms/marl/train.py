@@ -10,6 +10,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.f11 import LocalDecisionTrace, F11Logger, protect_training_outputs, LEARNING_MODEL, valid_decision
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
@@ -165,9 +166,10 @@ def train():
         strict_cache=True,
         dump_deadlines=True,
         print_deadlines=True,
-        deadlines_out_dir=os.path.join(ROOT_DIR, "outputs", "run", "marl", "deadlines"),
+        deadlines_out_dir=os.path.join(str(SCENARIO.log_dir("marl")), "deadlines"),
         deadlines_file_prefix="marl",
     )
+    protect_training_outputs(SCENARIO.checkpoint_dir("marl"), SCENARIO.log_dir("marl"))
     env = CloudWorkflowEnv_MARL(**env_kwargs)
     obs0, _info0 = env.reset(
         seed=random_seed,
@@ -257,6 +259,7 @@ def train():
     eval_interval_episode = 1
     global_step = 0
     episode_idx = 0
+    f11_log = F11Logger(os.path.dirname(log_path))
     while episode_idx < max_episodes:
         train_seed = random_seed + episode_idx
         obs, _info = env.reset(
@@ -268,7 +271,8 @@ def train():
                 "print_deadlines": True,
             },
         )
-        done = False
+        done = bool(env.done_flag)
+        local_trace = LocalDecisionTrace(local_agent)
         ep_energy0 = float(env.total_energy)
         ep_ret_g = 0.0
         ep_ret_l = 0.0
@@ -276,37 +280,32 @@ def train():
         ep_task_cnt = 0
         ep_wf_late = {}
         while not done:
-            gobs = obs["global_obs"]
-            gmask = obs["global_mask"]
+            gobs = np.array(obs["global_obs"], copy=True)
+            gmask = np.array(obs["global_mask"], copy=True)
+            valid_decision(gobs, gmask)
             a_host = global_agent.select_action(gobs, gmask, deterministic=False)
             host_id = env.host_ids[int(a_host)]
             host_index = int(a_host)
             lobs, lmask, vm_map = env.get_local_state(host_id)
-            if vm_map == []:
-                a_vm = 0
-            else:
-                a_vm = local_agent.select_action(
-                    lobs, lmask, host_index=host_index, deterministic=False
-                )
+            if not vm_map or not np.any(lmask > 0.5):
+                raise RuntimeError("Global selected a legal Host without a real Local VM decision")
+            lobs, lmask = np.array(lobs, copy=True), np.array(lmask, copy=True)
+            local_trace.advance(lobs, lmask, host_index=host_index)
+            a_vm = local_agent.select_action(lobs, lmask, host_index=host_index, deterministic=False)
             obs2, r_g, r_l, done, info2 = env.step(int(a_host), int(a_vm))
             late, _wf = _update_lateness_stats(info2, ep_wf_late)
             ep_total_late += late
             ep_task_cnt += 1
             gobs2 = obs2["global_obs"]
             gmask2 = obs2["global_mask"]
+            if info2.get("truncated", False):
+                global_agent.f11.truncation_cutoffs += 1
             _loss_g = global_agent.update_one_step(
                 gobs, gmask, int(a_host), float(r_g), gobs2, gmask2, float(done)
             )
-            _loss_l = local_agent.update_one_step(
-                lobs,
-                lmask,
-                int(a_vm),
-                float(r_l),
-                np.zeros_like(lobs),
-                np.zeros_like(lmask),
-                1.0,
-                host_index=host_index,
-            )
+            local_trace.record(lobs, lmask, a_vm, r_l, host_index=host_index)
+            if done:
+                local_trace.finish(truncated=bool(info2.get("truncated", False)))
             ep_ret_g += float(r_g)
             ep_ret_l += float(r_l)
             logger.log(
@@ -342,6 +341,10 @@ def train():
             obs = obs2
             global_step += 1
         ep_energy = float(env.total_energy - ep_energy0)
+        local_trace.finish()
+        f11_log.log(episode_idx, {"Global": global_agent, "Local": local_agent},
+                    pending=int(local_trace.pending is not None),
+                    local_reward_balance=local_trace.recorded_reward - local_trace.emitted_reward)
         ep_total_late, ep_avg_late, ep_wf_avg_late = _finalize_lateness_stats(
             ep_total_late, ep_task_cnt, ep_wf_late
         )
@@ -455,6 +458,8 @@ def train():
     print(f"  best_global   ={best_global_path}")
     print(f"  best_local    ={best_local_path}")
     print(f"  log_path      ={log_path}")
+
+    logger.close()
 
 
 if __name__ == "__main__":

@@ -53,7 +53,7 @@ try:
 except Exception:
     import gym
 
-from common.read_xml_opt_Tsize import validate_dax_template_name
+from common.read_xml_opt_Tsize import validate_cached_instance, validate_dax_template_name
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 from common.workflow_opt import validate_deadline_cache, task_subdeadlines, sample_deadline_alpha
 from common.workflow_opt import Workflow, exec_time_components, LoadRecord, energy_from_records
@@ -605,6 +605,9 @@ class IRWSEnvRouteA(gym.Env):
                 seed=int(self.random_seed + self.next_arrival_idx),
                 randomize_payloads=True,
             )
+            if self.deadline_mode == "cache_fcfs":
+                validate_cached_instance(self._deadline_cache, self.random_seed, len(self.workflows), G, tasks)
+
 
             wf = Workflow(
                 workflow_id=len(self.workflows),
@@ -786,9 +789,7 @@ class IRWSEnvRouteA(gym.Env):
                 t_next = min(t_next, float(t_comp))
 
             if not math.isfinite(t_next):
-                self._finalize_energy_if_done()
-                self.done_flag = True
-                return
+                raise RuntimeError("Unfinished IRWS episode has no arrival/completion event")
 
             t0 = float(self.current_time)
             t1 = float(t_next)

@@ -5,6 +5,9 @@ import contextlib
 import importlib
 import io
 import itertools
+import os
+from common.read_xml_opt_Tsize import DATA_MODEL
+from contextlib import nullcontext
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -36,6 +39,13 @@ def capture_environment(*args, **kwargs):
 
 
 class ScenarioTests(unittest.TestCase):
+    def setUp(self):
+        # Intercept only new cache existence checks: configuration tests never load caches.
+        real_exists = os.path.exists
+        mocked = patch("os.path.exists", side_effect=lambda path: DATA_MODEL in str(path) or real_exists(path))
+        mocked.start()
+        self.addCleanup(mocked.stop)
+
     def assert_configuration(self, kwargs, scenario):
         self.assertEqual(kwargs["num_hosts"], scenario.num_hosts)
         self.assertEqual(tuple(kwargs["vms_per_host"]), scenario.vms_per_host)
@@ -50,7 +60,8 @@ class ScenarioTests(unittest.TestCase):
             self.assertIsNotNone(probs)
             for actual, expected in zip(probs, scenario.deadline_probs):
                 self.assertAlmostEqual(actual, expected)
-        self.assertTrue(scenario.cache_path.is_file())
+        self.assertEqual(scenario.cache_path.parent.name, DATA_MODEL)
+        self.assertNotEqual(scenario.cache_path, scenario.legacy_cache_path)
         self.assertTrue(all(Path(path).is_file() for path in scenario.dax_paths()))
 
     def test_all_training_configurations(self):
@@ -66,7 +77,8 @@ class ScenarioTests(unittest.TestCase):
                 with self.subTest(
                     algorithm=algorithm, task=task, resource=resource, deadline=deadline
                 ):
-                    with patch.object(module, "SCENARIO", scenario), patch.object(
+                    with (patch.object(module, "_load_cache_seeds", return_value=list(range(1001)))
+                          if algorithm == "marl" else nullcontext()), patch.object(module, "SCENARIO", scenario), patch.object(
                         module, ENVIRONMENTS[algorithm], side_effect=capture_environment
                     ), patch("os.makedirs"), contextlib.redirect_stdout(io.StringIO()):
                         with self.assertRaises(CapturedConfiguration) as captured:

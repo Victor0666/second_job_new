@@ -17,7 +17,7 @@ try:
 except Exception:
     import gym
 
-from common.read_xml_opt_Tsize import validate_dax_template_name
+from common.read_xml_opt_Tsize import validate_cached_instance, validate_dax_template_name
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 from common.resource_opt import create_cluster
 from common.workflow_opt import validate_deadline_cache, task_subdeadlines, sample_deadline_alpha, DEADLINE_ALPHA_SEED_OFFSET
@@ -530,6 +530,9 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
                 seed=int(self.random_seed + self.next_arrival_idx),
                 randomize_payloads=True,
             )
+            if self.deadline_mode == "cache_fcfs":
+                validate_cached_instance(self._deadline_cache, self.random_seed, len(self.workflows), G, tasks)
+
 
             wf = Workflow(
                 workflow_id=len(self.workflows),
@@ -692,8 +695,9 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
 
     # ---------------- step ----------------
     def step(self, action: int):
-        if self.done_flag or self._cur_task_gid is None:
-            self.done_flag = True
+        if not self.done_flag and self._cur_task_gid is None:
+            self._observe_until_decision()
+        if self.done_flag:
             return self._build_obs(), 0.0, True, False, {}
 
         gid = int(self._cur_task_gid)

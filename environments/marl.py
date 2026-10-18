@@ -40,7 +40,7 @@ from common.workflow_opt import (
     Workflow,
     exec_time_components,
 )
-from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times, dax_template_id
+from common.read_xml_opt_Tsize import validate_cached_instance, load_workflow_from_dax, poisson_arrival_times, dax_template_id
 from common.resource_opt import create_cluster
 
 
@@ -391,6 +391,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
             "current_time": float(self.current_time),
             "episode_seed": int(self.episode_seed),
 
+            "terminated": bool(done and self._episode_should_end()),
+            "truncated": bool(done and not self._episode_should_end()),
             "assigned_task_id": int(tid),
             "wf_id": int(wf_id),
             "local_task_id": int(local_task_id),
@@ -431,14 +433,17 @@ class CloudWorkflowEnv_MARL(gym.Env):
         return obs.astype(np.float32), mask.astype(np.float32)
 
     def get_local_state(self, host_id: int):
-        if len(self.host_pending_tasks[int(host_id)]) == 0:
-            return (
-                np.zeros(self.local_obs_dim, np.float32),
-                np.zeros(self.local_act_dim, np.float32),
-                [],
-            )
-
-        tid = int(self.host_pending_tasks[int(host_id)][0])
+        queue = self.host_pending_tasks[int(host_id)]
+        if queue:
+            tid = int(queue[0])
+        else:
+            # Global has selected a host; expose the real FCFS task before step enqueues it.
+            if self.done_flag or not self._has_decision_point():
+                return (np.zeros(self.local_obs_dim, np.float32),
+                        np.zeros(self.local_act_dim, np.float32), [])
+            if self._cur_task_gid is None:
+                self._update_current_task_fcfs()
+            tid = int(self._cur_task_gid)
 
         vm_indices = list(self.host_vm_indices[int(host_id)])
         vm_map = []
@@ -759,19 +764,10 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 next_times.append(self.arrival_times[self.next_arrival_idx])
 
             if len(next_times) == 0:
-                self._no_event_streak += 1
-                if self._episode_should_end() or self._no_event_streak >= self._no_event_limit:
+                if self._episode_should_end():
                     self.done_flag = True
                     break
-
-                t_prev = float(self.current_time)
-                self.current_time += 1e-9
-                self._append_idle_records(t_prev, float(self.current_time))
-                r0, rb = self._energy_rewards_to_current_time()
-                rE_total_acc += r0
-                for h in self.host_ids:
-                    rE_host_acc[h] += rb[h]
-                continue
+                raise RuntimeError("Unfinished MARL episode has no arrival/completion event")
 
             next_t = min(next_times)
             if next_t <= self.current_time + 1e-12:
@@ -831,6 +827,10 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 seed=payload_seed,
                 randomize_payloads=True,
             )
+            if self.deadline_mode == "cache_fcfs":
+                validate_cached_instance(self._deadline_cache_by_seed, self._pick_cache_seed(self.episode_seed),
+                                         len(self.workflows), G, tasks)
+
             wf_id = len(self.workflows)
             wf = Workflow(
                 workflow_id=wf_id,

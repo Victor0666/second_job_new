@@ -17,6 +17,8 @@ A2C with action-mask support.
   * 评测只加载 net，不加载 optim（避免优化器 state 不匹配）
 """
 
+from common.f11 import LearningDiagnostics, validate_transition, LEARNING_MODEL
+
 from dataclasses import dataclass
 from typing import Tuple
 
@@ -126,6 +128,7 @@ class A2CAgent:
     def __init__(self, obs_dim: int, act_dim: int, cfg: A2CConfig):
         self.obs_dim = int(obs_dim)
         self.act_dim = int(act_dim)
+        self.f11 = LearningDiagnostics()
         self.cfg = cfg
         self.device = torch.device(cfg.device)
 
@@ -163,6 +166,8 @@ class A2CAgent:
         next_mask: np.ndarray,
         done: float,
     ) -> float:
+        validate_transition(obs, mask, act, reward, next_obs, next_mask, done)
+        self.f11.transition(done)
         obs_t = torch.tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
         mask_t = torch.tensor(mask, dtype=torch.float32, device=self.device).unsqueeze(0)
         act_t = torch.tensor([int(act)], dtype=torch.int64, device=self.device)
@@ -183,6 +188,7 @@ class A2CAgent:
             _logits2, v2 = self.net(next_obs_t)
             target = r_t + self.cfg.gamma * (1.0 - d_t) * v2
 
+        self.f11.target(self.cfg.gamma * (1.0 - d_t) * v2, target)
         adv = (target - v).detach()
 
         policy_loss = -(logp * adv).mean()
@@ -190,16 +196,19 @@ class A2CAgent:
         entropy_loss = -ent.mean()
         loss = policy_loss + self.cfg.vf_coef * value_loss + self.cfg.ent_coef * entropy_loss
 
+        loss_value = self.f11.loss(loss)
         self.optim.zero_grad()
         loss.backward()
         if self.cfg.grad_clip is not None and self.cfg.grad_clip > 0:
             nn.utils.clip_grad_norm_(self.net.parameters(), self.cfg.grad_clip)
         self.optim.step()
-        return float(loss.item())
+        self.f11.updates += 1
+        return loss_value
 
     def save(self, path: str):
         torch.save(
             {
+                "learning_model": LEARNING_MODEL,
                 "net": self.net.state_dict(),
                 "optim": self.optim.state_dict(),
                 "cfg": self.cfg.__dict__,
@@ -209,8 +218,10 @@ class A2CAgent:
             path,
         )
 
-    def load(self, path: str, strict: bool = True):
+    def load(self, path: str, strict: bool = True, require_learning_model: bool = False):
         ckpt = _torch_load_ckpt(path, self.device)
+        if require_learning_model and (not isinstance(ckpt, dict) or ckpt.get("learning_model") != LEARNING_MODEL):
+            raise ValueError(f"Checkpoint is not an F11-trained model: {path}")
         if isinstance(ckpt, dict) and "net" in ckpt:
             self.net.load_state_dict(ckpt["net"], strict=strict)
             # 训练继续跑才需要 optim；评测用不加载也行
@@ -280,12 +291,14 @@ class LocalSharedActorIndependentCriticA2C:
     - actor 共享
     - critic 按 host 独立
     - select/update 需要传入 host_index（即 Global 选择的 host 的 index）
+    - F11: 下一实际 Local 决策可属于不同 Host，Bootstrap 使用 next_host_index 的 Critic。
     """
 
     def __init__(self, obs_dim: int, act_dim: int, num_hosts: int, cfg: A2CConfig):
         self.obs_dim = int(obs_dim)
         self.act_dim = int(act_dim)
         self.num_hosts = int(num_hosts)
+        self.f11 = LearningDiagnostics()
         self.cfg = cfg
         self.device = torch.device(cfg.device)
 
@@ -325,7 +338,10 @@ class LocalSharedActorIndependentCriticA2C:
         next_mask: np.ndarray,
         done: float,
         host_index: int,
+        next_host_index: int | None = None,
     ) -> float:
+        validate_transition(obs, mask, act, reward, next_obs, next_mask, done)
+        self.f11.transition(done)
         obs_t = torch.tensor(obs, dtype=torch.float32, device=self.device).unsqueeze(0)
         mask_t = torch.tensor(mask, dtype=torch.float32, device=self.device).unsqueeze(0)
         act_t = torch.tensor([int(act)], dtype=torch.int64, device=self.device)
@@ -344,9 +360,14 @@ class LocalSharedActorIndependentCriticA2C:
         ent = dist.entropy()
 
         with torch.no_grad():
-            _logits2, v2 = self.net(next_obs_t, hi_t)
+            if not done and next_host_index is None:
+                raise ValueError("Local non-terminal transition requires next_host_index")
+            hi2_t = torch.tensor([int(host_index if done else next_host_index)],
+                                 dtype=torch.int64, device=self.device)
+            _logits2, v2 = self.net(next_obs_t, hi2_t)
             target = r_t + self.cfg.gamma * (1.0 - d_t) * v2
 
+        self.f11.target(self.cfg.gamma * (1.0 - d_t) * v2, target)
         adv = (target - v).detach()
 
         policy_loss = -(logp * adv).mean()
@@ -354,16 +375,19 @@ class LocalSharedActorIndependentCriticA2C:
         entropy_loss = -ent.mean()
         loss = policy_loss + self.cfg.vf_coef * value_loss + self.cfg.ent_coef * entropy_loss
 
+        loss_value = self.f11.loss(loss)
         self.optim.zero_grad()
         loss.backward()
         if self.cfg.grad_clip is not None and self.cfg.grad_clip > 0:
             nn.utils.clip_grad_norm_(self.net.parameters(), self.cfg.grad_clip)
         self.optim.step()
-        return float(loss.item())
+        self.f11.updates += 1
+        return loss_value
 
     def save(self, path: str):
         torch.save(
             {
+                "learning_model": LEARNING_MODEL,
                 "net": self.net.state_dict(),
                 "optim": self.optim.state_dict(),
                 "cfg": self.cfg.__dict__,
@@ -374,8 +398,10 @@ class LocalSharedActorIndependentCriticA2C:
             path,
         )
 
-    def load(self, path: str, strict: bool = True):
+    def load(self, path: str, strict: bool = True, require_learning_model: bool = False):
         ckpt = _torch_load_ckpt(path, self.device)
+        if require_learning_model and (not isinstance(ckpt, dict) or ckpt.get("learning_model") != LEARNING_MODEL):
+            raise ValueError(f"Checkpoint is not an F11-trained model: {path}")
         if isinstance(ckpt, dict) and "net" in ckpt:
             self.net.load_state_dict(ckpt["net"], strict=strict)
             if "optim" in ckpt:

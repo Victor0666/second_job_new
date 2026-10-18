@@ -6,9 +6,11 @@ Dueling Double DQN with action-mask support.
 变更点（对齐你新提供文件的行为）：
 - ε 衰减按「参数更新步数」推进（在 update() 成功执行一次就 +1），而不是按 select_action 次数。
 - 保留 Polyak 软更新（target_update_tau>0）或硬同步（fallback）。
-- 当 next_state 全非法时不做 bootstrap（q2=0）。
+- F11：非终止下一状态必须有合法动作；终止可使用空掩码，学习目标无未来项。
 - 评测时 deterministic=True 且不会影响 ε。
 """
+
+from common.f11 import LearningDiagnostics, validate_transition, LEARNING_MODEL
 
 import random
 from collections import deque
@@ -85,6 +87,7 @@ class D3QNAgent:
     ):
         self.input_dim = input_dim
         self.output_dim = output_dim
+        self.f11 = LearningDiagnostics()
         self.gamma = gamma
         self.batch_size = batch_size
         self.buffer = deque(maxlen=buffer_size)
@@ -166,7 +169,11 @@ class D3QNAgent:
         next_mask: np.ndarray,
         done: float,
     ):
-        self.buffer.append((state, mask, int(action), float(reward), next_state, next_mask, float(done)))
+        validate_transition(state, mask, action, reward, next_state, next_mask, done)
+        self.f11.transition(done)
+        self.buffer.append((np.array(state, copy=True), np.array(mask, copy=True), int(action),
+                            float(reward), np.array(next_state, copy=True),
+                            np.array(next_mask, copy=True), float(done)))
 
     # ---------- 学习 ----------
     def update(self):
@@ -201,8 +208,11 @@ class D3QNAgent:
 
             target = r + (1.0 - d) * self.gamma * q2
 
+        self.f11.target((1.0 - d) * self.gamma * q2, target)
+
         loss = F.smooth_l1_loss(q_sa, target)
 
+        loss_value = self.f11.loss(loss)
         self.optim.zero_grad()
         loss.backward()
         if self.grad_clip is not None and self.grad_clip > 0:
@@ -211,6 +221,7 @@ class D3QNAgent:
 
         # === 成功更新后推进计数 ===
         self._updates += 1
+        self.f11.updates += 1
         self._eps_steps += 1   # ✅ ε 的计步只在这里进行
 
         # 目标网络同步
@@ -220,12 +231,13 @@ class D3QNAgent:
             if (self._updates % self.target_update_freq) == 0:
                 self.target.load_state_dict(self.online.state_dict())
 
-        return float(loss.item())
+        return loss_value
 
     # ---------- 存取 ----------
     def save(self, path: str):
         torch.save(
             {
+                "learning_model": LEARNING_MODEL,
                 "online": self.online.state_dict(),
                 "target": self.target.state_dict(),
                 "optim": self.optim.state_dict(),
@@ -240,12 +252,14 @@ class D3QNAgent:
             path,
         )
 
-    def load(self, path: str, strict: bool = True):
+    def load(self, path: str, strict: bool = True, require_learning_model: bool = False):
         # 兼容新版本 PyTorch 的安全加载（如可用）
         try:
             ckpt = torch.load(path, map_location=self.device, weights_only=True)
         except TypeError:
             ckpt = torch.load(path, map_location=self.device)
+        if require_learning_model and ckpt.get("learning_model") != LEARNING_MODEL:
+            raise ValueError(f"Checkpoint is not an F11-trained model: {path}")
         self.online.load_state_dict(ckpt["online"], strict=strict)
         self.target.load_state_dict(ckpt["target"])
         self.optim.load_state_dict(ckpt["optim"])

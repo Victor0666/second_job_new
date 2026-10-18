@@ -6,6 +6,9 @@ import argparse
 from collections import Counter
 import json
 
+from common.read_xml_opt_Tsize import DATA_MODEL
+from common.f11 import LEARNING_MODEL
+
 ROOT = Path(__file__).resolve().parents[1]
 VM_COUNTS = {"S": (9, 8, 8), "M": (9, 9, 8, 8, 8, 8), "L": (9, 9, 9, 8, 8, 8, 8, 8, 8)}
 SMALL_PROBABILITY = {"Tight": 0.8, "Medium": 0.5, "Loose": 0.2}
@@ -105,6 +108,10 @@ class Scenario:
 
     @property
     def cache_path(self):
+        return ROOT / "data" / "deadlines" / DATA_MODEL / self.cache_name
+
+    @property
+    def legacy_cache_path(self):
         return ROOT / "data" / "deadlines" / self.cache_name
 
     @property
@@ -132,7 +139,7 @@ class Scenario:
         task = self.task if self.mode == "train" else self.train_task
         return MODEL_NAMES[algorithm].format(
             task=task, resource=self.resource, deadline=self.deadline
-        )
+        ) + "_" + LEARNING_MODEL
 
     def checkpoint_dir(self, algorithm):
         if self.mode == "eval" and self.checkpoint_override:

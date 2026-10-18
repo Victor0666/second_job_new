@@ -10,6 +10,8 @@ L1 Manager（阶段级）【动态权重增量控制】：
   对应 Δw ∈ {-0.1, 0, +0.1}^5（共 3^5=243 种组合）
 - 更新：w_raw ← clip(w_raw + Δw, min=0)；若全 0 回退为全 1
 - combo_weights = normalize(w_raw) 用于 ready tasks 打分排序
+- F15 五维属性：[ReadyTime, ProcessingTime, UpwardRank, SignedSlack, TaskSubDeadline]；
+  Ready 集合逐列 Min-Max，高分优先，平局依次按 ReadyTime、任务 ID。
 - 提供 get_manager_action_mask()：若某维 w_raw==0，则禁止该维再减 0.1 的动作
 
 Deadline 逻辑：
@@ -18,8 +20,7 @@ Deadline 逻辑：
 2) 任务级 deadline（task_baseline_finish）：
    根据 wf_deadline 做 Latest-Finish 反推
 3) 工作流级 deadline 用途：
-   - EDF 特征
-   - Manager state 的 slack 统计
+   - Manager state 的工作流级 slack 统计；TA 的 EDF 使用任务绝对子截止时刻
    - workflow lateness 统计
 
 【本版本关键修改】
@@ -670,10 +671,12 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         else:
             self._fuse_zero_assign_streak = 0
 
+        lower_energy_already_emitted = bool(self._phase_preadvanced)
         if self._phase_preadvanced:
             r_energy_phase = float(self._phase_preadvance_r_energy_total)
+            r_energy_by_host = dict(self._phase_preadvance_r_energy_by_host)
         else:
-            r_energy_phase = float(self._advance_until_decision_energy_only())
+            r_energy_phase, r_energy_by_host = self._advance_until_decision_energy_only(return_breakdown=True)
 
         if self._phase_assign_cnt > 0 and self._phase_size_sum_mi > 0:
             r_manager_raw = r_energy_phase / float(self._phase_size_sum_mi)
@@ -685,6 +688,10 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             "assign_cnt": int(self._phase_assign_cnt),
             "phase_size_sum_mi": float(self._phase_size_sum_mi),
             "r_energy_phase": float(r_energy_phase),
+            "r_energy_by_host": dict(r_energy_by_host),
+            "lower_energy_already_emitted": lower_energy_already_emitted,
+            "terminated": bool(self.done_flag and self._episode_should_end()),
+            "truncated": bool(self.done_flag and not self._episode_should_end()),
             "phase_assigned_tids": list(self._phase_assigned_tids),
         }
 
@@ -1003,16 +1010,10 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
                 next_times.append(self.arrival_times[self.next_arrival_idx])
 
             if len(next_times) == 0:
-                self._fuse_no_event_streak += 1
-                if self._episode_should_end() or self._fuse_no_event_streak >= self._fuse_no_event_limit:
+                if self._episode_should_end():
                     self.done_flag = True
                     break
-                self.current_time += 1e-9
-                r0, rb = self._energy_reward_to_current_time_with_breakdown()
-                r_energy += float(r0)
-                for h in self.host_ids:
-                    r_energy_by_host[int(h)] += float(rb.get(int(h), 0.0))
-                continue
+                raise RuntimeError("Unfinished MAHDRL episode has no arrival/completion event")
 
             next_t = min(next_times)
             if next_t <= self.current_time + 1e-12:
@@ -1087,44 +1088,42 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         self.ready_task_ids = [tid for tid in self.ready_task_ids if self.task_state[tid] == "Ready"]
 
     def _compute_task_heuristics_for_ready(self):
-        now = self.current_time
-        sel_ids = list(self.ready_task_ids)
-        if len(sel_ids) == 0:
-            return [], np.zeros((0, self.task_heur_dim), dtype=np.float32)
+        """F15: FCFS/SJF/MCF/HUR/EDF; every returned column is higher-priority-first."""
+        sel_ids = [tid for tid in self.ready_task_ids if self.task_state[tid] == "Ready"]
+        if not sel_ids:
+            return [], np.zeros((0, self.task_heur_dim), dtype=np.float64)
 
+        now = float(self.current_time)
         pc_mean = float(np.mean([self.vms[v].pc for v in self.vms]))
-        bw_mean = float(np.mean([self.vms[v].bw for v in self.vms]))
-        bw_mean_bps = bw_mean * 1e6
+        bw_mean_bps = float(np.mean([self.vms[v].bw for v in self.vms])) * 1e6
+        if not np.isfinite([now, pc_mean, bw_mean_bps]).all() or pc_mean <= 0 or bw_mean_bps <= 0:
+            raise ValueError("F15 requires finite time and positive mean VM capacity/bandwidth")
 
-        time_scale = 1.0 + np.mean(np.array(self.task_mi, dtype=np.float64) / max(pc_mean, 1.0))
-
-        feats = np.zeros((len(sel_ids), self.task_heur_dim), dtype=np.float32)
+        raw = np.empty((len(sel_ids), self.task_heur_dim), dtype=np.float64)
         for i, tid in enumerate(sel_ids):
-            exp_t = (
-                self.task_in_bits[tid] / max(bw_mean_bps, 1e-9)
-                + self.task_mi[tid] / max(pc_mean, 1.0)
-                + self.task_out_bits[tid] / max(bw_mean_bps, 1e-9)
-            )
-            fcfs = max(0.0, now - self.task_ready_time[tid])
-            sjf = 1.0 / (exp_t + 1.0)
-            mcf = float(len(self.task_children[tid]))
-            hur = float(self.task_up_rank[tid])
+            if tid >= len(self.task_baseline_finish):
+                raise ValueError(f"F15 Ready task {tid} has no absolute task sub-deadline")
+            processing = (float(self.task_in_bits[tid]) / bw_mean_bps
+                          + float(self.task_mi[tid]) / pc_mean
+                          + float(self.task_out_bits[tid]) / bw_mean_bps)
+            deadline = float(self.task_baseline_finish[tid])
+            raw[i] = [self.task_ready_time[tid], processing, self.task_up_rank[tid],
+                      deadline - now - processing, deadline]
+        if not np.isfinite(raw).all():
+            raise ValueError("F15 task attributes must be finite")
 
-            wf_idx, _ = self.task_meta[tid]
-            wf = self.workflows[wf_idx]
-            if getattr(wf, "deadline", None) is not None:
-                slack = max(0.0, float(wf.deadline) - (now + exp_t))
-                edf = 1.0 / (slack + 1.0)
-            else:
-                edf = 0.0
+        direction = np.array([-1.0, -1.0, 1.0, -1.0, -1.0])
+        if not self.normalize:
+            return sel_ids, raw * direction
 
-            if self.normalize:
-                fcfs = fcfs / max(self.horizon, 1.0)
-                hur = hur / max(time_scale, 1.0)
-                mcf = mcf / max(1.0, np.mean([len(ch) for ch in self.task_children]) + 1e-6)
-
-            feats[i] = np.array([fcfs, sjf, mcf, hur, edf], dtype=np.float32)
-        return sel_ids, feats
+        # Scale before subtraction to avoid overflow for large finite signed values.
+        scale = np.maximum(np.max(np.abs(raw), axis=0), 1.0)
+        scaled = raw / scale
+        low, high = scaled.min(axis=0), scaled.max(axis=0)
+        span = high - low
+        numerator = np.where(direction > 0, scaled - low, high - scaled)
+        feats = np.divide(numerator, span, out=np.zeros_like(raw), where=span > 0)
+        return sel_ids, np.clip(feats, 0.0, 1.0)
 
     def _phase_prepare_tasks(self):
         self._add_workflow_if_arrived()
@@ -1132,9 +1131,12 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         if feats.shape[0] == 0:
             self._phase_tasks = []
             return
-        scores = feats @ self.combo_weights.reshape(-1, 1)
-        order = np.argsort(-scores.squeeze(1))
-        self._phase_tasks = [int(sel_ids[i]) for i in order.tolist()]
+        scores = feats @ self.combo_weights
+        if not np.isfinite(scores).all():
+            raise ValueError("F15 weighted priorities must be finite")
+        order = sorted(range(len(sel_ids)),
+                       key=lambda i: (-float(scores[i]), self.task_ready_time[sel_ids[i]], sel_ids[i]))
+        self._phase_tasks = [int(sel_ids[i]) for i in order]
 
     def _compute_block2(self):
         now = self.current_time

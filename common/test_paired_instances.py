@@ -12,7 +12,7 @@ import numpy as np
 
 from common.scenarios import Scenario
 from common.workflow_opt import sample_deadline_alpha
-from common.read_xml_opt_Tsize import load_workflow_from_dax
+from common.read_xml_opt_Tsize import load_workflow_from_dax, workflow_instance_hash
 
 
 ALGORITHMS = {
@@ -122,6 +122,7 @@ class PairedInstanceTests(unittest.TestCase):
         self.assertEqual(len(env.workflows), 50)
         self.assertEqual(payload_seeds, list(range(2, 52)))
         return dict(names=names, alphas=alphas, payloads=payloads, payload_seeds=payload_seeds,
+                    hashes=[workflow_instance_hash(w.graph, w.tasks) for w in env.workflows],
                     arrivals=list(env.arrival_times), deadlines=[wf.deadline for wf in env.workflows],
                     task_deadlines=env.task_baseline_finish)
 
@@ -137,7 +138,7 @@ class PairedInstanceTests(unittest.TestCase):
                 for algorithm in ALGORITHMS:
                     with self.subTest(algorithm=algorithm, deadline=deadline):
                         actual = self.snapshot(algorithm, scenario, cache)
-                        for key in ('names', 'alphas', 'payload_seeds', 'payloads'):
+                        for key in ('names', 'alphas', 'payload_seeds', 'payloads', 'hashes'):
                             self.assertEqual(actual[key], reference[key], key)
                         for key in ('arrivals', 'deadlines', 'task_deadlines'):
                             np.testing.assert_allclose(actual[key], reference[key], rtol=0, atol=1e-10, err_msg=key)

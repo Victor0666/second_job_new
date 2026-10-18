@@ -10,7 +10,7 @@ import unittest
 
 import numpy as np
 
-from common.read_xml_opt_Tsize import dax_template_id
+from common.read_xml_opt_Tsize import data_model_metadata, dax_template_id
 from common.scenarios import Scenario
 from common.workflow_opt import COMMUNICATION_MODEL
 from environments.marl import CloudWorkflowEnv_MARL
@@ -21,7 +21,7 @@ class DAXTemplateTests(unittest.TestCase):
         path = Path(directory) / 'name_resolution_fixture.json'
         # Isolate template identity from reference makespan/communication semantics.
         path.write_text(json.dumps(dict(
-            meta=dict(communication_model=COMMUNICATION_MODEL),
+            meta=dict(communication_model=COMMUNICATION_MODEL, **data_model_metadata()),
             data=[dict(seed=2, arrival_times=arrivals or [float(i) for i in range(len(names))],
                        wf_dax_names=names, wf_makespans=[100.0] * len(names))],
         )), encoding='utf-8')
@@ -36,7 +36,7 @@ class DAXTemplateTests(unittest.TestCase):
         for resource in 'SML':
             with self.subTest(resource=resource), tempfile.TemporaryDirectory() as directory:
                 scenario = Scenario(task='M', resource=resource)
-                historical = json.loads(scenario.cache_path.read_text(encoding='utf-8'))
+                historical = json.loads(scenario.legacy_cache_path.read_text(encoding='utf-8'))
                 record = next(r for r in historical['data'] if r['seed'] == 2)
                 names = record['wf_dax_names']
                 self.assertEqual(dax_template_id(names[4]), 'ligo_50.xml')
@@ -98,7 +98,7 @@ class DAXTemplateTests(unittest.TestCase):
         for task in 'SML':
             for resource in 'SML':
                 scenario = Scenario(task=task, resource=resource)
-                obj = json.loads(scenario.cache_path.read_text(encoding='utf-8'))
+                obj = json.loads(scenario.legacy_cache_path.read_text(encoding='utf-8'))
                 paths = scenario.dax_paths()
                 for record in obj['data']:
                     names = record['wf_dax_names']

@@ -117,70 +117,32 @@ def _pick_first_idle_host(env: CloudWorkflowEnv_VMAgents, host_mask: np.ndarray)
     return int(best_host_action)
 
 
-def _infer_vm_action_mapping(
-    env: CloudWorkflowEnv_VMAgents, selected_host_action: int, vm_mask_len: int
-) -> Tuple[str, List[int]]:
-    """
-    推断 vm action -> 全局 VM 索引 的映射。
-
-    返回:
-    - mode == "global": mapping[i] 为 action i 对应的全局 VM 索引
-    - mode == "local":  mapping[i] 为本 host 下 action i 对应的全局 VM 索引
-    - mode == "fallback": 无法可靠推断
-    """
-    num_vms = int(getattr(env, "num_vms", 0))
-    if vm_mask_len == num_vms:
-        return ("global", list(range(num_vms)))
-    host_id = _host_id_from_action(env, int(selected_host_action))
-    gvm_idxs = _global_vm_indices_of_host(env, host_id)
-    if vm_mask_len == len(gvm_idxs):
-        return ("local", gvm_idxs)
-    candidate_attrs = [
-        "current_host_vm_indices",
-        "_current_host_vm_indices",
-        "selected_host_vm_indices",
-        "_selected_host_vm_indices",
-        "candidate_vm_indices",
-        "_candidate_vm_indices",
-        "current_candidate_vm_indices",
-        "_current_candidate_vm_indices",
-    ]
-    for attr in candidate_attrs:
-        if hasattr(env, attr):
-            try:
-                arr = list(getattr(env, attr))
-                if len(arr) == vm_mask_len:
-                    return ("local", [int(x) for x in arr])
-            except Exception:
-                pass
-    return ("fallback", [])
-
-
 def _pick_fifs_vm(
     env: CloudWorkflowEnv_VMAgents, vm_mask: np.ndarray, selected_host_action: int
 ) -> int:
-    """
-    FIFS：在所选 host 内选择最早空闲 VM；若并列，选 action idx 更小者。
-    """
-    valid = np.where(np.asarray(vm_mask, dtype=float) > 0.5)[0].astype(int)
+    """Choose earliest-idle VM within the selected host; return its local slot."""
+    host_action = int(selected_host_action)
+    if not 0 <= host_action < len(env.host_ids):
+        raise ValueError(f"Host action out of range: {host_action}")
+    host_id = env.host_ids[host_action]
+    # Use exactly the slot order consumed by env.vm_assign(), including on 8-VM hosts.
+    mapping = env.host_to_vm_indices[host_id]
+    mask = np.asarray(vm_mask, dtype=float)
+    if mask.ndim != 1 or len(mask) != env.max_vms_per_host or not np.all(np.isfinite(mask)):
+        raise ValueError("VM mask must be a finite vector padded to max_vms_per_host")
+    if len(mapping) > len(mask):
+        raise ValueError("Host VM mapping exceeds the padded mask length")
+    valid = np.flatnonzero(mask > 0.5)
+    if np.any(valid >= len(mapping)):
+        raise ValueError("VM mask marks a padding slot as legal")
     if valid.size == 0:
-        return 0
-    vm_available_at = np.asarray(getattr(env, "vm_available_at", []), dtype=float)
-    mode, mapping = _infer_vm_action_mapping(env, selected_host_action, len(vm_mask))
-    if mode in ("global", "local") and len(mapping) == len(vm_mask):
-        best_action = int(valid[0])
-        best_time = float("inf")
-        for a_vm in valid:
-            gidx = int(mapping[int(a_vm)])
-            if 0 <= gidx < len(vm_available_at):
-                t0 = float(vm_available_at[gidx])
-            else:
-                t0 = float("inf")
-            if t0 < best_time - 1e-12 or (abs(t0 - best_time) <= 1e-12 and int(a_vm) < best_action):
-                best_time = t0
-                best_action = int(a_vm)
-        return int(best_action)
-    return int(valid[0])
+        raise ValueError("Selected host has no legal VM action")
+    available = np.asarray(env.vm_available_at, dtype=float)
+    for slot in valid:
+        gidx = int(mapping[int(slot)])
+        if not 0 <= gidx < len(available) or not np.isfinite(available[gidx]):
+            raise ValueError(f"Invalid VM availability mapping for host {host_id}, slot {slot}")
+    return int(min(valid, key=lambda slot: (available[mapping[int(slot)]], int(slot))))
 
 
 def _get_records(env: CloudWorkflowEnv_VMAgents):

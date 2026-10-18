@@ -33,17 +33,17 @@ def percentiles(values):
     return dict(zip(('P50','P95','P99','Max'), map(float, [*np.percentile(a, [50,95,99], method='linear'), a.max()])))
 
 
-def validate_seeds(seeds, heldout=range(1,32)):
-    overlap = sorted(set(seeds) & set(heldout))
-    if overlap:
-        raise ValueError(f'Calibration overlaps validation/test seeds {overlap}; specify other training calibration seeds')
-    if not set(seeds) <= set(range(1,601)):
-        raise ValueError('Default formal training seeds are 1-600; use training calibration seeds in 32-600')
+def validate_seeds(seeds, heldout=None):
+    from common.experiment_protocol import ExperimentProtocol, DEFAULT_PROTOCOL
+    protocol = ExperimentProtocol.load(DEFAULT_PROTOCOL)
+    excluded = set(protocol.validation) | set(protocol.test) if heldout is None else set(heldout)
+    if set(seeds) & excluded or not set(seeds) <= set(protocol.train):
+        raise ValueError('Calibration requires F22 training seeds 0-599, excluding validation/test')
 
 
 def cache_info(scenario, seeds):
     path = scenario.cache_path
-    command = f'./run.cmd common/precompute_deadlines.py --task S --resource {scenario.resource} --seeds 0-1000'
+    command = f'./run.cmd common/f22_cache.py --task {scenario.task} --resource {scenario.resource}'
     try:
         raw = path.read_bytes(); obj = json.loads(raw)
         validate_deadline_cache(obj, str(path))
@@ -61,7 +61,7 @@ def cache_info(scenario, seeds):
             raise ValueError('Cache DAX mixture mismatch')
         return dict(path=str(path), sha256=hashlib.sha256(raw).hexdigest(), meta=meta)
     except (OSError, ValueError, KeyError) as exc:
-        raise ValueError(f'{exc}. Prepare a matching cache: {command}. Existing caches are never overwritten; use a separate output and validate it before replacing a mismatched cache.') from exc
+        raise ValueError(f'{exc}. Audit cache and missing seeds: {command}. Use --supplement-out with a new path for missing seeds only. Existing caches are never overwritten; incompatible caches require separate preparation.') from exc
 
 
 def sample_episode(scenario, seed, raw_records=False):

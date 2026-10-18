@@ -195,7 +195,7 @@ def build_agent_and_env_kwargs():
         dax_paths=dax_list,
         horizon=1000000000.0,
         arrival_lambda=0.03,
-        random_seed=1,
+        random_seed=SCENARIO.seeds[0],
         workflows_per_episode=50,
         max_ready_tasks="auto",
         normalize=True,
@@ -260,7 +260,7 @@ def build_agent_and_env_kwargs():
 def main():
     num_runs = len(SCENARIO.seeds)
     seeds = list(SCENARIO.seeds)
-    result_dir = os.path.join(ROOT_DIR, "outputs", "run", SCENARIO.normalization_mode, LEARNING_MODEL, "pd3qn_wfInfo_rn")
+    result_dir = os.path.join(ROOT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, "pd3qn_wfInfo_rn")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,
@@ -303,7 +303,7 @@ def main():
     wf_avg_late_list, wf_avg_tardy_list, wf_success_list = ([], [], [])
     for idx, seed in enumerate(seeds, start=1):
         print(f"\n===== Eval {idx}/{num_runs} | seed={seed} =====")
-        set_seed(seed)
+        set_seed(SCENARIO.model_seed)
         env_kwargs = dict(env_kwargs_base)
         env_kwargs["random_seed"] = int(seed)
         eval_ret, eval_steps, m, _ = evaluate_one_episode(

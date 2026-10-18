@@ -132,7 +132,8 @@ def _canonicalize_episode_metrics(m_raw: dict) -> dict:
     return out
 
 
-def build_env_kwargs_irws(random_seed=1):
+def build_env_kwargs_irws(random_seed=None):
+    random_seed = SCENARIO.seeds[0] if random_seed is None else random_seed
     dax_dir = os.path.join(PROJECT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
     horizon = 1000000000.0
@@ -289,7 +290,7 @@ def evaluate_one_seed(env_kwargs: dict, task_selector, ppo, seed: int) -> dict:
 def main():
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_irws(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.normalization_mode, LEARNING_MODEL, "irws_fcfs_wfInfo_Mix_Alpha_rn")
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, "irws_fcfs_wfInfo_Mix_Alpha_rn")
     _ensure_dir(result_dir)
     csv_path = os.path.join(
         result_dir, f"eval_task{SCENARIO.task}_res{SCENARIO.resource}_{SCENARIO.deadline}.csv"
@@ -327,7 +328,7 @@ def main():
     rows = []
     for idx, sd in enumerate(seeds):
         print(f"\n===== Eval {idx + 1}/{len(seeds)} | seed={sd} =====")
-        set_seed(sd)
+        set_seed(SCENARIO.model_seed)
         kw_i = dict(env_kwargs_base)
         kw_i["random_seed"] = int(sd)
         m = evaluate_one_seed(kw_i, task_selector, ppo, seed=int(sd))
@@ -380,7 +381,7 @@ def main():
 
     mean_row = dict(
         run_idx="AVG",
-        seed="2-31",
+        seed=SCENARIO.seed_spec,
         steps=col_mean("steps"),
         total_energy=col_mean("total_energy"),
         makespan=col_mean("makespan"),

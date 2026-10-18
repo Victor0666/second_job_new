@@ -698,6 +698,8 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         return float(r_manager_raw), info
 
     def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self.random_seed = int(seed)
         super().reset(seed=seed)
         self._reset_internal_buffers()
 

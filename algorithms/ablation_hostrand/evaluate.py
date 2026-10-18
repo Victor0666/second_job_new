@@ -397,7 +397,7 @@ def build_agents_and_load(env_kwargs: dict):
 def main():
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_hostrand(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.normalization_mode, LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_hostrand_ddlMix")
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_hostrand_ddlMix")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,
@@ -437,7 +437,7 @@ def main():
     all_rows = []
     for idx, sd in enumerate(seeds):
         print(f"\n===== Eval {idx}/{len(seeds) - 1} | seed={sd} =====")
-        set_seed(sd)
+        set_seed(SCENARIO.model_seed)
         kwargs_i = dict(env_kwargs_base)
         kwargs_i["random_seed"] = int(sd)
         row = evaluate_hostrand_one_seed(EnvHOSTRAND, kwargs_i, vm_agent, manager_agent)

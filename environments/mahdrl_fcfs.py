@@ -169,6 +169,8 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
 
     # ---------------- reset ----------------
     def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self.random_seed = int(seed)
         self.rng = np.random.RandomState(int(self.random_seed))
         ret = super().reset(seed=seed, options=options)
 

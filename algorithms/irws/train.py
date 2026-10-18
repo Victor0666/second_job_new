@@ -108,9 +108,9 @@ def train():
     DEADLINE_ALPHA_CHOICES = (2.0, 3.0)
     DEADLINE_ALPHA_PROBS = SCENARIO.deadline_probs
     UPDATE_EVERY_ASSIGNMENTS = 2048
-    EVAL_SEEDS = [1]
-    random_seed = 1
-    set_seed(random_seed)
+    EVAL_SEEDS = SCENARIO.validation_seeds()
+    random_seed = SCENARIO.first_training_seed()
+    set_seed(SCENARIO.model_seed)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     env_kwargs = dict(
         dax_paths=dax_list,
@@ -136,6 +136,9 @@ def train():
     )
     env_kwargs.update(SCENARIO.normalization_kwargs())
     env = IRWSEnvRouteA(**env_kwargs)
+    from common.f22_instances import write_run_metadata, episode_identity
+    write_run_metadata(save_dir, SCENARIO)
+    write_run_metadata(SCENARIO.log_dir("irws"), SCENARIO)
     env.reset()
     task_selector = IRWSTaskSelector(TaskSelectorConfig(feat_dim=7, hidden=128, device=device))
     vm_st = None
@@ -230,7 +233,7 @@ def train():
     total_assign = 0
     f11_log = F11Logger(log_dir)
     while episode < MAX_EPISODES:
-        env.random_seed = int(env.random_seed)
+        env.random_seed = SCENARIO.training_seed(episode)
         env.reset()
         episode_assign = 0
         ppo_losses = []
@@ -301,7 +304,7 @@ def train():
             loss = ppo.update(last_value=0.0)
             if loss is not None:
                 ppo_losses.append(float(loss))
-        f11_log.log(episode, {"VM_PPO": ppo}, normalization=normalization_diagnostics(env), pending=ppo.buf.size(), truncated=truncated_episode)
+        f11_log.log(episode, {"VM_PPO": ppo}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO), pending=ppo.buf.size(), truncated=truncated_episode)
         m = env.get_episode_metrics()
         eval_m = evaluate_irws_multi_seed(
             env_ctor_kwargs=env_kwargs,
@@ -336,7 +339,6 @@ def train():
             best_eval_energy = float(eval_m["total_energy"])
             save_joint(best_path)
             print(f"⭐ best updated: eval_energy={best_eval_energy:.3f}J -> saved {best_path}")
-        env.random_seed = int(env.random_seed) + 1
         episode += 1
     save_joint(final_path)
     print(f"训练结束。\nbest={best_path}\nfinal={final_path}\nlog={log_path}")

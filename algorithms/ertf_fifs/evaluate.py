@@ -376,7 +376,7 @@ def main():
     dax_list = SCENARIO.dax_paths(dax_dir)
     horizon = 1000000000.0
     arrival_lambda = 0.03
-    random_seed = 1
+    random_seed = SCENARIO.seeds[0]
     workflows_per_episode = 50
     max_ready_tasks = "auto"
     normalize_obs = True
@@ -397,11 +397,12 @@ def main():
         ROOT_DIR,
         "outputs",
         "run",
+        SCENARIO.output_version,
         "fcfs_fifs_ddlMix",
         f"eval_task{SCENARIO.task}_res{SCENARIO.resource}_{SCENARIO.deadline}.csv",
     )
     eval_seeds = list(SCENARIO.seeds)
-    set_seed(random_seed)
+    set_seed(SCENARIO.model_seed)
     env_kwargs = dict(
         dax_paths=dax_list,
         horizon=horizon,

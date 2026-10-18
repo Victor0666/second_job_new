@@ -109,10 +109,6 @@ def check_checkpoint(actual, expected):
 
 def bind_normalization(agent, scenario):
     agent.normalization_metadata = scenario.normalization_metadata()
-    if getattr(scenario, 'experiment_protocol', None):
-        from common.experiment_protocol import protocol_hash
-        agent.normalization_metadata['experiment_protocol_hash'] = protocol_hash(scenario.experiment_protocol)
-        agent.normalization_metadata['experiment_protocol'] = scenario.protocol().metadata()
     return agent
 
 def observe_rr(env, ready_count):

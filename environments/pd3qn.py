@@ -384,6 +384,8 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
 
     # ---------------- reset ----------------
     def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self.random_seed = int(seed)
         self.rng = np.random.RandomState(int(self.random_seed))
 
         self.current_time = 0.0

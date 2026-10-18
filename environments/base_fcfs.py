@@ -130,6 +130,8 @@ class CloudWorkflowEnv_VMAgents(_BaseEnv):
 
     # ---------------- reset：每episode重置rng（保证seed绑定模板序列） ----------------
     def reset(self, *, seed=None, options=None):
+        if seed is not None:
+            self.random_seed = int(seed)
         # 关键：episode 的模板抽样 rng 必须与 self.random_seed 绑定，否则 cache 对不上
         self.rng = np.random.RandomState(int(self.random_seed))
         return super().reset(seed=seed, options=options)

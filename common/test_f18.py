@@ -93,9 +93,9 @@ class F18Tests(unittest.TestCase):
 
     def test_T06_cache_validation_and_seed_isolation(self):
         s=self.Scenario();info=cache_info(s,[101]);self.assertIn('sha256',info)
-        with self.assertRaisesRegex(ValueError,'precompute_deadlines'):cache_info(s,[102])
+        with self.assertRaisesRegex(ValueError,'f22_cache'):cache_info(s,[102])
         validate_seeds(range(101,131))
-        for seeds in ([1],[2],[31],[601]):
+        for seeds in ([600],[700],[729],[601]):
             with self.assertRaises(ValueError):validate_seeds(seeds)
 
     def test_T08_four_algorithms_same_parameters(self):

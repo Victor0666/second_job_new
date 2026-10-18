@@ -477,7 +477,8 @@ def compute_task_and_workflow_metrics(env: EnvNoHost):
     }
 
 
-def build_env_kwargs_nohost(random_seed=1):
+def build_env_kwargs_nohost(random_seed=None):
+    random_seed = SCENARIO.seeds[0] if random_seed is None else random_seed
     dax_dir = os.path.join(PROJECT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
     horizon = 1000000000.0
@@ -672,7 +673,7 @@ def build_two_layer_agents_and_load(env_kwargs: dict):
 def main():
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_nohost(random_seed=seeds[0])
-    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.normalization_mode, LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_nohost_ddlMix")
+    result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, TA_WEIGHT_MODEL, "hrl_nohost_ddlMix")
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(
         result_dir,
@@ -717,7 +718,7 @@ def main():
     ms_list = []
     for idx, sd in enumerate(seeds, start=1):
         print(f"\n===== Eval {idx}/{len(seeds)} | seed={sd} =====")
-        set_seed(sd)
+        set_seed(SCENARIO.model_seed)
         kwargs_i = dict(env_kwargs_base)
         kwargs_i["random_seed"] = int(sd)
         out = evaluate_nohost_one_seed(EnvNoHost, kwargs_i, vm_agent, manager_agent)

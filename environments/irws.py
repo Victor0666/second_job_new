@@ -472,6 +472,8 @@ class IRWSEnvRouteA(gym.Env):
     # ---------------- core API ----------------
 
     def reset(self, *, seed: Optional[int] = None, options: Optional[dict] = None):
+        if seed is not None:
+            self.random_seed = int(seed)
         # self.rng 只用于模板抽样
         self.rng = np.random.RandomState(int(self.random_seed))
 

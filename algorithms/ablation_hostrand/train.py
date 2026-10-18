@@ -245,7 +245,7 @@ def train():
         raise FileNotFoundError(
             f"deadline cache 不存在：{DEADLINE_CACHE_PATH}\n请先运行：common/precompute_deadlines.py --task {SCENARIO.task} --resource {SCENARIO.resource} 生成 cache"
         )
-    set_seed(random_seed)
+    set_seed(SCENARIO.model_seed)
     EnvCls = CloudWorkflowEnv_VMAgents
     env_kwargs = dict(
         dax_paths=dax_list,
@@ -270,6 +270,9 @@ def train():
     )
     env_kwargs.update(SCENARIO.normalization_kwargs())
     env = EnvCls(**env_kwargs)
+    from common.f22_instances import write_run_metadata, episode_identity
+    write_run_metadata(save_dir, SCENARIO)
+    write_run_metadata(SCENARIO.log_dir("ablation_hostrand"), SCENARIO)
     env.reset()
     env.energy_reward_scale = ENERGY_REWARD_SCALE
     env.task_baseline_norm = TASK_BASELINE_NORM
@@ -418,7 +421,7 @@ def train():
     HARD_MAX_STEPS = 10**9
     while episode_idx < MAX_EPISODES and global_step < HARD_MAX_STEPS:
         if env.done_flag:
-            f11_log.log(episode_idx, {'TA': manager_agent, 'VA': vm_agent}, normalization=normalization_diagnostics(env),
+            f11_log.log(episode_idx, {'TA': manager_agent, 'VA': vm_agent}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO),
                         reward_audit=reward_audit.summary(env, host_trace, vm_trace),
                         pending=sum(t.pending is not None for t in (host_trace, vm_trace) if t is not None),
                         reward_balance={name: t.recorded_reward - t.emitted_reward for name, t in
@@ -475,7 +478,9 @@ def train():
             if global_step % save_interval == 0:
                 vm_agent.save(os.path.join(save_dir, f"vm_step{global_step}.pth"))
                 manager_agent.save(os.path.join(save_dir, f"mgr_step{global_step}.pth"))
-            env.random_seed = getattr(env, "random_seed", 0) + 1
+            if episode_idx + 1 >= MAX_EPISODES:
+                break
+            env.random_seed = SCENARIO.training_seed(episode_idx + 1)
             reward_audit = LowerRewardAudit(host_trace, vm_trace)
             env.reset()
             env.energy_reward_scale = env_kwargs["energy_reward_scale"]
@@ -584,7 +589,7 @@ def train():
         if trace is not None:
             trace.finish(truncated=not env.done_flag)
     if global_step >= HARD_MAX_STEPS and not env.done_flag:
-        f11_log.log(episode_idx, {'TA': manager_agent, 'VA': vm_agent}, normalization=normalization_diagnostics(env), pending=0,
+        f11_log.log(episode_idx, {'TA': manager_agent, 'VA': vm_agent}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO), pending=0,
                     end_reason="training_step_cap_no_successor",
                     cutoffs=sum(t.cutoffs for t in (host_trace, vm_trace) if t is not None))
     vm_final = os.path.join(save_dir, "vm_final.pth")

@@ -4,7 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
-DEFAULT_PROTOCOL = Path(__file__).resolve().parents[1]/'configs/paired_cloud_protocol_v1.json'
+DEFAULT_PROTOCOL = Path(__file__).resolve().parents[1]/'configs/f22_split_v1.json'
 
 
 @dataclass(frozen=True)
@@ -14,9 +14,13 @@ class ExperimentProtocol:
     test: tuple
     episodes: int = 600
     selection: str = 'minimum_validation_total_energy'
-    version: str = 'paired_cloud_disjoint_v1'
+    version: str = 'f22_split_v1'
 
     def __post_init__(self):
+        if self.version == 'f22_split_v1' and (self.train != tuple(range(600)) or self.validation != (600,) or self.test != tuple(range(700,730)) or self.episodes != 600):
+            raise ValueError('f22_split_v1 requires train=0-599, validation=600, test=700-729 and 600 episodes')
+        if len(self.validation) != 1:
+            raise ValueError('Exactly one validation instance seed is required')
         groups=[set(self.train),set(self.validation),set(self.test)]
         if any(not g for g in groups) or any(len(g)!=len(seq) for g,seq in zip(groups,(self.train,self.validation,self.test))):
             raise ValueError('Empty or duplicate experiment seeds')

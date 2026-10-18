@@ -135,7 +135,7 @@ def evaluate_marl(
 
 def train():
     random_seed = SCENARIO.first_training_seed()
-    set_seed(random_seed)
+    set_seed(SCENARIO.model_seed)
     dax_dir = os.path.join(ROOT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
     deadline_cache_path = str(SCENARIO.cache_path)
@@ -173,6 +173,9 @@ def train():
     env_kwargs.update(SCENARIO.normalization_kwargs())
     protect_training_outputs(SCENARIO.checkpoint_dir("marl"), SCENARIO.log_dir("marl"))
     env = CloudWorkflowEnv_MARL(**env_kwargs)
+    from common.f22_instances import write_run_metadata, episode_identity
+    write_run_metadata(SCENARIO.checkpoint_dir("marl"), SCENARIO)
+    write_run_metadata(SCENARIO.log_dir("marl"), SCENARIO)
     obs0, _info0 = env.reset(
         seed=random_seed,
         options={"episode_id": 0, "tag": "probe", "dump_deadlines": True, "print_deadlines": True},
@@ -265,7 +268,7 @@ def train():
     episode_idx = 0
     f11_log = F11Logger(os.path.dirname(log_path))
     while episode_idx < max_episodes:
-        train_seed = random_seed + episode_idx
+        train_seed = SCENARIO.training_seed(episode_idx)
         obs, _info = env.reset(
             seed=train_seed,
             options={
@@ -346,7 +349,7 @@ def train():
             global_step += 1
         ep_energy = float(env.total_energy - ep_energy0)
         local_trace.finish()
-        f11_log.log(episode_idx, {"Global": global_agent, "Local": local_agent}, normalization=normalization_diagnostics(env),
+        f11_log.log(episode_idx, {"Global": global_agent, "Local": local_agent}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO),
                     pending=int(local_trace.pending is not None),
                     local_reward_balance=local_trace.recorded_reward - local_trace.emitted_reward)
         ep_total_late, ep_avg_late, ep_wf_avg_late = _finalize_lateness_stats(

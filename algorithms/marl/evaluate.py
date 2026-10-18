@@ -91,7 +91,7 @@ def build_env_kwargs(deadline_cache_path: str) -> Dict[str, Any]:
         dax_paths=dax_list,
         horizon=1000000000.0,
         arrival_lambda=0.03,
-        random_seed=1,
+        random_seed=SCENARIO.seeds[0],
         normalize=True,
         num_hosts=SCENARIO.num_hosts,
         vms_per_host=SCENARIO.vms_per_host,
@@ -110,7 +110,7 @@ def build_env_kwargs(deadline_cache_path: str) -> Dict[str, Any]:
         strict_cache=True,
         dump_deadlines=True,
         print_deadlines=True,
-        deadlines_out_dir=os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.normalization_mode, LEARNING_MODEL, "marl", "deadlines"),
+        deadlines_out_dir=os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, "marl", "deadlines"),
         deadlines_file_prefix="marl",
     )
 
@@ -290,7 +290,7 @@ def main():
         PROJECT_DIR,
         "outputs",
         "run",
-        SCENARIO.normalization_mode,
+        SCENARIO.output_version,
         LEARNING_MODEL,
         "marl_fcfs_mix_ddlAlpha",
         f"run_marl0p75_style_task{SCENARIO.task}_res{SCENARIO.resource}_ddlMix_{SCENARIO.deadline}.csv",
@@ -373,7 +373,7 @@ def main():
     steps_list, diff_list = ([], [])
     for idx, sd in enumerate(seeds):
         print(f"\n===== Eval {idx}/{len(seeds) - 1} | seed={sd} =====")
-        set_seed(int(sd))
+        set_seed(SCENARIO.model_seed)
         m = evaluate_one_seed(
             env_kwargs=env_kwargs,
             global_agent=global_agent,

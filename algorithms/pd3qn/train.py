@@ -124,8 +124,11 @@ def train():
     protect_training_outputs(save_dir, os.path.dirname(log_path))
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
-    set_seed(random_seed)
+    set_seed(SCENARIO.model_seed)
     env = CloudWorkflowEnv_PD3QN_Cost(**env_kwargs)
+    from common.f22_instances import write_run_metadata, episode_identity
+    write_run_metadata(save_dir, SCENARIO)
+    write_run_metadata(SCENARIO.log_dir("pd3qn"), SCENARIO)
     obs, _ = env.reset()
     obs_dim = int(obs.shape[0])
     act_dim = int(env.action_space.n)
@@ -211,7 +214,7 @@ def train():
             obs = obs2
             ep_steps += 1
             global_step += 1
-        f11_log.log(episode_idx, {"PD3QN": agent}, normalization=normalization_diagnostics(env), pending=0,
+        f11_log.log(episode_idx, {"PD3QN": agent}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO), pending=0,
                     terminated=bool(terminated), truncated=bool(truncated))
         m = env.get_episode_metrics()
         ep_energy = float(m["total_energy"])
@@ -250,7 +253,7 @@ def train():
             print(f"⭐ best updated: eval_energy={best_eval_energy:.3f}J -> saved {best_ckpt}")
         if global_step % SAVE_INTERVAL == 0:
             agent.save(os.path.join(save_dir, f"pd3qn_step{global_step}.pth"))
-        env.random_seed = int(getattr(env, "random_seed", 0) + 1)
+        env.random_seed = SCENARIO.training_seed(episode_idx + 1) if episode_idx + 1 < SCENARIO.episodes else env.random_seed
         env_kwargs["random_seed"] = int(env.random_seed)
         episode_idx += 1
     final_ckpt = os.path.join(save_dir, "pd3qn_final.pth")

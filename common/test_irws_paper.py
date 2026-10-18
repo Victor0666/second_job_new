@@ -203,11 +203,11 @@ class PaperIRWSTests(unittest.TestCase):
 
     def test_protocol_isolation_and_frozen_test_instances(self):
         protocol=ExperimentProtocol.load(DEFAULT_PROTOCOL)
-        self.assertEqual(protocol.test,tuple(range(2,32)));self.assertEqual(len(protocol.train),600)
+        self.assertEqual(protocol.test,tuple(range(700,730)));self.assertEqual(len(protocol.train),600)
         with self.assertRaises(ValueError):ExperimentProtocol((1,2),(2,),(3,),2)
         with self.assertRaises(ValueError):Scenario(mode='eval',seed_spec='32',experiment_protocol=str(DEFAULT_PROTOCOL))
-        self.assertEqual(Scenario(experiment_protocol=str(DEFAULT_PROTOCOL)).first_training_seed(),32)
-        self.assertEqual(Scenario().first_training_seed(),1)
+        self.assertEqual(Scenario(experiment_protocol=str(DEFAULT_PROTOCOL)).first_training_seed(),0)
+        self.assertEqual(Scenario(legacy_split=True).first_training_seed(),1)
         from types import SimpleNamespace
         from common.f18_state_normalization import bind_normalization,check_checkpoint
         agent=bind_normalization(SimpleNamespace(),self.scenario)
@@ -223,8 +223,8 @@ class PaperIRWSTests(unittest.TestCase):
             context=patch.object(module,'_load_cache_seeds',return_value=list(range(1001))) if algorithm=='marl' else contextlib.nullcontext()
             with context,patch.object(module,'SCENARIO',scenario),patch.object(module,ENVIRONMENTS[algorithm],side_effect=capture_environment), patch('os.path.exists',return_value=True),patch('os.makedirs'),contextlib.redirect_stdout(io.StringIO()):
                 with self.assertRaises(CapturedConfiguration) as captured:module.train()
-            self.assertEqual(captured.exception.kwargs['random_seed'],32)
-            self.assertEqual(module.SCENARIO.validation_seeds(),[1]) # restoration preserves historical configuration
+            self.assertEqual(captured.exception.kwargs['random_seed'],0)
+            self.assertEqual(module.SCENARIO.validation_seeds(),[600]) # restoration preserves the default F22 configuration
 
     def test_checkpoint_roundtrip_resume_and_no_evaluation_learning(self):
         with synthetic_env(self.path) as env:
@@ -238,6 +238,11 @@ class PaperIRWSTests(unittest.TestCase):
             self.assertEqual(a['metrics'],b['metrics']);self.assertEqual(a['fusion'],b['fusion'])
             self.assertTrue(all(torch.equal(v,loaded.task.state_dict()[k]) for k,v in weights.items()))
             self.assertTrue(all(obj['optimizers'][n]['state'] for n in ('task','actor','critic','intrinsic')))
+            historical=dict(obj);historical['normalization']=dict(obj['normalization'])
+            historical['normalization'].pop('experiment_protocol_hash',None)
+            torch.save(historical,self.root/'historical.pth')
+            _,restored=load_checkpoint(self.root/'historical.pth',scenario)
+            self.assertEqual(restored['protocol'],obj['protocol'])
             torch.save({'model_version':'old_irws'},self.root/'old.pth')
             with self.assertRaises(ValueError):load_checkpoint(self.root/'old.pth',scenario)
 

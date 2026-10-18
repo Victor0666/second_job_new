@@ -203,7 +203,7 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 
 新的正式实现位于 `algorithms/irws_paper/`，原 `algorithms/irws/` 和历史模型保持不变。新版本包含双向 DAG/Bi-GRU、全 Ready Softmax、Table III PPO、历史 GRU、动态融合和可微元梯度；使用公共云物理环境与冻结的 F18 尺度。原文聚合、池化、零 Rank 和元更新存在未充分规定的细节，采用的工程近似及全部验收结果见 [IRWS 原文对应报告](docs/IRWS_paper_reproduction.md)，不能据短程验证声称精确复制原论文结果。
 
-公共无重叠协议位于 `configs/paired_cloud_protocol_v1.json`：训练 32–631（600 回合）、验证 632、最终测试仍 2–31。新 IRWS 默认使用它；MAHDRL、MARL、PD3QN 及四个既有消融通过 `--experiment-protocol configs/paired_cloud_protocol_v1.json` 显式启用同一协议。不传该参数的旧入口仍保留历史行为，不能与新协议结果混作正式配对比较。选模规则仍为验证总能耗最小。
+以下为 IRWS 初次适配时的历史协议，已由下文 F22 默认协议替代。历史公共无重叠协议位于 `configs/paired_cloud_protocol_v1.json`：训练 32–631（600 回合）、验证 632、最终测试仍 2–31。新 IRWS 默认使用它；MAHDRL、MARL、PD3QN 及四个既有消融通过 `--experiment-protocol configs/paired_cloud_protocol_v1.json` 显式启用同一协议。不传该参数的旧入口仍保留历史行为，不能与新协议结果混作正式配对比较。选模规则仍为验证总能耗最小。
 
 ```powershell
 # 最小完整流程：临时缓存、1 Episode、2 工作流；无正式训练或消融
@@ -213,3 +213,9 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 ```
 
 正式重跑之前，仍须生成新版 Deadline Cache 与有效的 F18 校准配置；当前短程数据不能替代它们。新旧输出目录分离，Checkpoint 校验模型版本、源尺度和实验协议，评测仅使用公共物理指标。
+
+## F22 统一实例划分
+
+所有学习算法、四个 MAHDRL 消融及启发式评测默认使用 `configs/f22_split_v1.json`：训练 0–599（600 Episode）、验证仅 600、测试 700–729（30 个实例）。`--model-seed` 与实例种子分离；新结果保存协议与实例哈希，旧 Checkpoint 不会被标记为 F22。历史种子评测需显式 `--legacy-split --seeds 2-31`。正式启动会严格审计新版 Deadline Cache；当前九组缓存缺失、F18 校准场景为空，尚不能直接启动正式训练。
+
+验收、修改清单及各算法 PowerShell 命令见 [F22 报告](docs/F22_data_split.md)。仅检查缓存：`.\run.cmd common/f22_cache.py --all`；仅预览配置：`.\run.cmd algorithms/mahdrl/train.py --dry-run`。本次没有运行正式训练或 30 种子正式测试。

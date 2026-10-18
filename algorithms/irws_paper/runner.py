@@ -94,7 +94,11 @@ def load_checkpoint(path,scenario,device='cpu',restore_training=False):
     # Locally produced training files contain RNG/optimizer state, not weights alone.
     obj=torch.load(path,map_location=device,weights_only=False)
     if obj.get('model_version')!=MODEL_VERSION:raise ValueError('Historical IRWS checkpoint is not a paper-model checkpoint')
-    check_checkpoint(obj.get('normalization'),scenario.normalization_metadata())
+    expected=scenario.normalization_metadata()
+    # Before F22, paper checkpoints stored the protocol separately from normalization.
+    if scenario.protocol().version != 'f22_split_v1' and not (obj.get('normalization') or {}).get('experiment_protocol_hash'):
+        expected.pop('experiment_protocol_hash',None)
+    check_checkpoint(obj.get('normalization'),expected)
     if obj.get('protocol')!=scenario.protocol().metadata():raise ValueError('Checkpoint experiment protocol mismatch')
     cfg=dict(obj['paper_config']);cfg['device']=device
     for k in ('actor_hidden','critic_hidden'):cfg[k]=tuple(cfg[k])
@@ -111,8 +115,9 @@ def load_checkpoint(path,scenario,device='cpu',restore_training=False):
 
 def evaluate(learner,scenario,seeds,split='test',kwargs=None):
     protocol=scenario.protocol()
-    allowed=protocol.validation if split=='validation' else protocol.test
-    if not set(seeds)<=set(allowed):raise ValueError('Evaluation attempted to cross the frozen data partition')
+    allowed=protocol.validation if split=='validation' else seeds
+    if not set(seeds)<=set(allowed) or set(seeds)&set(protocol.train) or (split!='validation' and set(seeds)&set(protocol.validation)):
+        raise ValueError('Evaluation attempted to cross the frozen data partition')
     rows=[]
     for seed in seeds:
         env=PaperCloudEnv(**(dict(kwargs,random_seed=seed) if kwargs is not None else env_kwargs(scenario,seed)))
@@ -133,19 +138,23 @@ def train(scenario,config=None,kwargs=None,out=None,resume=None):
             raise ValueError('Resume must continue its own output directory')
     else:protect_training_outputs(directory,directory/'logs')
     kwargs=dict(kwargs or env_kwargs(scenario,protocol.train[0]));env=PaperCloudEnv(**kwargs)
-    scenario.normalization_metadata();seed_everything(protocol.train[0])
+    scenario.normalization_metadata();seed_everything(scenario.model_seed)
     cfg=config or PaperConfig(device=(scenario.paper_options or {}).get('device','cpu'))
     start=0;best=float('inf')
     if resume:
         learner,obj=load_checkpoint(resume,scenario,cfg.device,True);start=obj['episode']+1;best=obj['best_validation_energy']
     else:learner=PaperLearner(env.num_vms,cfg)
+    from common.f22_instances import write_run_metadata
+    write_run_metadata(directory,scenario)
     directory.mkdir(parents=True,exist_ok=True);log=directory/'training.jsonl'
     for episode in range(start,scenario.episodes):
         seed=protocol.train[episode]
         result=run_episode(env,learner,seed,True)
         _,validation=evaluate(learner,scenario,protocol.validation,'validation',kwargs)
         energy=validation['total_energy']['mean']
-        result.update(episode=episode,seed=seed,validation=validation,model_version=MODEL_VERSION)
+        from common.f22_instances import instance_identity
+        result.update(episode=episode,seed=seed,validation=validation,model_version=MODEL_VERSION,
+                      instance=instance_identity(env,scenario,seed))
         with log.open('a',encoding='utf-8') as stream:stream.write(json.dumps(result,allow_nan=False)+'\n')
         if energy<best:
             best=energy;save_checkpoint(directory/'best.pth',learner,scenario,episode,best,kwargs)

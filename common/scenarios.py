@@ -8,6 +8,7 @@ import json
 
 from common.read_xml_opt_Tsize import DATA_MODEL
 from common.f11 import LEARNING_MODEL
+from common.ta_weights import TA_WEIGHT_MODEL, TA_ALGORITHMS
 
 ROOT = Path(__file__).resolve().parents[1]
 VM_COUNTS = {"S": (9, 8, 8), "M": (9, 9, 8, 8, 8, 8), "L": (9, 9, 9, 8, 8, 8, 8, 8, 8)}
@@ -139,7 +140,7 @@ class Scenario:
         task = self.task if self.mode == "train" else self.train_task
         return MODEL_NAMES[algorithm].format(
             task=task, resource=self.resource, deadline=self.deadline
-        ) + "_" + LEARNING_MODEL
+        ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "")
 
     def checkpoint_dir(self, algorithm):
         if self.mode == "eval" and self.checkpoint_override:

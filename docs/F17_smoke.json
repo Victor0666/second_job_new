@@ -1,0 +1,320 @@
+{
+  "ta_weight_model": "f17_normalized_weights_v1",
+  "verification_overrides": {
+    "hidden_dims": [
+      16,
+      8
+    ],
+    "dqn_batch_size": 4,
+    "dqn_buffer_size": 32,
+    "episodes": 1
+  },
+  "algorithms": {
+    "mahdrl": {
+      "actual_train_entry": true,
+      "train_and_validation_weight_actions": 691,
+      "checked_resets": 4,
+      "diagnostics": {
+        "learning_model": "f11_real_decisions_v1",
+        "episode": 0,
+        "learners": {
+          "TA": {
+            "transitions": 302,
+            "nonterminal": 301,
+            "nonterminal_ratio": 0.9966887417218543,
+            "gradient_updates": 299,
+            "sampled_targets": 1196,
+            "last_loss": 0.040231358259916306,
+            "max_abs_loss": 1.3233120441436768,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 0.5919182952431133,
+            "target_mean": 0.3030599123957165,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          },
+          "HA": {
+            "transitions": 1364,
+            "nonterminal": 1363,
+            "nonterminal_ratio": 0.999266862170088,
+            "gradient_updates": 1361,
+            "sampled_targets": 5444,
+            "last_loss": 246583.515625,
+            "max_abs_loss": 964726.3125,
+            "bootstrap_nonzero_ratio": 0.9998163115356355,
+            "future_abs_mean": 173371.42855092764,
+            "target_mean": 173371.36847618938,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          },
+          "VA": {
+            "transitions": 1364,
+            "nonterminal": 1363,
+            "nonterminal_ratio": 0.999266862170088,
+            "gradient_updates": 1361,
+            "sampled_targets": 5444,
+            "last_loss": 35294.48046875,
+            "max_abs_loss": 966016.375,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 191735.42101396032,
+            "target_mean": 190386.60227716292,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          }
+        },
+        "reward_audit": {
+          "physical_energy_balance": 0.0,
+          "lower_energy_balance": -4.547473508864641e-13,
+          "team_energy_reward": -337.62816305599756,
+          "selected_host_energy_reward": -114.41628143840991,
+          "HA_reward_formula_balance": 0.0,
+          "VA_reward_formula_balance": 0.0
+        },
+        "pending": 0,
+        "reward_balance": {
+          "HA": 0.0,
+          "VA": 0.0
+        },
+        "cutoffs": 0
+      }
+    },
+    "ablation_hostrand": {
+      "actual_train_entry": true,
+      "train_and_validation_weight_actions": 728,
+      "checked_resets": 4,
+      "diagnostics": {
+        "learning_model": "f11_real_decisions_v1",
+        "episode": 0,
+        "learners": {
+          "TA": {
+            "transitions": 337,
+            "nonterminal": 336,
+            "nonterminal_ratio": 0.9970326409495549,
+            "gradient_updates": 334,
+            "sampled_targets": 1336,
+            "last_loss": 0.0920136496424675,
+            "max_abs_loss": 1.4002094268798828,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 0.5577328065019882,
+            "target_mean": 0.3069599339749642,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          },
+          "VA": {
+            "transitions": 1364,
+            "nonterminal": 1363,
+            "nonterminal_ratio": 0.999266862170088,
+            "gradient_updates": 1361,
+            "sampled_targets": 5444,
+            "last_loss": 91501.296875,
+            "max_abs_loss": 1181514.125,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 202512.1945720059,
+            "target_mean": 201085.21571052994,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          }
+        },
+        "reward_audit": {
+          "physical_energy_balance": 0.0,
+          "lower_energy_balance": -2.8421709430404007e-13,
+          "team_energy_reward": -328.6953082392525,
+          "selected_host_energy_reward": -111.06877348822877,
+          "VA_reward_formula_balance": 0.0
+        },
+        "pending": 0,
+        "reward_balance": {
+          "VA": 0.0
+        },
+        "cutoffs": 0
+      }
+    },
+    "ablation_mgrrand": {
+      "actual_train_entry": true,
+      "train_and_validation_weight_actions": 722,
+      "checked_resets": 4,
+      "diagnostics": {
+        "learning_model": "f11_real_decisions_v1",
+        "episode": 0,
+        "learners": {
+          "HA": {
+            "transitions": 1364,
+            "nonterminal": 1363,
+            "nonterminal_ratio": 0.999266862170088,
+            "gradient_updates": 1361,
+            "sampled_targets": 5444,
+            "last_loss": 38507.2578125,
+            "max_abs_loss": 603914.9375,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 146461.13310238335,
+            "target_mean": 146461.07437373715,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          },
+          "VA": {
+            "transitions": 1364,
+            "nonterminal": 1363,
+            "nonterminal_ratio": 0.999266862170088,
+            "gradient_updates": 1361,
+            "sampled_targets": 5444,
+            "last_loss": 25285.873046875,
+            "max_abs_loss": 1282332.875,
+            "bootstrap_nonzero_ratio": 0.9998163115356355,
+            "future_abs_mean": 195288.63303063004,
+            "target_mean": 194478.08795233283,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          }
+        },
+        "reward_audit": {
+          "physical_energy_balance": 0.0,
+          "lower_energy_balance": -1.1368683772161603e-13,
+          "team_energy_reward": -347.4787339275512,
+          "selected_host_energy_reward": -117.97570968097763,
+          "HA_reward_formula_balance": 0.0,
+          "VA_reward_formula_balance": -3.552713678800501e-15
+        },
+        "pending": 0,
+        "reward_balance": {
+          "HA": 0.0,
+          "VA": 0.0
+        },
+        "cutoffs": 0
+      }
+    },
+    "ablation_vmrand": {
+      "actual_train_entry": true,
+      "train_and_validation_weight_actions": 699,
+      "checked_resets": 4,
+      "diagnostics": {
+        "learning_model": "f11_real_decisions_v1",
+        "episode": 0,
+        "learners": {
+          "TA": {
+            "transitions": 353,
+            "nonterminal": 352,
+            "nonterminal_ratio": 0.9971671388101983,
+            "gradient_updates": 350,
+            "sampled_targets": 1400,
+            "last_loss": 0.09185591340065002,
+            "max_abs_loss": 0.9896824955940247,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 0.27288582652807236,
+            "target_mean": 0.04373306247804846,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          },
+          "HA": {
+            "transitions": 1364,
+            "nonterminal": 1363,
+            "nonterminal_ratio": 0.999266862170088,
+            "gradient_updates": 1361,
+            "sampled_targets": 5444,
+            "last_loss": 3547.08203125,
+            "max_abs_loss": 1351141.625,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 101670.39083895939,
+            "target_mean": -12598.031833399227,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          }
+        },
+        "reward_audit": {
+          "physical_energy_balance": 0.0,
+          "lower_energy_balance": -3.410605131648481e-13,
+          "team_energy_reward": -338.00892213104686,
+          "selected_host_energy_reward": -115.202022169883,
+          "HA_reward_formula_balance": 0.0
+        },
+        "pending": 0,
+        "reward_balance": {
+          "HA": 0.0
+        },
+        "cutoffs": 0
+      }
+    },
+    "ablation_nohost": {
+      "actual_train_entry": true,
+      "train_and_validation_weight_actions": 676,
+      "checked_resets": 4,
+      "diagnostics": {
+        "learning_model": "f11_real_decisions_v1",
+        "episode": 0,
+        "learners": {
+          "TA": {
+            "transitions": 329,
+            "nonterminal": 328,
+            "nonterminal_ratio": 0.9969604863221885,
+            "gradient_updates": 326,
+            "sampled_targets": 1304,
+            "last_loss": 0.13362465798854828,
+            "max_abs_loss": 1.4702622890472412,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 0.5678180804464714,
+            "target_mean": 0.3145671856641038,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          },
+          "VA": {
+            "transitions": 1364,
+            "nonterminal": 1363,
+            "nonterminal_ratio": 0.999266862170088,
+            "gradient_updates": 1361,
+            "sampled_targets": 5444,
+            "last_loss": 0.13686059415340424,
+            "max_abs_loss": 1135442.0,
+            "bootstrap_nonzero_ratio": 1.0,
+            "future_abs_mean": 43181.87920456713,
+            "target_mean": 16880.10134287819,
+            "last_rollout_value": null,
+            "nonterminal_rollouts": 0,
+            "last_nonterminal_rollout_value": null,
+            "truncation_cutoffs": 0,
+            "terminal_transitions": 1
+          }
+        },
+        "reward_audit": {
+          "physical_energy_balance": 0.0,
+          "lower_energy_balance": 3.979039320256561e-13,
+          "team_energy_reward": -334.35526327451527,
+          "selected_host_energy_reward": -112.625863255924,
+          "VA_reward_formula_balance": 3.552713678800501e-15
+        },
+        "pending": 0,
+        "reward_balance": {
+          "VA": 0.0
+        },
+        "cutoffs": 0
+      }
+    }
+  }
+}

@@ -5,14 +5,14 @@ env_heft.py
 三层智能体环境（阶段式 HRL + HostAgent + VMAgent）：
 
 L1 Manager（阶段级）【动态权重增量控制】：
-- 维护 5 维 raw 权重 w_raw（FCFS/SJF/MCF/HUR/EDF）
+- 维护唯一的 5 维归一化权重 combo_weights（FCFS/SJF/MCF/HUR/EDF）
 - 每个 phase 开始时，Manager 选择一个离散动作 a ∈ {0..242}
   对应 Δw ∈ {-0.1, 0, +0.1}^5（共 3^5=243 种组合）
-- 更新：w_raw ← clip(w_raw + Δw, min=0)；若全 0 回退为全 1
-- combo_weights = normalize(w_raw) 用于 ready tasks 打分排序
+- 更新：检查 u = combo_weights + Δw 合法后，combo_weights ← u / sum(u)
+- 非法动作明确拒绝；默认及 Episode 重置权重为 [0.2] * 5
 - F15 五维属性：[ReadyTime, ProcessingTime, UpwardRank, SignedSlack, TaskSubDeadline]；
   Ready 集合逐列 Min-Max，高分优先，平局依次按 ReadyTime、任务 ID。
-- 提供 get_manager_action_mask()：若某维 w_raw==0，则禁止该维再减 0.1 的动作
+- get_manager_action_mask() 与执行共用候选检查；产生负权重或非正总量的动作被过滤
 
 Deadline 逻辑：
 1) 工作流级 deadline:
@@ -61,6 +61,7 @@ except Exception:
 from common.workflow_opt import LoadRecord, energy_from_records, Workflow, exec_time_components
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
 from common.resource_opt import create_cluster
+from common.ta_weights import normalize_initial_weights, weight_candidates
 
 
 def _safe_div(a, b, eps=1e-9):
@@ -311,16 +312,10 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         self.state_include_host = bool(state_include_host)
         self.state_include_queue = bool(state_include_queue)
 
-        self.manager_raw_w = np.ones(self.task_heur_dim, dtype=np.float32)
-        if combo_weights is not None:
-            w = np.asarray(combo_weights, dtype=float).reshape(-1)
-            assert w.size == self.task_heur_dim, "combo_weights 维度需等于 5（FCFS/SJF/MCF/HUR/EDF）"
-            w = np.clip(w, 0.0, None)
-            if np.allclose(w.sum(), 0.0):
-                w = np.ones_like(w)
-            self.manager_raw_w = w.astype(np.float32)
-
-        self.combo_weights = (self.manager_raw_w / max(float(self.manager_raw_w.sum()), 1e-9)).astype(np.float32)
+        initial = normalize_initial_weights([.2] * 5 if combo_weights is None else combo_weights)
+        # Immutable reset configuration, never accumulated as a second decision state.
+        self._manager_initial_weights = tuple(float(value) for value in initial)
+        self.combo_weights = initial.copy()
 
         self.block1_dim = 12
         self.block2_dim = 10
@@ -352,40 +347,26 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
 
         self._reset_internal_buffers()
 
-    def _normalize_manager_raw(self):
-        s = float(np.sum(self.manager_raw_w))
-        if s <= 1e-12:
-            self.manager_raw_w[:] = 1.0
-            s = float(np.sum(self.manager_raw_w))
-        self.combo_weights = (self.manager_raw_w / max(s, 1e-9)).astype(np.float32)
-
     def set_manager_combo(self, weights):
-        w = np.asarray(weights, dtype=np.float32).reshape(-1)
-        assert w.size == self.task_heur_dim, "combo 权重长度应为 5"
-        w = np.clip(w, 0.0, None)
-        if np.allclose(w.sum(), 0.0):
-            w = np.ones_like(w)
-        self.manager_raw_w = w.astype(np.float32)
-        self._normalize_manager_raw()
-
+        candidate = normalize_initial_weights(weights)
+        self.combo_weights = candidate
         self._phase_started = False
         self._phase_tasks = []
 
     def apply_manager_delta(self, delta_vec):
-        d = np.asarray(delta_vec, dtype=np.float32).reshape(-1)
-        assert d.size == self.task_heur_dim, "delta_vec 长度必须为 5"
-        self.manager_raw_w = np.maximum(0.0, self.manager_raw_w + d).astype(np.float32)
-        self._normalize_manager_raw()
-
+        delta = np.asarray(delta_vec, dtype=np.float64)
+        if delta.shape != (self.task_heur_dim,):
+            raise ValueError("TA increment must have five dimensions")
+        candidates, valid = weight_candidates(self.combo_weights, delta[None, :])
+        if not valid[0]:
+            raise ValueError("Illegal TA increment: candidate weights must be nonnegative with positive total")
+        self.combo_weights = candidates[0].copy()
         self._phase_started = False
         self._phase_tasks = []
 
     def get_manager_action_mask(self) -> np.ndarray:
-        w = self.manager_raw_w.reshape(1, -1)
-        delta = MANAGER_ACTION_TABLE
-        invalid = (w <= 1e-12) & (delta < 0.0)
-        mask = (~invalid.any(axis=1)).astype(np.float32)
-        return mask
+        _, valid = weight_candidates(self.combo_weights, MANAGER_ACTION_TABLE)
+        return valid.astype(np.float32)
 
     def get_manager_state(self):
         now = getattr(self, "current_time", 0.0)
@@ -713,12 +694,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         super().reset(seed=seed)
         self._reset_internal_buffers()
 
-        rs = np.random.RandomState(12345)
-        w0 = rs.uniform(low=0.0, high=1.0, size=self.task_heur_dim).astype(np.float32)
-        if float(w0.sum()) <= 1e-12:
-            w0[:] = 1.0
-        self.manager_raw_w = w0
-        self._normalize_manager_raw()
+        self.combo_weights = np.array(self._manager_initial_weights, dtype=np.float32)
 
         self.arrival_times = poisson_arrival_times(
             self.arrival_lambda,

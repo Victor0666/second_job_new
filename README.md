@@ -175,3 +175,10 @@ MAHDRL 及四种消融中保留的资源学习器、PD3QN、MARL Local 已恢复
 新模型/日志名称追加 `_f11_real_decisions_v1`，学习型评测结果进入 `outputs/run/f11_real_decisions_v1/`。默认评测拒绝无 F11 标记的旧 Checkpoint；旧模型保留，但必须重新训练才能报告 F11 结果。训练拒绝复用非空输出目录。最佳模型选择规则保持不变，F07 的新版缓存路径保持不变。
 
 诊断写入对应训练日志目录的 `f11_diagnostics.jsonl`；设置 `$env:F11_DIAGNOSTICS = '0'` 可关闭诊断统计和写入。专项测试：`.\.venv\Scripts\python.exe -m unittest common.test_f11 -v`。八个实际训练入口的轻量验证：`.\.venv\Scripts\python.exe -m common.smoke_F11 --out docs/F11_smoke.json`，仅在该验证脚本内使用小网络和临时输出，不替代正式训练。
+
+
+## F17 TA 归一化权重与重训
+
+TA 直接执行 `Norm(w + delta)`，只维护一套归一化决策权重；默认构造与 reset 为 `[0.2]*5`，替换旧随机 Raw 初始化。Mask 与执行共用合法性检查，非法动作拒绝，全零增量精确保持权重。F15 排序属性、243 个动作与 HA/VA 算法保持不变。
+
+MAHDRL 及四种消融的新模型/日志名称追加 `_f17_normalized_weights_v1`，评测写入独立 F17 子目录。旧 checkpoint 张量虽可兼容读取，不能作为 F17 正式结果，必须重新训练。F17 不要求额外重建缓存，但此前 F07 等版本要求仍有效。验证命令、英文论文补充、审稿回复和完整验收表见 [F17 返修记录](docs/revision_F17.md)。

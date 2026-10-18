@@ -10,6 +10,7 @@ if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
 from common.f11 import LEARNING_MODEL
+from common.ta_weights import TA_WEIGHT_MODEL
 
 SCENARIO = Scenario(mode="eval")
 from common.metrics_logger import CSVLogger
@@ -713,7 +714,7 @@ def main():
     seeds = list(SCENARIO.seeds)
     env_kwargs_base = build_env_kwargs_hrl_mix(random_seed=seeds[0])
     result_dir = os.path.join(
-        PROJECT_DIR, "outputs", "run", LEARNING_MODEL, f"hrl_mix_wfInfo__HVrn_{SCENARIO.deadline}"
+        PROJECT_DIR, "outputs", "run", LEARNING_MODEL, TA_WEIGHT_MODEL, f"hrl_mix_wfInfo__HVrn_{SCENARIO.deadline}"
     )
     os.makedirs(result_dir, exist_ok=True)
     csv_path = os.path.join(

@@ -199,3 +199,17 @@ MAHDRL 及四种消融的新模型/日志名称追加 `_f17_normalized_weights_v
 Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.py --all-nine --seeds 101-130 --resume`。结果位于 `outputs/f18_normalization_calibration/`；支持单场景、断点续跑、重新汇总及按需详细记录。当前缺少新版正式缓存，九场景正式百分位和归一化参数尚未生成，不能直接开始 F18 正式训练。
 
 所有新模型/日志名追加 `_f18_shared_v1`，Checkpoint 保存源训练场景与配置哈希；评测校验一致性。MS/LS 等泛化继续使用源 S 训练配置。四算法及四消融需要重训，旧模型与结果不覆盖。预计算命令、字段映射、物理轨迹对照、测试边界和英文论文公式修改建议见 [F18 完整说明](docs/F18_shared_state_normalization.md)。轻量集成验证：`.\.venv\Scripts\python.exe -m common.smoke_F18 --out docs/F18_smoke.json`。
+## 原论文 IRWS 独立复现版本
+
+新的正式实现位于 `algorithms/irws_paper/`，原 `algorithms/irws/` 和历史模型保持不变。新版本包含双向 DAG/Bi-GRU、全 Ready Softmax、Table III PPO、历史 GRU、动态融合和可微元梯度；使用公共云物理环境与冻结的 F18 尺度。原文聚合、池化、零 Rank 和元更新存在未充分规定的细节，采用的工程近似及全部验收结果见 [IRWS 原文对应报告](docs/IRWS_paper_reproduction.md)，不能据短程验证声称精确复制原论文结果。
+
+公共无重叠协议位于 `configs/paired_cloud_protocol_v1.json`：训练 32–631（600 回合）、验证 632、最终测试仍 2–31。新 IRWS 默认使用它；MAHDRL、MARL、PD3QN 及四个既有消融通过 `--experiment-protocol configs/paired_cloud_protocol_v1.json` 显式启用同一协议。不传该参数的旧入口仍保留历史行为，不能与新协议结果混作正式配对比较。选模规则仍为验证总能耗最小。
+
+```powershell
+# 最小完整流程：临时缓存、1 Episode、2 工作流；无正式训练或消融
+.\run.cmd common/smoke_irws_paper.py --out docs/IRWS_paper_smoke.json
+# 正式参数预览
+.\run.cmd algorithms/irws_paper/train.py --task S --resource S --deadline Tight --dry-run
+```
+
+正式重跑之前，仍须生成新版 Deadline Cache 与有效的 F18 校准配置；当前短程数据不能替代它们。新旧输出目录分离，Checkpoint 校验模型版本、源尺度和实验协议，评测仅使用公共物理指标。

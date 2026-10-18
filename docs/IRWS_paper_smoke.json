@@ -1,0 +1,381 @@
+{
+  "common_mahdrl_physical_trace": {
+    "assignments": 54,
+    "max_execution_component_gap": 0.0,
+    "max_energy_window_gap": 1.4551915228366852e-11,
+    "final_energy_gap": 1.4551915228366852e-11,
+    "deadlines_identical": true,
+    "host_loads_identical": true
+  },
+  "model_version": "irws_paper_cloud_v1",
+  "paper_config": {
+    "gamma": 0.2,
+    "clip": 0.2,
+    "actor_lr": 1e-05,
+    "critic_lr": 0.0001,
+    "intrinsic_lr": 1e-05,
+    "embedding_lr": 1e-06,
+    "embedding_dim": 5,
+    "trajectory_length": 16,
+    "batch_size": 64,
+    "actor_hidden": [
+      128,
+      64
+    ],
+    "critic_hidden": [
+      64,
+      64,
+      32
+    ],
+    "alpha": 0.5,
+    "message_passes": 1,
+    "gae_lambda": 0.0,
+    "update_rounds": 1,
+    "entropy_coef": 0.01,
+    "rnn_hidden": 5,
+    "device": "cpu"
+  },
+  "training_result": {
+    "metrics": {
+      "total_energy": 31879.58666608727,
+      "makespan": 536.6494487311855,
+      "task_count": 54.0,
+      "task_tardy_count": 0.0,
+      "task_total_lateness": -20141.162308874038,
+      "task_total_tardiness": 0.0,
+      "task_avg_lateness": -372.98448720137105,
+      "task_avg_tardiness": 0.0,
+      "pct_tardy": 0.0,
+      "task_success_rate": 1.0,
+      "wf_count": 2.0,
+      "wf_tardy_count": 0.0,
+      "wf_total_lateness": -575.6587433993459,
+      "wf_total_tardiness": 0.0,
+      "wf_avg_lateness": -287.82937169967295,
+      "wf_avg_tardiness": 0.0,
+      "wf_pct_tardy": 0.0,
+      "wf_success_rate": 1.0,
+      "wf_avg_tardy": 0.0
+    },
+    "updates": [
+      {
+        "losses": {
+          "actor": -0.994460179660153,
+          "critic": 1.7201073496169068,
+          "intrinsic_meta": 14.23036813895562,
+          "embedding_meta": -0.9551532108901739
+        },
+        "gradient_norms": {
+          "actor": 0.8114438137020095,
+          "intrinsic": 0.00010094116577977845,
+          "embedding_and_selector": 3.7430241833596095e-07
+        },
+        "bootstrap": 0.0,
+        "terminal": true,
+        "transitions": 54,
+        "r_int_mean": 0.9158824564625894
+      }
+    ],
+    "assignments": 54,
+    "fusion": {
+      "minimum": 0.1161225907409596,
+      "maximum": 2.9679772947314373,
+      "mean": 0.8500686470780534,
+      "outside_unit_interval": 8,
+      "zero_rank_boundaries": 26
+    },
+    "episode": 0,
+    "seed": 32,
+    "validation": {
+      "total_energy": {
+        "mean": 23747.756139342782,
+        "std": 0.0
+      },
+      "makespan": {
+        "mean": 383.16161735869747,
+        "std": 0.0
+      },
+      "task_count": {
+        "mean": 60.0,
+        "std": 0.0
+      },
+      "task_tardy_count": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "task_total_lateness": {
+        "mean": -15968.040715088766,
+        "std": 0.0
+      },
+      "task_total_tardiness": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "task_avg_lateness": {
+        "mean": -266.1340119181461,
+        "std": 0.0
+      },
+      "task_avg_tardiness": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "pct_tardy": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "task_success_rate": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "wf_count": {
+        "mean": 2.0,
+        "std": 0.0
+      },
+      "wf_tardy_count": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "wf_total_lateness": {
+        "mean": -392.9682370911848,
+        "std": 0.0
+      },
+      "wf_total_tardiness": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "wf_avg_lateness": {
+        "mean": -196.4841185455924,
+        "std": 0.0
+      },
+      "wf_avg_tardiness": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "wf_pct_tardy": {
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "wf_success_rate": {
+        "mean": 1.0,
+        "std": 0.0
+      },
+      "wf_avg_tardy": {
+        "mean": 0.0,
+        "std": 0.0
+      }
+    },
+    "model_version": "irws_paper_cloud_v1"
+  },
+  "parameter_max_changes": {
+    "embedding": 9.534525566845531e-07,
+    "selector": 2.535794907387867e-09,
+    "actor": 9.999999334486809e-06,
+    "critic": 9.999999947651883e-05,
+    "intrinsic": 9.997694692773229e-06
+  },
+  "checkpoint_deterministic_roundtrip": true,
+  "test_rows": [
+    {
+      "seed": 2,
+      "total_energy": 24046.87190457242,
+      "makespan": 373.1908180054588,
+      "task_count": 60.0,
+      "task_tardy_count": 0.0,
+      "task_total_lateness": -29439.650133591775,
+      "task_total_tardiness": 0.0,
+      "task_avg_lateness": -490.6608355598629,
+      "task_avg_tardiness": 0.0,
+      "pct_tardy": 0.0,
+      "task_success_rate": 1.0,
+      "wf_count": 2.0,
+      "wf_tardy_count": 0.0,
+      "wf_total_lateness": -847.6091553668623,
+      "wf_total_tardiness": 0.0,
+      "wf_avg_lateness": -423.80457768343115,
+      "wf_avg_tardiness": 0.0,
+      "wf_pct_tardy": 0.0,
+      "wf_success_rate": 1.0,
+      "wf_avg_tardy": 0.0
+    }
+  ],
+  "test_summary": {
+    "total_energy": {
+      "mean": 24046.87190457242,
+      "std": 0.0
+    },
+    "makespan": {
+      "mean": 373.1908180054588,
+      "std": 0.0
+    },
+    "task_count": {
+      "mean": 60.0,
+      "std": 0.0
+    },
+    "task_tardy_count": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "task_total_lateness": {
+      "mean": -29439.650133591775,
+      "std": 0.0
+    },
+    "task_total_tardiness": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "task_avg_lateness": {
+      "mean": -490.6608355598629,
+      "std": 0.0
+    },
+    "task_avg_tardiness": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "pct_tardy": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "task_success_rate": {
+      "mean": 1.0,
+      "std": 0.0
+    },
+    "wf_count": {
+      "mean": 2.0,
+      "std": 0.0
+    },
+    "wf_tardy_count": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "wf_total_lateness": {
+      "mean": -847.6091553668623,
+      "std": 0.0
+    },
+    "wf_total_tardiness": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "wf_avg_lateness": {
+      "mean": -423.80457768343115,
+      "std": 0.0
+    },
+    "wf_avg_tardiness": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "wf_pct_tardy": {
+      "mean": 0.0,
+      "std": 0.0
+    },
+    "wf_success_rate": {
+      "mean": 1.0,
+      "std": 0.0
+    },
+    "wf_avg_tardy": {
+      "mean": 0.0,
+      "std": 0.0
+    }
+  },
+  "normalization": {
+    "normalization_version": "f18_shared_v1",
+    "source_train_scene": "SS_T",
+    "normalization_config_path": "C:\\Users\\lyz12\\AppData\\Local\\Temp\\IRWS_paper_smoke_xprlwadi\\f18_shared_normalization_v1.json",
+    "normalization_config_hash": "31b61c50890cbfbb00f1ffbee211d86e1206b10e8cd07617acf771a0e19833c7",
+    "R_ref": 46,
+    "T_ref": 1448.8437135942922
+  },
+  "protocol": {
+    "version": "paper_smoke_disjoint_v1",
+    "train": [
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      41,
+      42,
+      43,
+      44,
+      45,
+      46,
+      47,
+      48,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      56,
+      57,
+      58,
+      59,
+      60,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      76,
+      77,
+      78,
+      79,
+      80,
+      81,
+      82,
+      83,
+      84,
+      85,
+      86,
+      87,
+      88,
+      89,
+      90,
+      91,
+      92,
+      93,
+      94,
+      95,
+      96,
+      97,
+      98,
+      99,
+      100,
+      101
+    ],
+    "validation": [
+      632
+    ],
+    "test": [
+      2
+    ],
+    "episodes": 1,
+    "selection": "minimum_validation_total_energy"
+  },
+  "verification_overrides": {
+    "episodes": 1,
+    "workflows_per_episode": 2,
+    "normalization_calibration_seeds": [
+      101
+    ],
+    "temporary_caches": true,
+    "network_dimensions": "published Table III, unchanged"
+  },
+  "formal_training_executed": false,
+  "ablations_executed": false
+}

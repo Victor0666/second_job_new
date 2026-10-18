@@ -8,6 +8,7 @@ import json
 
 from common.read_xml_opt_Tsize import DATA_MODEL
 from common.f11 import LEARNING_MODEL
+from common.experiment_protocol import ExperimentProtocol, protocol_hash, DEFAULT_PROTOCOL
 from common.f18_state_normalization import VERSION, DEFAULT_CONFIG, scene_id, load_normalizer
 from common.ta_weights import TA_WEIGHT_MODEL, TA_ALGORITHMS
 
@@ -67,6 +68,18 @@ class Scenario:
     checkpoint_override: str | None = None
     cache_output: str | None = None
     marl_options: dict | None = None
+    paper_options: dict | None = None
+
+    experiment_protocol: str | None = None
+
+    def protocol(self):
+        return ExperimentProtocol.load(self.experiment_protocol) if self.experiment_protocol else None
+
+    def first_training_seed(self):
+        return self.protocol().train[0] if self.experiment_protocol else 1
+
+    def validation_seeds(self):
+        return list(self.protocol().validation) if self.experiment_protocol else [1]
 
     normalization_mode: str = VERSION
     normalization_config: str = str(DEFAULT_CONFIG)
@@ -103,6 +116,12 @@ class Scenario:
             raise ValueError('Invalid source deadline')
         if self.normalization_mode not in ('legacy', VERSION):
             raise ValueError('Unknown observation normalization mode')
+        if self.experiment_protocol:
+            protocol=self.protocol()
+            if self.mode == 'train' and self.episodes > protocol.episodes:
+                raise ValueError('Episode budget exceeds the shared protocol')
+            if self.mode == 'eval' and not set(parse_seeds(self.seed_spec)) <= set(protocol.test):
+                raise ValueError('Evaluation seeds are outside the frozen test partition')
         parse_seeds(self.seed_spec)
 
     @property
@@ -161,10 +180,11 @@ class Scenario:
 
     def model_name(self, algorithm):
         task = self.task if self.mode == "train" else self.train_task
-        return MODEL_NAMES[algorithm].format(
+        name = MODEL_NAMES[algorithm].format(
             task=task, resource=(self.train_resource or self.resource) if self.mode == "eval" else self.resource,
             deadline=(self.train_deadline or self.deadline) if self.mode == "eval" else self.deadline
-        ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "") + ("_" + VERSION if self.normalization_mode == VERSION else "")
+        ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "") + ("_" + VERSION if self.normalization_mode == VERSION else "") + ("_protocol_" + protocol_hash(self.experiment_protocol)[:12] if self.experiment_protocol else "")
+        return name.replace("_seed1_", "_seed" + str(self.first_training_seed()) + "_") if self.experiment_protocol else name
 
     def checkpoint_dir(self, algorithm):
         if self.mode == "eval" and self.checkpoint_override:
@@ -180,6 +200,7 @@ class Scenario:
             resource=self.resource,
             deadline=self.deadline,
             mode=self.mode,
+            experiment_protocol=self.protocol().metadata() if self.experiment_protocol else "legacy_overlapping_seeds",
             normalization=self.normalization_kwargs() if self.mode != 'precompute' else None,
             num_hosts=self.num_hosts,
             vms_per_host=self.vms_per_host,
@@ -241,14 +262,20 @@ def parse_scenario(mode, algorithm=None):
         for flag in ("--deadline-cache", "--ckpt-global", "--ckpt-local", "--out", "--device"):
             parser.add_argument(flag)
     if mode != 'precompute' and algorithm != 'ertf_fifs':
+        parser.add_argument('--experiment-protocol', default=str(DEFAULT_PROTOCOL) if algorithm == 'irws_paper' else None)
         parser.add_argument('--normalization-mode', choices=(VERSION, 'legacy'), default=VERSION)
         parser.add_argument('--normalization-config', default=str(DEFAULT_CONFIG))
         if mode == 'eval':
             parser.add_argument('--train-resource', choices=VM_COUNTS)
             parser.add_argument('--train-deadline', choices=SMALL_PROBABILITY)
+    if algorithm == 'irws_paper':
+        parser.add_argument('--resume-checkpoint')
+        parser.add_argument('--device', default='cpu')
     args = parser.parse_args()
     try:
         scenario = Scenario(
+            paper_options={k:getattr(args,k) for k in ('resume_checkpoint','device')} if algorithm == 'irws_paper' else None,
+            experiment_protocol=getattr(args, 'experiment_protocol', None),
             normalization_mode=getattr(args, 'normalization_mode', VERSION),
             normalization_config=getattr(args, 'normalization_config', str(DEFAULT_CONFIG)),
             train_resource=getattr(args, 'train_resource', None), train_deadline=getattr(args, 'train_deadline', None),

@@ -194,7 +194,7 @@ def train():
     dax_list = SCENARIO.dax_paths(dax_dir)
     horizon = 1000000000.0
     arrival_lambda = 0.03
-    random_seed = 1
+    random_seed = SCENARIO.first_training_seed()
     max_ready_tasks = "auto"
     normalize_obs = True
     WORKFLOWS_PER_EPISODE = 50
@@ -238,7 +238,7 @@ def train():
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     SKIP_MANAGER_UPDATE_IF_ZERO_ASSIGN = True
-    EVAL_SEEDS = [1]
+    EVAL_SEEDS = SCENARIO.validation_seeds()
     WARMUP_FRAC = 0.03
     DEADLINE_CACHE_PATH = str(SCENARIO.cache_path)
     if not os.path.exists(DEADLINE_CACHE_PATH):

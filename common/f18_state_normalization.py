@@ -102,13 +102,17 @@ def checkpoint_metadata(agent):
 def check_checkpoint(actual, expected):
     actual = actual or {'normalization_version':'legacy'}
     expected = expected or {'normalization_version':'legacy'}
-    for key in ('normalization_version', 'source_train_scene', 'normalization_config_hash', 'R_ref', 'T_ref'):
+    for key in ('normalization_version', 'source_train_scene', 'normalization_config_hash', 'R_ref', 'T_ref', 'experiment_protocol_hash'):
         if actual.get(key) != expected.get(key):
             raise ValueError('Checkpoint normalization mismatch: ' + key)
 
 
 def bind_normalization(agent, scenario):
     agent.normalization_metadata = scenario.normalization_metadata()
+    if getattr(scenario, 'experiment_protocol', None):
+        from common.experiment_protocol import protocol_hash
+        agent.normalization_metadata['experiment_protocol_hash'] = protocol_hash(scenario.experiment_protocol)
+        agent.normalization_metadata['experiment_protocol'] = scenario.protocol().metadata()
     return agent
 
 def observe_rr(env, ready_count):

@@ -134,7 +134,7 @@ def evaluate_marl(
 
 
 def train():
-    random_seed = 1
+    random_seed = SCENARIO.first_training_seed()
     set_seed(random_seed)
     dax_dir = os.path.join(ROOT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
@@ -259,7 +259,7 @@ def train():
     best_global_path = os.path.join(save_dir, "best_global.pth")
     best_local_path = os.path.join(save_dir, "best_local_actor_critics.pth")
     max_episodes = SCENARIO.episodes
-    eval_seeds = [1]
+    eval_seeds = SCENARIO.validation_seeds()
     eval_interval_episode = 1
     global_step = 0
     episode_idx = 0

@@ -64,7 +64,7 @@ def train():
     horizon = 1000000000.0
     arrival_lambda = 0.03
     WORKFLOWS_PER_EPISODE = 50
-    random_seed = 1
+    random_seed = SCENARIO.first_training_seed()
     ALPHA_DELAY_VM = 0.75
     TASK_BASELINE_NORM = 300.0
     ENERGY_REWARD_SCALE = 0.001
@@ -116,7 +116,7 @@ def train():
     WARMUP_FRAC = 0.03
     MAX_EPISODES = SCENARIO.episodes
     SAVE_INTERVAL = 2000
-    EVAL_SEEDS = [1]
+    EVAL_SEEDS = SCENARIO.validation_seeds()
     save_dir = str(SCENARIO.checkpoint_dir("pd3qn"))
     log_path = os.path.join(
         ROOT_DIR, "outputs", "logs", SCENARIO.model_name("pd3qn"), "train_metrics_pd3qn_cost.csv"

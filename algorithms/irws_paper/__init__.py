@@ -1,0 +1,1 @@
+"""Paper-based IRWS cloud adaptation; historical algorithms.irws remains intact."""

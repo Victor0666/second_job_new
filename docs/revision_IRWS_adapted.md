@@ -101,3 +101,7 @@
 ## 本轮实际回归结果
 
 执行 `.\.venv\Scripts\python.exe -m unittest common.test_f11 common.test_irws common.test_paired_instances -v`：31 项通过，用时 10.433 秒。覆盖 F14 对应的非终止尾值、真正终止、GAE 边界、IRWS 通信编号/依赖和九算法配对实例。没有执行尚不存在的 F12/F13 新模块测试、元梯度测试或新联合训练消融，不把先前通过项冒充本次完整适配验收。
+
+## 2026-10-19 后续状态
+
+用户已提供可访问的 IRWS 原论文 PDF。本轮新增独立 `algorithms/irws_paper/` 并完成核心机制、元梯度与公共物理环境验证；旧算法文件保持不变。详见 [新的原文对应、工程近似及验收报告](IRWS_paper_reproduction.md)。本文件以上内容作为此前审计的历史记录保留；其中原文缺失的阻塞已解除，不代表原文数学歧义自动消失。

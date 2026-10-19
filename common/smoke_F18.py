@@ -7,6 +7,7 @@ from pathlib import Path
 import tempfile
 import sys
 from common.scenarios import Scenario
+from common.experiment_protocol import protocol_binding
 from common.precompute_deadlines import main as precompute
 from common.f18_calibrate_normalization import nine_scenarios, sample_episode, summarize, cache_info
 from common.f18_state_normalization import VERSION, scene_id
@@ -20,7 +21,7 @@ def run():
         class LocalScenario(Scenario):
             @property
             def cache_path(self):return root/('cache_'+self.resource+'.json')
-        manifest=dict(normalization_version=VERSION,scenes={},verification_only=True,seeds=[101])
+        manifest=dict(**protocol_binding(),normalization_version=VERSION,scenes={},verification_only=True,seeds=[101])
         with redirect_stdout(io.StringIO()):
             for resource in 'SML':
                 precompute(Scenario(resource=resource,mode='precompute',seed_spec='101',cache_output=str(root/('cache_'+resource+'.json'))))

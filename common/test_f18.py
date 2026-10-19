@@ -17,6 +17,7 @@ from common.f18_state_normalization import (VERSION, SCALE_UNITS, StateNormalize
 from common.f18_calibrate_normalization import (nine_scenarios, percentiles, validate_seeds,
     cache_info, sample_episode, summarize, main as calibrate)
 from common.scenarios import Scenario
+from common.experiment_protocol import protocol_binding
 from common.precompute_deadlines import main as precompute
 from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents as MA
 from environments.marl import CloudWorkflowEnv_MARL as MARL
@@ -28,7 +29,8 @@ def fixture_config(path):
     scales=dict(R_ref=3,T_ref=123.,workload_mi_ref=400.,input_bits_ref=2e9,output_bits_ref=3e9,
                 up_rank_ref=200.,down_rank_ref=300.,vm_pc_ref=8.,vm_bw_ref=8000.,host_pc_ref=60.)
     obj=dict(normalization_version=VERSION,units=SCALE_UNITS,scenes={scene_id('S',r,d):dict(scales)
-        for r in 'SML' for d in ('Loose','Medium','Tight')})
+        for r in 'SML' for d in ('Loose','Medium','Tight')},
+        generation=dict(**protocol_binding(),calibration_seeds={scene_id('S',r,d):[101] for r in 'SML' for d in ('Loose','Medium','Tight')}))
     path.write_text(json.dumps(obj),encoding='utf-8')
     return obj
 
@@ -204,7 +206,7 @@ class F18Tests(unittest.TestCase):
 
     def test_summary_missing_resume_and_dry_run(self):
         out=self.root/'summary';out.mkdir(exist_ok=True);(out/'episodes').mkdir(exist_ok=True)
-        manifest=dict(scenes={'SS_T':dict(seeds=[101])})
+        manifest=dict(**protocol_binding(),scenes={'SS_T':dict(seeds=[101])})
         self.assertEqual(summarize(out,manifest),1)
         import csv
         with (out/'ready_percentiles_9scenarios.csv').open() as f:rows=list(csv.DictReader(f))

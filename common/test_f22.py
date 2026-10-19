@@ -43,7 +43,8 @@ class F22Tests(unittest.TestCase):
 
     def test_T03_test_defaults_and_explicit_override(self):
         self.assertEqual(Scenario().seeds, tuple(range(700,730)))
-        self.assertEqual(Scenario(seed_spec='800,801').seeds, (800,801))
+        self.assertEqual(Scenario(seed_spec='700,701').seeds, (700,701))
+        with self.assertRaises(ValueError): Scenario(seed_spec='800,801')
         with self.assertRaises(ValueError): Scenario(seed_spec='599,700')
         with self.assertRaises(ValueError): Scenario(seed_spec='600')
         self.assertEqual(Scenario(legacy_split=True,seed_spec='2-31').seeds,tuple(range(2,32)))

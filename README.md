@@ -47,11 +47,11 @@ Windows 下先运行 `setup.cmd` 建立 `.venv`，依赖见 `requirements.txt`�
 # 评测：默认使用该资源和截止期下以 S 任务训练的模型，种子 2..31
 .\run.cmd algorithms/mahdrl/evaluate.py --task S --resource S --deadline Tight
 
-# 泛化评测：M 任务、M 资源、Medium；以 S 任务训练的模型；只跑种子 2
-.\run.cmd algorithms/mahdrl/evaluate.py --task M --resource M --deadline Medium --seeds 2
+# 泛化评测：M 任务、M 资源、Medium；以 S 任务训练的模型；只跑种子 700
+.\run.cmd algorithms/mahdrl/evaluate.py --task M --resource M --deadline Medium --seeds 700
 
 # 如果模型以 M 任务训练，明确指定 --train-task M
-.\run.cmd algorithms/mahdrl/evaluate.py --task L --resource M --deadline Medium --train-task M --seeds 2,5,8
+.\run.cmd algorithms/mahdrl/evaluate.py --task L --resource M --deadline Medium --train-task M --seeds 700,705,708
 
 # 预览参数与模型目录，不运行实验
 .\run.cmd algorithms/mahdrl/evaluate.py --task L --resource L --deadline Loose --dry-run
@@ -60,7 +60,7 @@ Windows 下先运行 `setup.cmd` 建立 `.venv`，依赖见 `requirements.txt`�
 将路径中的 `mahdrl` 换成其他算法目录名，即可使用相同参数。启发式使用：
 
 ```powershell
-.\run.cmd algorithms/ertf_fifs/evaluate.py --task M --resource S --deadline Medium --seeds 2
+.\run.cmd algorithms/ertf_fifs/evaluate.py --task M --resource S --deadline Medium --seeds 700
 ```
 
 | 参数 | 可选值/默认值 | 含义 |
@@ -69,7 +69,7 @@ Windows 下先运行 `setup.cmd` 建立 `.venv`，依赖见 `requirements.txt`�
 | `--resource` | S / M / L，默认 S | 3 / 6 / 9 个主机，25 / 50 / 75 个 VM |
 | `--deadline` | Tight / Medium / Loose，默认 Tight | ddlAlpha=2.0 的概率为 0.8 / 0.5 / 0.2，其余为 3.0 |
 | `--episodes` | 正整数，默认 600 | 训练回合数，仅训练入口 |
-| `--seeds` | 如 `2-31` 或 `2,5,8`，默认 2-31 | 评测种子，范围含两端 |
+| `--seeds` | 如 `700-729` 或 `700,705,708`，默认 700-729 | 评测种子，范围含两端 |
 | `--train-task` | S / M / L，默认 S | 被评测模型的训练任务规模，独立于评测任务 |
 | `--checkpoint-dir` | 目录路径 | 显式选择评测模型目录 |
 | `--dry-run` | 开关 | 只打印所选配置 |
@@ -236,3 +236,10 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 ### 新版 IRWS 的共同目标适配
 
 新版 `irws_paper` 已按公共问题使用能耗—超期外部奖励及同一元学习物理成本，保留图嵌入、PPO、动态内在奖励和元梯度；新增动态截止期上下文，采用独立 `irws_cloud_energy_tardiness_v2` 模型目录。旧目标权重必须重训。设计、类似问题排查和验证见 [R03 适配说明](docs/R03_IRWS_common_objective.md)。
+
+
+### R16 校准与测试名单检查
+
+默认训练0–599、校准101–130、验证600、测试700–729保持不变。正式评测的 `--seeds` 必须属于所选协议的测试名单；可用其中的子集调试，正式对比应统一使用完整名单。扩展测试集需新建独立版本的协议，不能在原协议中临时换题。
+
+校准新增 `--experiment-protocol`，默认仍为F22。校准、续跑、仅汇总均核对同一协议；校准种子只能来自该协议的训练名单。训练和评测会检查校准文件记录的协议与种子，缺少记录或不匹配时拒绝加载。旧校准文件需在新输出目录重新生成，不能只改标签。命令和验证边界见 [R16说明](docs/R16_protocol_binding.md)。

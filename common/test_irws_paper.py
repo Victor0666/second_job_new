@@ -15,7 +15,7 @@ import numpy as np
 import torch
 from common.read_xml_opt_Tsize import Task
 from common.scenarios import Scenario
-from common.experiment_protocol import ExperimentProtocol,DEFAULT_PROTOCOL
+from common.experiment_protocol import ExperimentProtocol,DEFAULT_PROTOCOL,protocol_binding
 from common.f18_state_normalization import VERSION,SCALE_UNITS
 from environments.irws import IRWSEnvRouteA
 from algorithms.irws_paper.config import PaperConfig,MODEL_VERSION,REWARD_PROTOCOL,COMMON_REWARD
@@ -45,6 +45,8 @@ def fixture(root):
     path=root/'normalization.json';path.write_text(json.dumps(dict(normalization_version=VERSION,units=SCALE_UNITS,scenes={'SS_T':scales})))
     protocol=root/'protocol.json';protocol.write_text(json.dumps(dict(version='test_disjoint',train=[32],validation=[632],test=[2],
         episodes=1,selection='minimum_validation_total_energy')))
+    obj=json.loads(path.read_text());obj['generation']=dict(**protocol_binding(protocol),calibration_seeds={'SS_T':[32]})
+    path.write_text(json.dumps(obj))
     class FixtureScenario(Scenario):
         @property
         def vms_per_host(self):return (2,1)

@@ -46,3 +46,7 @@ class ExperimentProtocol:
 
 
 def protocol_hash(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+def protocol_binding(path=DEFAULT_PROTOCOL):
+    return dict(experiment_protocol=ExperimentProtocol.load(path).metadata(),
+                experiment_protocol_hash=protocol_hash(path))

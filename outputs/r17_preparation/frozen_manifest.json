@@ -1,0 +1,111 @@
+{
+  "status": "complete",
+  "created_utc": "2026-10-19T11:32:05.112357+00:00",
+  "code_fingerprint": "814e10a379c1e74e088ba78acf86a1dee4796f6998aada73b25756fd413d5610",
+  "protocol_hash": "64d2c570d2fd3c995cfc12a92d1cafa99d3ffc7b8f95d4b580c35d4ccf71335e",
+  "cache_count": 9,
+  "seeds_per_cache": 1001,
+  "calibration_scenes": 9,
+  "calibration_seeds": [
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130
+  ],
+  "calibration_episodes": 270,
+  "default_normalization": "outputs\\f18_normalization_calibration\\f18_shared_normalization_v1.json",
+  "artifacts": [
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskS_resS_seed0-1000.json",
+      "sha256": "120eb72473037bef90be95182e463b6424a97edfc61c96e23aad60ac8cdbaa05",
+      "bytes": 8237073
+    },
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskS_resM_seed0-1000.json",
+      "sha256": "3df24edaba33c36c8d5250e1155c92d5aa57236188feab1b4980e81b0397468b",
+      "bytes": 8244932
+    },
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskS_resL_seed0-1000.json",
+      "sha256": "44ec2d5e301bc8b4f44aadbc0a9e30269c1dbd987ef9ccc61364726078a5faa0",
+      "bytes": 8243155
+    },
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskM_resS_seed0-1000.json",
+      "sha256": "681580d4cf8f60aa230de28f861f75eeebf639f759366edcb9b2711f17100f44",
+      "bytes": 8255298
+    },
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskM_resM_seed0-1000.json",
+      "sha256": "21e0c274e74123c382a2fe081a76c6eb724194928cc5b7128756f4c56cd33fd2",
+      "bytes": 8241030
+    },
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskM_resL_seed0-1000.json",
+      "sha256": "21005991b08ab6566adac39cffc245ab112ea590b197eaf9564979dcca04b731",
+      "bytes": 8242482
+    },
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskL_resS_seed0-1000.json",
+      "sha256": "e4b2c511be1c07259c57274affd49d7983cbf6ef723f1170aadcac8330702540",
+      "bytes": 8271453
+    },
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskL_resM_seed0-1000.json",
+      "sha256": "f7b1e8afc3e1c2d08d24c6309e023dcf54b946965e544734cbd6a2ebdfe69b47",
+      "bytes": 8262847
+    },
+    {
+      "path": "data\\deadlines\\dynamic_full_parent_output_v1\\ddl_fcfs_taskL_resL_seed0-1000.json",
+      "sha256": "bb88e18ed24da8ef563408bcfe4fcb5db444be0af400e14c17dc0a22ddd98ac5",
+      "bytes": 8257701
+    },
+    {
+      "path": "configs\\f22_split_v1.json",
+      "sha256": "64d2c570d2fd3c995cfc12a92d1cafa99d3ffc7b8f95d4b580c35d4ccf71335e",
+      "bytes": 6367
+    },
+    {
+      "path": "outputs\\f18_calibration_r17\\f18_shared_normalization_v1.json",
+      "sha256": "74246ed69684438086f55be1b4ca29bac0d4db173cb571c3df0a950ec945daa0",
+      "bytes": 168438
+    },
+    {
+      "path": "outputs\\f18_normalization_calibration\\f18_shared_normalization_v1.json",
+      "sha256": "74246ed69684438086f55be1b4ca29bac0d4db173cb571c3df0a950ec945daa0",
+      "bytes": 168438
+    },
+    {
+      "path": "outputs\\f18_calibration_r17\\f18_calibration_manifest.json",
+      "sha256": "da3f52e1de83da00b56143032b4583485c49174643edf84eb4e1310bd2cece32",
+      "bytes": 151853
+    }
+  ],
+  "formal_algorithm_training_executed": false
+}

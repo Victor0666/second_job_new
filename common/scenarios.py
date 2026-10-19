@@ -103,6 +103,7 @@ class Scenario:
 
     def normalization_metadata(self):
         kw = self.normalization_kwargs()
+        self.validate_calibration()
         n = load_normalizer(kw['normalization_mode'], kw['normalization_config'], kw['source_train_scene'])
         metadata = dict(n.metadata) if n else {'normalization_version':'legacy'}
         if self.protocol():
@@ -110,6 +111,12 @@ class Scenario:
                             experiment_protocol=self.protocol().metadata())
         metadata['reproducibility'] = self.reproducibility_metadata()
         return metadata
+
+    def validate_calibration(self):
+        if self.protocol() and self.normalization_mode in SHARED_VERSIONS:
+            from common.f18_state_normalization import validate_calibration
+            validate_calibration(self.normalization_config,
+                                 self.normalization_kwargs()['source_train_scene'], self.experiment_protocol)
 
     def reproducibility_metadata(self):
         from common.f22_instances import reproducibility_metadata
@@ -143,8 +150,8 @@ class Scenario:
             protocol=self.protocol()
             if self.mode == 'train' and self.episodes > protocol.episodes:
                 raise ValueError('Episode budget exceeds the shared protocol')
-            if self.mode == 'eval' and set(parse_seeds(self.seed_spec)) & (set(protocol.train) | set(protocol.validation)):
-                raise ValueError('Evaluation seeds overlap training or validation partition')
+            if self.mode == 'eval' and not set(parse_seeds(self.seed_spec)) <= set(protocol.test):
+                raise ValueError('Evaluation seeds must belong to the selected protocol test partition')
         parse_seeds(self.seed_spec)
 
     @property
@@ -339,5 +346,7 @@ def parse_scenario(mode, algorithm=None):
     if mode != 'precompute' and not scenario.legacy_split:
         from common.f22_cache import check_cache
         cache_override = (scenario.marl_options or {}).get('deadline_cache')
+        if algorithm != 'ertf_fifs':
+            scenario.validate_calibration()
         check_cache(scenario, path=cache_override)
     return scenario

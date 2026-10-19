@@ -77,6 +77,19 @@ def load_normalizer(mode='legacy', path=None, source_scene=None):
     return StateNormalizer(path or DEFAULT_CONFIG, source_scene, version=mode)
 
 
+def validate_calibration(path, source_scene, protocol_path):
+    from common.experiment_protocol import ExperimentProtocol, protocol_binding
+    obj = json.loads(Path(path).read_text(encoding='utf-8'))
+    generation = obj.get('generation', {})
+    for key, value in protocol_binding(protocol_path).items():
+        if generation.get(key) != value:
+            raise ValueError('Calibration protocol missing or mismatched; regenerate with the selected protocol: ' + key)
+    seeds = generation.get('calibration_seeds', {}).get(source_scene, [])
+    protocol = ExperimentProtocol.load(protocol_path)
+    if not seeds or len(set(seeds)) != len(seeds) or not set(seeds) <= set(protocol.train):
+        raise ValueError('Calibration seeds must belong to the selected training partition: ' + source_scene)
+
+
 def counts(env):
     """Arrays use unique global task IDs and contain arrived tasks only."""
     states = env.task_state

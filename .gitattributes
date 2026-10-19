@@ -1,0 +1,7 @@
+# Preserve the bytes used by the frozen experiment hashes.
+/data/deadlines/dynamic_full_parent_output_v1/*.json -text
+/configs/f22_split_v1.json -text
+/outputs/f18_calibration_r17/*.json -text
+/outputs/f18_calibration_r17/*.csv -text
+/outputs/f18_normalization_calibration/f18_shared_normalization_v1.json -text
+/outputs/r17_preparation/frozen_manifest.json -text

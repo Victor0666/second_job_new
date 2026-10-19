@@ -1,0 +1,9 @@
+R16 focused: python -m unittest common.test_r16 -q
+Ran 4 tests in 0.181s: OK
+Related: common.test_f18 common.test_f22 common.test_irws_paper
+Ran 47 tests in 54.328s: OK
+Full: python -m unittest discover -s common -p test_*.py -q
+Ran 173 tests in 80.184s: OK
+Real temporary DAX calibration / IRWS train / validation / save / load / evaluation: OK
+Summary: docs/R16_IRWS_smoke.json
+No formal 600-episode training, no full formal calibration, no performance comparison.

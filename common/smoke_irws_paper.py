@@ -8,6 +8,7 @@ import tempfile
 import torch
 import numpy as np
 from common.scenarios import Scenario
+from common.experiment_protocol import protocol_binding
 from common.workflow_opt import energy_from_records, exec_time_components
 from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents as CommonEnv
 from common.precompute_deadlines import main as precompute
@@ -70,15 +71,15 @@ def run():
         class LocalScenario(Scenario):
             @property
             def cache_path(self):return root/'cache.json'
-        with redirect_stdout(io.StringIO()):
-            precompute(Scenario(mode='precompute',seed_spec='2,32,101,632',cache_output=str(root/'cache.json')))
-            scene=LocalScenario(mode='train')
-            calibration=sample_episode(scene,101)
-            (root/'episodes').mkdir();(root/'episodes/SS_T_101.json').write_text(json.dumps(calibration),encoding='utf-8')
-            manifest=dict(scenes={'SS_T':dict(seeds=[101])},verification_only=True)
-            assert summarize(root,manifest)==0
         protocol=root/'protocol.json';protocol.write_text(json.dumps(dict(version='paper_smoke_disjoint_v1',train=list(range(32,102)),validation=[632],
             test=[2],episodes=1,selection='minimum_validation_total_energy')),encoding='utf-8')
+        with redirect_stdout(io.StringIO()):
+            precompute(Scenario(mode='precompute',seed_spec='2,32,101,632',cache_output=str(root/'cache.json')))
+            scene=LocalScenario(mode='train',episodes=1,experiment_protocol=str(protocol))
+            calibration=sample_episode(scene,101)
+            (root/'episodes').mkdir();(root/'episodes/SS_T_101.json').write_text(json.dumps(calibration),encoding='utf-8')
+            manifest=dict(**protocol_binding(protocol),scenes={'SS_T':dict(seeds=[101])},verification_only=True)
+            assert summarize(root,manifest,protocol)==0
         scene=LocalScenario(mode='train',episodes=1,experiment_protocol=str(protocol),normalization_config=str(root/'f18_shared_normalization_v1.json'))
         kwargs=env_kwargs(scene,32);kwargs['workflows_per_episode']=2
         physical_trace=verify_common_trace(scene,kwargs)

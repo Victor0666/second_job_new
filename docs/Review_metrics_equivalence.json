@@ -1,0 +1,17 @@
+{
+  "device": "cpu",
+  "same_final_parameter_hashes_and_physical_metrics": true,
+  "algorithms": [
+    "mahdrl",
+    "pd3qn",
+    "marl",
+    "ablation_hostrand",
+    "ablation_mgrrand",
+    "ablation_vmrand",
+    "ablation_nohost",
+    "ablation_tl2",
+    "irws",
+    "ertf_fifs"
+  ],
+  "formal_training_executed": false
+}

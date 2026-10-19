@@ -16,6 +16,7 @@ SCENARIO = Scenario(mode="train")
 from common.d3qn_agent_EXDehid import D3QNAgent
 from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
 from common.metrics_logger import CSVLogger
+from common.experiment_measurements import TrainingRecorder, collect_validation
 
 
 def set_seed(seed):
@@ -164,6 +165,7 @@ def evaluate_hrl_three_layer_multi_seed(env_cls, env_kwargs, vm_agent, host_agen
         avg_vm = ret_vm_phase_mean / max(phases, 1)
         avg_host = ret_host_phase_mean / max(phases, 1)
         avg_mgr = ret_mgr / max(phases, 1)
+        collect_validation(eval_env)
         total_energy = float(eval_env.total_energy)
         vm_list.append(avg_vm)
         host_list.append(avg_host)
@@ -380,6 +382,7 @@ def train():
     best_eval_energy = float("inf")
     best_ckpt_vm = os.path.join(save_dir, "best_vm.pth")
     best_ckpt_host = os.path.join(save_dir, "best_host.pth")
+    recorder = TrainingRecorder(os.path.dirname(log_path), SCENARIO, 'ablation_mgrrand', env, {'HA': host_agent, 'VA': vm_agent})
     global_step = 0
     episode_idx = 0
     episode_steps = 0
@@ -408,7 +411,7 @@ def train():
                         reward_balance={name: t.recorded_reward - t.emitted_reward for name, t in
                                         (("HA", host_trace), ("VA", vm_trace)) if t is not None},
                         cutoffs=sum(t.cutoffs for t in (host_trace, vm_trace) if t is not None))
-            eval_vm, eval_host, eval_mgr, eval_energy = evaluate_hrl_three_layer_multi_seed(
+            eval_vm, eval_host, eval_mgr, eval_energy = recorder.validation(evaluate_hrl_three_layer_multi_seed,
                 EnvCls, dict(env_kwargs), vm_agent, host_agent, seeds=EVAL_SEEDS
             )
             ep_energy = float(env.total_energy - ep_energy0)
@@ -567,6 +570,7 @@ def train():
         f"训练结束。\nVM最终模型：{vm_final}\nHost最终模型：{host_final}\n最优评测模型：{best_ckpt_vm} / {best_ckpt_host}\n日志：{log_path}"
     )
 
+    recorder.close()
     logger.close()
 
 

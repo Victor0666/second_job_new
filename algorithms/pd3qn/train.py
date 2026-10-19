@@ -14,6 +14,7 @@ from common.f11 import pd3qn_transition, F11Logger, protect_training_outputs
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
+from common.experiment_measurements import TrainingRecorder, collect_validation
 from common.d3qn_agent_PER import D3QNAgent
 from environments.pd3qn import CloudWorkflowEnv_PD3QN_Cost
 
@@ -52,6 +53,7 @@ def evaluate_pd3qn(env_cls, env_kwargs: dict, agent: D3QNAgent, seeds):
             steps += 1
             if steps > 10**9:
                 break
+        collect_validation(env)
         metrics_list.append(env.get_episode_metrics())
     keys = metrics_list[0].keys()
     out = {k: float(np.mean([m[k] for m in metrics_list])) for k in keys}
@@ -196,6 +198,7 @@ def train():
         f"[reward shallow-align] alpha_delay_vm={ALPHA_DELAY_VM:.3f}, alpha_energy_vm={1.0 - ALPHA_DELAY_VM:.3f}, task_baseline_norm={TASK_BASELINE_NORM}, energy_reward_scale={ENERGY_REWARD_SCALE}"
     )
     f11_log = F11Logger(os.path.dirname(log_path))
+    recorder = TrainingRecorder(os.path.dirname(log_path), SCENARIO, 'pd3qn', env, {'PD3QN': agent})
     HARD_MAX_STEPS = 10**9
     while episode_idx < MAX_EPISODES and global_step < HARD_MAX_STEPS:
         done = False
@@ -218,7 +221,7 @@ def train():
                     terminated=bool(terminated), truncated=bool(truncated))
         m = env.get_episode_metrics()
         ep_energy = float(m["total_energy"])
-        eval_m = evaluate_pd3qn(
+        eval_m = recorder.validation(evaluate_pd3qn,
             CloudWorkflowEnv_PD3QN_Cost, dict(env_kwargs), agent, seeds=EVAL_SEEDS
         )
         logger.log(
@@ -260,6 +263,7 @@ def train():
     agent.save(final_ckpt)
     print(f"训练结束：final={final_ckpt} \n best={best_ckpt} \n log={log_path}")
 
+    recorder.close()
     logger.close()
 
 

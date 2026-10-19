@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from common.f18_state_normalization import VERSION,CURRENT_VERSION,SHARED_VERSIONS,check_checkpoint
 from common.f11 import protect_training_outputs
+from common.experiment_measurements import TrainingRecorder, EvaluationRecorder, collect_validation
 from common.scenarios import ROOT,parse_scenario
 from .config import MODEL_VERSION,REWARD_PROTOCOL,COMMON_REWARD,PaperConfig
 from .environment import PaperCloudEnv
@@ -40,11 +41,12 @@ def output_dir(scenario,kind):
     return ROOT/'outputs'/kind/MODEL_VERSION/(source+'_'+digest+'_'+norm['normalization_config_hash'][:12]+encoding)
 
 
-def run_episode(env,learner,seed,training=False):
+def run_episode(env,learner,seed,training=False,evaluation=None):
     if any(getattr(env,k)!=v for k,v in COMMON_REWARD.items()):
         raise ValueError("Adapted IRWS must use the shared energy-tardiness coefficients")
     learner.numerics.reset()
     env.reset(seed=seed);learner.reset_history();updates=[];weights=[];boundaries=0
+    measurement = EvaluationRecorder(evaluation[0], 'irws_paper', env, {'IRWS':learner}, evaluation[1], checkpoint_directory=str(evaluation[0].checkpoint_override or output_dir(evaluation[0],'ckpts'))) if evaluation else None
     pending=None;external_return=0.;physical_cost=0.
     if not env.done_flag:
         decision=learner.prepare(env,deterministic=not training)
@@ -67,6 +69,7 @@ def run_episode(env,learner,seed,training=False):
                 bootstrap=0. if done else pending[3]  # selected actual successor, pre-update critic
                 updates.append(learner.update(bootstrap))
         if len(weights)>100000:raise RuntimeError('Episode exceeded the decision guard')
+    if measurement is not None:measurement.finish()
     metrics=env.get_episode_metrics()
     if env.completed_workflows!=env.workflows_per_episode or any(s!='Finished' for s in env.task_state):
         raise RuntimeError('Paper IRWS ended before actual physical completion')
@@ -130,7 +133,10 @@ def evaluate(learner,scenario,seeds,split='test',kwargs=None):
     rows=[]
     for seed in seeds:
         env=PaperCloudEnv(**(dict(kwargs,random_seed=seed) if kwargs is not None else env_kwargs(scenario,seed)))
-        result=run_episode(env,learner,seed,False);rows.append(dict(seed=seed,**result['metrics']))
+        directory=output_dir(scenario,'run')/(scenario.task+scenario.resource+'_'+scenario.deadline)/'measurements'
+        result=run_episode(env,learner,seed,False,evaluation=(scenario,directory) if split=='test' else None)
+        collect_validation(env)
+        rows.append(dict(seed=seed,**result['metrics']))
     names=[k for k in rows[0] if k!='seed']
     summary={k:dict(mean=float(np.mean([r[k] for r in rows])),std=float(np.std([r[k] for r in rows],ddof=1)) if len(rows)>1 else 0.) for k in names}
     return rows,summary
@@ -156,19 +162,22 @@ def train(scenario,config=None,kwargs=None,out=None,resume=None):
     from common.f22_instances import write_run_metadata
     write_run_metadata(directory,scenario)
     directory.mkdir(parents=True,exist_ok=True);log=directory/'training.jsonl'
+    recorder=TrainingRecorder(directory/'logs',scenario,'irws_paper',env,{'IRWS':learner})
+    recorder.index=start
     for episode in range(start,scenario.episodes):
         seed=protocol.train[episode]
         result=run_episode(env,learner,seed,True)
-        _,validation=evaluate(learner,scenario,protocol.validation,'validation',kwargs)
+        _,validation=recorder.validation(evaluate,learner,scenario,protocol.validation,'validation',kwargs)
         energy=validation['total_energy']['mean']
         from common.f22_instances import instance_identity
         result.update(episode=episode,seed=seed,validation=validation,model_version=MODEL_VERSION,
                       instance=instance_identity(env,scenario,seed))
         with log.open('a',encoding='utf-8') as stream:stream.write(json.dumps(result,allow_nan=False)+'\n')
         if energy<best:
-            best=energy;save_checkpoint(directory/'best.pth',learner,scenario,episode,best,kwargs)
-        save_checkpoint(directory/'final.pth',learner,scenario,episode,best,kwargs)
+            best=energy;recorder.checkpoint(save_checkpoint)(directory/'best.pth',learner,scenario,episode,best,kwargs)
+        recorder.checkpoint(save_checkpoint)(directory/'final.pth',learner,scenario,episode,best,kwargs)
         print(f'IRWS-paper episode={episode} seed={seed} energy={result["metrics"]["total_energy"]:.6f} validation_energy={energy:.6f}',flush=True)
+    recorder.close()
     return learner,directory
 
 

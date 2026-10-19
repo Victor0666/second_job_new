@@ -11,6 +11,7 @@ if ROOT_DIR in sys.path:
     sys.path.remove(ROOT_DIR)
 sys.path.insert(0, ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.experiment_measurements import EvaluationRecorder, episode_duration
 from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 
@@ -139,6 +140,7 @@ def _derive_workflow_metrics(metrics: dict) -> dict:
 def evaluate_one_episode(env_cls, env_kwargs: dict, agent: D3QNAgent, deterministic: bool = True):
     env = env_cls(**env_kwargs)
     ret = env.reset()
+    measurement = EvaluationRecorder(SCENARIO, 'pd3qn', env, {'PD3QN':agent})
     obs = ret[0] if isinstance(ret, tuple) else ret
     t_now = getattr(env, "current_time", getattr(env, "time", getattr(env, "now", None)))
     E0 = getattr(env, "total_energy", None)
@@ -175,7 +177,8 @@ def evaluate_one_episode(env_cls, env_kwargs: dict, agent: D3QNAgent, determinis
     metrics.update(_derive_task_metrics(metrics))
     metrics.update(_derive_workflow_metrics(metrics))
     metrics["total_energy"] = _safe_float(_pick_first(metrics, ["total_energy"], E_acc), E_acc)
-    metrics["makespan"] = _safe_float(_pick_first(metrics, ["makespan"], np.nan), np.nan)
+    metrics["makespan"] = episode_duration(env)
+    measurement.finish()
     if hasattr(env, "close"):
         try:
             env.close()

@@ -9,6 +9,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.experiment_measurements import EvaluationRecorder, episode_duration
 from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 from common.ta_weights import TA_WEIGHT_MODEL
@@ -490,7 +491,7 @@ def compute_task_and_workflow_metrics(env: EnvHRLVMRandom):
     wf_avg_tardiness = wf_sum_tardiness / max(wf_n_finished, 1)
     wf_pct_tardy = float(wf_n_tardy) / float(max(wf_n_finished, 1))
     wf_success_rate = 1.0 - wf_pct_tardy
-    makespan = float(getattr(env, "current_time", 0.0))
+    makespan = episode_duration(env)
     return {
         "task_n_finished": int(task_n_finished),
         "task_n_tardy": int(task_n_tardy),
@@ -588,6 +589,7 @@ def evaluate_hrl_vm_random_one_seed(env_cls, env_kwargs, host_agent, manager_age
     env = env_cls(**ctor_kwargs)
     _sync_env_scales(env, env_kwargs)
     env.reset()
+    measurement = EvaluationRecorder(SCENARIO, 'ablation_vmrand', env, {'TA':manager_agent,'HA':host_agent})
     vm_selector = RandomVMSelector(_vm_random_seed_from_episode_seed(env_kwargs["random_seed"]))
     sH = env.get_manager_state()
     m_mask = env.get_manager_action_mask()
@@ -612,7 +614,7 @@ def evaluate_hrl_vm_random_one_seed(env_cls, env_kwargs, host_agent, manager_age
             st_vm, ok_vm = env.get_vm_state_for_current_task()
             if not ok_vm:
                 break
-            a_vm = vm_selector.select_action(st_vm["mask"])
+            a_vm = measurement.measure(vm_selector.select_action, 'RandomVA')(st_vm["mask"])
             r_host, r_vm, _info_task = env.vm_assign(int(a_vm))
             host_rewards.append(float(r_host))
             vm_rewards.append(float(r_vm))
@@ -641,6 +643,7 @@ def evaluate_hrl_vm_random_one_seed(env_cls, env_kwargs, host_agent, manager_age
             "eval_energy": float(total_energy),
         }
     )
+    measurement.finish()
     return metrics
 
 

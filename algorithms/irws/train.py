@@ -18,6 +18,7 @@ from common.f11 import F11Logger, protect_training_outputs, LEARNING_MODEL
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
+from common.experiment_measurements import TrainingRecorder, collect_validation
 from environments.irws import IRWSEnvRouteA
 from algorithms.irws.task_ranker import IRWSTaskSelector, TaskSelectorConfig
 from algorithms.irws.intrinsic_reward import IntrinsicRewardNet, IntrinsicNetConfig
@@ -81,6 +82,7 @@ def evaluate_irws_multi_seed(
             vm_st = env.get_vm_obs_and_mask()
             a_vm, _ = ppo.select_action(vm_st["obs"], vm_st["mask"], deterministic=True)
             _obs2, _r, _term, _trunc, _info = env.step(int(a_vm))
+        collect_validation(env)
         metrics_list.append(env.get_episode_metrics())
     keys = metrics_list[0].keys() if metrics_list else []
     out = {}
@@ -137,8 +139,6 @@ def train():
     env_kwargs.update(SCENARIO.normalization_kwargs())
     env = IRWSEnvRouteA(**env_kwargs)
     from common.f22_instances import write_run_metadata, episode_identity
-    write_run_metadata(save_dir, SCENARIO)
-    write_run_metadata(SCENARIO.log_dir("irws"), SCENARIO)
     env.reset()
     task_selector = IRWSTaskSelector(TaskSelectorConfig(feat_dim=7, hidden=128, device=device))
     vm_st = None
@@ -182,6 +182,8 @@ def train():
     protect_training_outputs(save_dir, log_dir)
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(log_dir, exist_ok=True)
+    write_run_metadata(save_dir, SCENARIO)
+    write_run_metadata(log_dir, SCENARIO)
     log_path = os.path.join(log_dir, "train_metrics_irws.csv")
     logger = CSVLogger(
         filepath=log_path,
@@ -232,6 +234,8 @@ def train():
     MAX_EPISODES = SCENARIO.episodes
     total_assign = 0
     f11_log = F11Logger(log_dir)
+    recorder = TrainingRecorder(log_dir, SCENARIO, 'irws', env, {'Task':task_selector,'VM':ppo,'Intrinsic':intrinsic})
+    save_joint = recorder.checkpoint(save_joint)
     while episode < MAX_EPISODES:
         env.random_seed = SCENARIO.training_seed(episode)
         env.reset()
@@ -307,7 +311,7 @@ def train():
         f11_log.log(episode, {"VM_PPO": ppo}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO), pending=ppo.buf.size(), truncated=truncated_episode,
                     task_selector_numerics=task_selector.numerics.snapshot(), intrinsic_numerics=intrinsic.numerics.snapshot())
         m = env.get_episode_metrics()
-        eval_m = evaluate_irws_multi_seed(
+        eval_m = recorder.validation(evaluate_irws_multi_seed,
             env_ctor_kwargs=env_kwargs,
             ppo=ppo,
             task_selector=task_selector,
@@ -344,6 +348,7 @@ def train():
     save_joint(final_path)
     print(f"训练结束。\nbest={best_path}\nfinal={final_path}\nlog={log_path}")
 
+    recorder.close()
     logger.close()
 
 

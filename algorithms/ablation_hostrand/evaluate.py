@@ -10,6 +10,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.experiment_measurements import EvaluationRecorder, episode_duration
 from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 from common.ta_weights import TA_WEIGHT_MODEL
@@ -199,7 +200,7 @@ def compute_task_workflow_metrics(env: EnvHOSTRAND):
             if finish_t is not None and float(finish_t) <= ddl:
                 wf_success_count += 1
         wf_success_rate = float(wf_success_count) / float(max(wf_cnt, 1))
-    makespan = float(getattr(env, "current_time", 0.0))
+    makespan = episode_duration(env)
     return {
         "finished_tasks": int(finished_tasks),
         "completed_workflows": int(completed_workflows),
@@ -232,6 +233,7 @@ def evaluate_hostrand_one_seed(env_cls, env_kwargs, vm_agent, manager_agent):
     env = env_cls(**ctor_kwargs)
     _sync_env_scales(env, env_kwargs)
     _obs0, info0 = env.reset()
+    measurement = EvaluationRecorder(SCENARIO, 'ablation_hostrand', env, {'TA':manager_agent,'VA':vm_agent})
     reset_t = float(getattr(env, "current_time", 0.0))
     reset_e = float(getattr(env, "total_energy", 0.0))
     first_arrival_t = float(
@@ -255,7 +257,7 @@ def evaluate_hostrand_one_seed(env_cls, env_kwargs, vm_agent, manager_agent):
             st_host, has_next = env.get_host_state_for_next_assignment()
             if not has_next:
                 break
-            a_host = host_selector.select_action(
+            a_host = measurement.measure(host_selector.select_action, 'RandomHA')(
                 st_host["mask"], deterministic=True, count_step=False
             )
             env.host_select(int(a_host))
@@ -305,6 +307,7 @@ def evaluate_hostrand_one_seed(env_cls, env_kwargs, vm_agent, manager_agent):
             "first_arrival_t": float(first_arrival_t),
         }
     )
+    measurement.finish()
     return metrics
 
 

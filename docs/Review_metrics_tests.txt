@@ -1,0 +1,10 @@
+Final regression: python -m unittest discover -s common -p test_*.py -q
+Ran 180 tests in 80.865s: OK
+Measurement unit tests include CPU/CUDA parameter and RNG equality, workflow exports, TL global assignment interface,
+PPO sample reuse and short final minibatch, probability intervals and paired scenario validation.
+Actual small-network train+evaluation smoke: 9 train runners plus ERTF-H-FIFS evaluation passed.
+CPU recording on/off: final parameter hashes, training physical metrics and evaluation physical metrics match.
+New paper IRWS: real temporary DAX train/validation/save/load/evaluate passed; CUDA synthetic control passed.
+All 13 frozen prerequisite artifact SHA256 hashes unchanged.
+No formal 600-episode training or 30-seed performance experiment executed.
+CUDA device: NVIDIA GeForce RTX 4060 Ti

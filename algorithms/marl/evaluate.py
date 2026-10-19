@@ -13,6 +13,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.experiment_measurements import EvaluationRecorder, episode_duration
 from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 
@@ -195,6 +196,7 @@ def evaluate_one_seed(
             "print_deadlines": False,
         },
     )
+    measurement = EvaluationRecorder(SCENARIO, 'marl', env, {'Global':global_agent,'Local':local_agent})
     t_now = float(info0.get("current_time", getattr(env, "current_time", 0.0)))
     E0 = float(getattr(env, "total_energy", 0.0))
     arr = getattr(env, "arrival_times", [])
@@ -225,7 +227,7 @@ def evaluate_one_seed(
             obs = obs2
     m = env.get_episode_metrics()
     energy = _get_metric(m, ["total_energy_J", "total_energy"], getattr(env, "total_energy", 0.0))
-    makespan = _get_metric(m, ["makespan"])
+    makespan = episode_duration(env)
     task_avg_lateness = _get_metric(m, ["task_avg_lateness", "avg_lateness"])
     task_avg_tardiness = _get_metric(m, ["task_avg_tardiness", "avg_tardiness"])
     task_pct_tardy = _get_metric(m, ["task_pct_tardy", "pct_tardy"])
@@ -259,6 +261,7 @@ def evaluate_one_seed(
     print(
         f"[MARL0.75-MIX] vm={vm_r:.6f} host={host_r:.6f} mgr={mgr_r:.6f} energy={energy:.3f} J | task_avg_lateness={task_avg_lateness:.6f} task_avg_tardiness={task_avg_tardiness:.6f} task_success_rate={task_success_rate:.6f} task_pct_tardy={task_pct_tardy:.6f} | wf_avg_lateness={wf_avg_lateness:.6f} wf_avg_tardiness={wf_avg_tardiness:.6f} wf_success_rate={wf_success_rate:.6f} wf_pct_tardy={wf_pct_tardy:.6f} | makespan={makespan:.3f}"
     )
+    measurement.finish()
     if hasattr(env, "close"):
         env.close()
     del env

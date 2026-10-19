@@ -9,6 +9,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.experiment_measurements import EvaluationRecorder, episode_duration
 from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 from common.ta_weights import TA_WEIGHT_MODEL
@@ -480,7 +481,7 @@ def compute_task_and_workflow_metrics(env: EnvHRLMix):
     wf_avg_tardiness = wf_sum_tardiness / max(wf_n_finished, 1)
     wf_pct_tardy = float(wf_n_tardy) / float(max(wf_n_finished, 1))
     wf_success_rate = 1.0 - wf_pct_tardy
-    makespan = float(getattr(env, "current_time", 0.0))
+    makespan = episode_duration(env)
     return {
         "task_n_finished": int(task_n_finished),
         "task_n_tardy": int(task_n_tardy),
@@ -575,9 +576,10 @@ def evaluate_mgrrand_one_seed(env_cls, env_kwargs, vm_agent, host_agent):
     env = env_cls(**ctor_kwargs)
     _sync_env_scales(env, env_kwargs)
     env.reset()
+    measurement = EvaluationRecorder(SCENARIO, 'ablation_mgrrand', env, {'HA':host_agent,'VA':vm_agent})
     mgr_rng = make_manager_rng(int(env_kwargs["random_seed"]))
     m_mask = env.get_manager_action_mask()
-    m_act = random_manager_action(m_mask, mgr_rng)
+    m_act = measurement.measure(random_manager_action, 'RandomTA')(m_mask, mgr_rng)
     manager_apply_action(env, m_act)
     done = bool(getattr(env, "done_flag", False))
     phases = 0
@@ -613,7 +615,7 @@ def evaluate_mgrrand_one_seed(env_cls, env_kwargs, vm_agent, host_agent):
         if done:
             break
         m_mask = env.get_manager_action_mask()
-        m_act = random_manager_action(m_mask, mgr_rng)
+        m_act = measurement.measure(random_manager_action, 'RandomTA')(m_mask, mgr_rng)
         manager_apply_action(env, m_act)
     avg_vm = ret_vm_phase_mean / max(phases, 1)
     avg_host = ret_host_phase_mean / max(phases, 1)
@@ -628,6 +630,7 @@ def evaluate_mgrrand_one_seed(env_cls, env_kwargs, vm_agent, host_agent):
             "eval_energy": float(total_energy),
         }
     )
+    measurement.finish()
     return metrics
 
 

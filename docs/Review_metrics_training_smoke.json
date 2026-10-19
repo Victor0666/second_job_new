@@ -1,0 +1,525 @@
+{
+  "verification_only": true,
+  "episodes": 1,
+  "workflows_per_episode": 2,
+  "small_networks": true,
+  "device": "cpu",
+  "training_metrics_enabled": true,
+  "algorithms": {
+    "mahdrl": {
+      "parameter_hashes": {
+        "TA": "2a66bbecb5c9c5f35867d505a86a61e83bc44b908f7e026f12cca87321e2bd19",
+        "HA": "5ef0f8b549b4342a568cbc1e79d73d359f4e0800a9f3d1d7830a1bcf69d4c5fe",
+        "VA": "0abed58a4f55f8670ee666161c8599a663126d038dbbabcbd54568f2d688eff9"
+      },
+      "evaluation_metrics": {
+        "total_energy": 34130.67208323768,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 613.0507553612438,
+        "makespan": 582.1783864977548,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 488.8013046362454,
+        "legacy_environment_makespan": 613.0507553612438
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "TA.optim": 20,
+        "HA.optim": 56,
+        "VA.optim": 56
+      },
+      "optimizer_sample_presentations": {
+        "TA.optim": 80,
+        "HA.optim": 224,
+        "VA.optim": 224
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 23955.048041157377,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 377.945530762048,
+        "makespan": 355.28113396308436,
+        "task_count": 59,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 302.9189318625919
+      },
+      "train_seconds": 0.3606706000864506,
+      "validation_seconds": 0.12127159995725378,
+      "checkpoint_seconds": 0.021751799969933927
+    },
+    "pd3qn": {
+      "parameter_hashes": {
+        "PD3QN": "0748df4d10883cb3d3654731db53f626e22abfb72ff95285e10cb3355628efdb"
+      },
+      "evaluation_metrics": {
+        "total_energy": 34378.09593100184,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 661.2904126863737,
+        "makespan": 630.4180438228847,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 529.0802684931685,
+        "legacy_environment_makespan": 661.2904126863737
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "PD3QN.optim": 56
+      },
+      "optimizer_sample_presentations": {
+        "PD3QN.optim": 224
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 28380.094254910666,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 465.4445510322797,
+        "makespan": 442.78015423331607,
+        "task_count": 59,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 319.57627495395934
+      },
+      "train_seconds": 0.11885360005544499,
+      "validation_seconds": 0.027858899964485317,
+      "checkpoint_seconds": 0.005106399999931455
+    },
+    "marl": {
+      "parameter_hashes": {
+        "Global": "0b647a54698310f638124e90b72f13c0863fa494409f0c4f9b41536f11c11eeb",
+        "Local": "b3e9ba76e2eef19dcf49153d8fbfa598e1a11436bcf6361b6da9719ef1c5899f"
+      },
+      "evaluation_metrics": {
+        "total_energy": 22347.161896557485,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 420.4360634779879,
+        "makespan": 389.5636946144989,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 371.90630059587625,
+        "legacy_environment_makespan": 389.5636946144989
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "Global.optim": 59,
+        "Local.optim": 59
+      },
+      "optimizer_sample_presentations": {
+        "Global.optim": 59,
+        "Local.optim": 59
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 27986.365998777306,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 470.82290343468145,
+        "makespan": 448.1585066357178,
+        "task_count": 59,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 302.1148606688856
+      },
+      "train_seconds": 0.3048781000543386,
+      "validation_seconds": 0.10080179997021332,
+      "checkpoint_seconds": 0.006175799993798137
+    },
+    "ablation_hostrand": {
+      "parameter_hashes": {
+        "TA": "5fb2b4043799f2f6912cfc793fdb48d36baf52307a67f116cdf7a59738377376",
+        "VA": "521d86042a05d2d7a0076d63b65b0937696cce7b82a27a17ee8e32b002e9b0e8"
+      },
+      "evaluation_metrics": {
+        "total_energy": 27953.361014650447,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 513.2969237467989,
+        "makespan": 482.42455488330995,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 372.1218820338736,
+        "legacy_environment_makespan": 513.2969237467989
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "TA.optim": 20,
+        "VA.optim": 56
+      },
+      "optimizer_sample_presentations": {
+        "TA.optim": 80,
+        "VA.optim": 224
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 28106.488502149034,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 451.4670445864822,
+        "makespan": 428.80264778751854,
+        "task_count": 59,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 341.3947770812318
+      },
+      "train_seconds": 0.24401050008600578,
+      "validation_seconds": 0.09505339997122064,
+      "checkpoint_seconds": 0.01033089990960434
+    },
+    "ablation_mgrrand": {
+      "parameter_hashes": {
+        "HA": "10fc14cccd3dd08396db76a45dcf95eaeb7e0c25c56d3753716e7f9ad9b0de1a",
+        "VA": "a6202c9181cf62eb1f8978fa471c4533e4e883bd4f110ed78502abce9e802c51"
+      },
+      "evaluation_metrics": {
+        "total_energy": 48126.6294354932,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 927.1247277925678,
+        "makespan": 896.2523589290788,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 602.813812195287,
+        "legacy_environment_makespan": 927.1247277925678
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "HA.optim": 56,
+        "VA.optim": 56
+      },
+      "optimizer_sample_presentations": {
+        "HA.optim": 224,
+        "VA.optim": 224
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 22798.658187903035,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 346.49976720399786,
+        "makespan": 323.8353704050342,
+        "task_count": 59,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 267.8798093654374
+      },
+      "train_seconds": 0.31600009999237955,
+      "validation_seconds": 0.09976460004691035,
+      "checkpoint_seconds": 0.016512899950612336
+    },
+    "ablation_vmrand": {
+      "parameter_hashes": {
+        "TA": "c8f0101c86575dc7899bb5f21f016f2c255d490cedd28a9ad460c9185b04c4fc",
+        "HA": "65d3fe4f21a1c71c4e4bef44458885c5a9d04ee1e45b57d808e2dae5e09d132d"
+      },
+      "evaluation_metrics": {
+        "total_energy": 30113.61799070237,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 583.924713758555,
+        "makespan": 553.052344895066,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 447.80902405248014,
+        "legacy_environment_makespan": 583.924713758555
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "TA.optim": 20,
+        "HA.optim": 56
+      },
+      "optimizer_sample_presentations": {
+        "TA.optim": 80,
+        "HA.optim": 224
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 27402.93059209383,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 451.61627147278534,
+        "makespan": 428.9518746738217,
+        "task_count": 59,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 355.61022725725115
+      },
+      "train_seconds": 0.24786599999060854,
+      "validation_seconds": 0.09701109997695312,
+      "checkpoint_seconds": 0.009887600026559085
+    },
+    "ablation_nohost": {
+      "parameter_hashes": {
+        "TA": "040bed8bccf9fe6d77df77fb49c1af8d21c50c261a5594637e6113cedbe0adab",
+        "VA": "c8487539c467a1cf820e851cdeb4adc153154d3b7dac44da5b9d1a2c1eedfd74"
+      },
+      "evaluation_metrics": {
+        "total_energy": 30593.653032190377,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 577.518200364744,
+        "makespan": 546.645831501255,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 426.43601674351703,
+        "legacy_environment_makespan": 577.518200364744
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "TA.optim": 20,
+        "VA.optim": 56
+      },
+      "optimizer_sample_presentations": {
+        "TA.optim": 80,
+        "VA.optim": 224
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 37420.69977772625,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 655.4331783814307,
+        "makespan": 632.768781582467,
+        "task_count": 59,
+        "task_tardy_count": 2,
+        "task_avg_tardiness": 4.8099737784575,
+        "task_success_rate": 0.9661016949152542,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 1,
+        "wf_tardy_count": 1,
+        "wf_success_rate": 0.5,
+        "wf_avg_tardiness": 88.66277276049826,
+        "wf_avg_response_time": 390.0481612091661
+      },
+      "train_seconds": 0.23181179992388934,
+      "validation_seconds": 0.068066900013946,
+      "checkpoint_seconds": 0.00927650002995506
+    },
+    "ablation_tl2": {
+      "parameter_hashes": {
+        "TA": "040bed8bccf9fe6d77df77fb49c1af8d21c50c261a5594637e6113cedbe0adab",
+        "VA": "a589a7d4ddd65826c4060553e404344cfb5e36be2a47695ac27b3d7754e4cc37"
+      },
+      "evaluation_metrics": {
+        "total_energy": 30593.653032190377,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 577.518200364744,
+        "makespan": 546.645831501255,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 426.43601674351703,
+        "legacy_environment_makespan": 577.518200364744
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "TA.optim": 20,
+        "VA.optim": 56
+      },
+      "optimizer_sample_presentations": {
+        "TA.optim": 80,
+        "VA.optim": 224
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 37420.69977772625,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 655.4331783814307,
+        "makespan": 632.768781582467,
+        "task_count": 59,
+        "task_tardy_count": 2,
+        "task_avg_tardiness": 4.8099737784575,
+        "task_success_rate": 0.9661016949152542,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 1,
+        "wf_tardy_count": 1,
+        "wf_success_rate": 0.5,
+        "wf_avg_tardiness": 88.66277276049826,
+        "wf_avg_response_time": 390.0481612091661
+      },
+      "train_seconds": 0.2316024000174366,
+      "validation_seconds": 0.07208879996323958,
+      "checkpoint_seconds": 0.008906200004275888
+    },
+    "irws": {
+      "parameter_hashes": {
+        "Task": "cf73173e6d53f8001b7df3f8fbaff5713007c827416673b025213ceaf22a47e0",
+        "VM": "c48359146034a524f399d49808c19b1dcd1fd54b6eb90113d51a8425c6e751e3",
+        "Intrinsic": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "evaluation_metrics": {
+        "total_energy": 24605.481487371406,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 442.987022109003,
+        "makespan": 412.11465324551403,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 347.07419801303206,
+        "legacy_environment_makespan": 412.11465324551403
+      },
+      "evaluation_allocation_count": 49,
+      "assignment_calls": 59,
+      "optimizer_steps": {
+        "VM.opt": 4
+      },
+      "optimizer_sample_presentations": {
+        "VM.opt": 236
+      },
+      "validation_instances": 1,
+      "metrics": {
+        "total_energy": 31104.896457623323,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 526.9332906190631,
+        "makespan": 504.26889382009944,
+        "task_count": 59,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 381.8525208283241
+      },
+      "train_seconds": 0.4229678999981843,
+      "validation_seconds": 0.11186930001713336,
+      "checkpoint_seconds": 0.00851630000397563
+    },
+    "ertf_fifs": {
+      "metrics": {
+        "total_energy": 37867.53438000957,
+        "first_arrival_time": 30.872368863489008,
+        "final_completion_time": 719.6661807661101,
+        "makespan": 688.7938119026211,
+        "task_count": 49,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 2,
+        "wf_completed_count": 2,
+        "wf_success_count": 2,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 583.7925949309991,
+        "legacy_environment_makespan": 719.6661807661101
+      },
+      "evaluation_allocation_count": 49
+    }
+  }
+}

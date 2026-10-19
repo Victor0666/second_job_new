@@ -1,0 +1,314 @@
+Linux / Bash 独立 CUDA 训练命令
+================================
+
+共81条独立训练命令：正式学习基线27条，主算法及5个消融54条。
+每个算法分别训练 SS、SM、SL × Tight、Medium、Loose，共9种情况。
+每条命令只启动一个场景，600 episode，模型初始化种子1。
+ERTF-H-FIFS是启发式，无需训练；新版IRWS使用irws_paper，未列历史简化irws。
+
+一、启动前（每个终端先执行）
+--------------------------------
+# 先进入服务器上的项目根目录，再激活该服务器的Python环境。
+# 若使用Conda，请用实际的conda activate命令替代下一行。
+source .venv/bin/activate
+mkdir -p outputs/server_console_logs
+nvidia-smi
+
+# 核对九组缓存和九个源训练场景的默认校准配置；检查通过再启动训练。
+python launch.py common/f22_cache.py --all
+python -c "from common.f18_calibrate_normalization import nine_scenarios; [s.normalization_metadata() for s in nine_scenarios()]; print('All nine normalization scenes OK')"
+
+二、并行执行说明
+--------------------------------
+1. 以下命令各自独立，可逐条复制到Bash执行。每条末尾的 & 表示后台运行。
+2. CUDA_VISIBLE_DEVICES=0表示物理GPU 0。把单条命令中的0改为1、2等，即可分配到其他GPU。
+   如果在Slurm等调度系统内运行，应遵守作业分配的GPU设置，不要擅自覆盖调度器设置。
+3. 各任务使用独立日志、PID文件和已有的独立模型目录。不要重复启动同一算法、同一场景。
+4. 每条命令启动时都会检查CUDA；不可用会退出，不会静默使用CPU。
+   PD3QN、MARL、MAHDRL及消融自动选择CUDA；新版IRWS显式使用--device cuda。
+5. 请按GPU显存、CPU核心和内存选择并发数，不要一次粘贴执行全部81条。
+   同一GPU可运行多个任务，但显存不足会失败；环境仿真仍使用CPU。
+6. nohup允许退出终端后继续运行。PID文件记录进程号，不代表训练成功；请检查日志。
+7. 当前命令使用已安装的默认校准配置和F22协议，不重新校准，不改动已有缓存。
+8. 如使用不同--model-seed重复训练，需同步修改日志和PID文件名。已有训练目录会受到覆盖保护。
+
+三、独立训练命令
+================================
+
+【PD3QN（正式对比算法）：pd3qn】
+--------------------------------
+
+# PD3QN（正式对比算法） | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SS_Tight_seed1.pid
+
+# PD3QN（正式对比算法） | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SS_Medium_seed1.pid
+
+# PD3QN（正式对比算法） | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SS_Loose_seed1.pid
+
+# PD3QN（正式对比算法） | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SM_Tight_seed1.pid
+
+# PD3QN（正式对比算法） | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SM_Medium_seed1.pid
+
+# PD3QN（正式对比算法） | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SM_Loose_seed1.pid
+
+# PD3QN（正式对比算法） | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SL_Tight_seed1.pid
+
+# PD3QN（正式对比算法） | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SL_Medium_seed1.pid
+
+# PD3QN（正式对比算法） | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/pd3qn/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/pd3qn_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/pd3qn_SL_Loose_seed1.pid
+
+【MARL（正式对比算法）：marl】
+--------------------------------
+
+# MARL（正式对比算法） | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SS_Tight_seed1.pid
+
+# MARL（正式对比算法） | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SS_Medium_seed1.pid
+
+# MARL（正式对比算法） | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SS_Loose_seed1.pid
+
+# MARL（正式对比算法） | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SM_Tight_seed1.pid
+
+# MARL（正式对比算法） | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SM_Medium_seed1.pid
+
+# MARL（正式对比算法） | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SM_Loose_seed1.pid
+
+# MARL（正式对比算法） | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SL_Tight_seed1.pid
+
+# MARL（正式对比算法） | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SL_Medium_seed1.pid
+
+# MARL（正式对比算法） | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/marl/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/marl_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/marl_SL_Loose_seed1.pid
+
+【新版 IRWS（正式对比算法）：irws_paper】
+--------------------------------
+
+# 新版 IRWS（正式对比算法） | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SS_Tight_seed1.pid
+
+# 新版 IRWS（正式对比算法） | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SS_Medium_seed1.pid
+
+# 新版 IRWS（正式对比算法） | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SS_Loose_seed1.pid
+
+# 新版 IRWS（正式对比算法） | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SM_Tight_seed1.pid
+
+# 新版 IRWS（正式对比算法） | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SM_Medium_seed1.pid
+
+# 新版 IRWS（正式对比算法） | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SM_Loose_seed1.pid
+
+# 新版 IRWS（正式对比算法） | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SL_Tight_seed1.pid
+
+# 新版 IRWS（正式对比算法） | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SL_Medium_seed1.pid
+
+# 新版 IRWS（正式对比算法） | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_paper/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/irws_paper_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_paper_SL_Loose_seed1.pid
+
+【MAHDRL（主算法）：mahdrl】
+--------------------------------
+
+# MAHDRL（主算法） | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SS_Tight_seed1.pid
+
+# MAHDRL（主算法） | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SS_Medium_seed1.pid
+
+# MAHDRL（主算法） | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SS_Loose_seed1.pid
+
+# MAHDRL（主算法） | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SM_Tight_seed1.pid
+
+# MAHDRL（主算法） | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SM_Medium_seed1.pid
+
+# MAHDRL（主算法） | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SM_Loose_seed1.pid
+
+# MAHDRL（主算法） | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SL_Tight_seed1.pid
+
+# MAHDRL（主算法） | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SL_Medium_seed1.pid
+
+# MAHDRL（主算法） | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_SL_Loose_seed1.pid
+
+【随机主机选择消融：ablation_hostrand】
+--------------------------------
+
+# 随机主机选择消融 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SS_Tight_seed1.pid
+
+# 随机主机选择消融 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SS_Medium_seed1.pid
+
+# 随机主机选择消融 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SS_Loose_seed1.pid
+
+# 随机主机选择消融 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SM_Tight_seed1.pid
+
+# 随机主机选择消融 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SM_Medium_seed1.pid
+
+# 随机主机选择消融 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SM_Loose_seed1.pid
+
+# 随机主机选择消融 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SL_Tight_seed1.pid
+
+# 随机主机选择消融 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SL_Medium_seed1.pid
+
+# 随机主机选择消融 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_hostrand/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_hostrand_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_hostrand_SL_Loose_seed1.pid
+
+【随机任务管理消融：ablation_mgrrand】
+--------------------------------
+
+# 随机任务管理消融 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SS_Tight_seed1.pid
+
+# 随机任务管理消融 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SS_Medium_seed1.pid
+
+# 随机任务管理消融 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SS_Loose_seed1.pid
+
+# 随机任务管理消融 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SM_Tight_seed1.pid
+
+# 随机任务管理消融 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SM_Medium_seed1.pid
+
+# 随机任务管理消融 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SM_Loose_seed1.pid
+
+# 随机任务管理消融 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SL_Tight_seed1.pid
+
+# 随机任务管理消融 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SL_Medium_seed1.pid
+
+# 随机任务管理消融 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_mgrrand/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_mgrrand_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_mgrrand_SL_Loose_seed1.pid
+
+【随机 VM 选择消融：ablation_vmrand】
+--------------------------------
+
+# 随机 VM 选择消融 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SS_Tight_seed1.pid
+
+# 随机 VM 选择消融 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SS_Medium_seed1.pid
+
+# 随机 VM 选择消融 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SS_Loose_seed1.pid
+
+# 随机 VM 选择消融 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SM_Tight_seed1.pid
+
+# 随机 VM 选择消融 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SM_Medium_seed1.pid
+
+# 随机 VM 选择消融 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SM_Loose_seed1.pid
+
+# 随机 VM 选择消融 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SL_Tight_seed1.pid
+
+# 随机 VM 选择消融 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SL_Medium_seed1.pid
+
+# 随机 VM 选择消融 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SL_Loose_seed1.pid
+
+【TL：去主机层消融：ablation_nohost】
+--------------------------------
+
+# TL：去主机层消融 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SS_Tight_seed1.pid
+
+# TL：去主机层消融 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SS_Medium_seed1.pid
+
+# TL：去主机层消融 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SS_Loose_seed1.pid
+
+# TL：去主机层消融 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SM_Tight_seed1.pid
+
+# TL：去主机层消融 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SM_Medium_seed1.pid
+
+# TL：去主机层消融 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SM_Loose_seed1.pid
+
+# TL：去主机层消融 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SL_Tight_seed1.pid
+
+# TL：去主机层消融 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SL_Medium_seed1.pid
+
+# TL：去主机层消融 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_nohost/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_nohost_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_nohost_SL_Loose_seed1.pid
+
+【TL_2：全局能耗奖励消融：ablation_tl2】
+--------------------------------
+
+# TL_2：全局能耗奖励消融 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SS_Tight_seed1.pid
+
+# TL_2：全局能耗奖励消融 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SS_Medium_seed1.pid
+
+# TL_2：全局能耗奖励消融 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SS_Loose_seed1.pid
+
+# TL_2：全局能耗奖励消融 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SM_Tight_seed1.pid
+
+# TL_2：全局能耗奖励消融 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SM_Medium_seed1.pid
+
+# TL_2：全局能耗奖励消融 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SM_Loose_seed1.pid
+
+# TL_2：全局能耗奖励消融 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SL_Tight_seed1.pid
+
+# TL_2：全局能耗奖励消融 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SL_Medium_seed1.pid
+
+# TL_2：全局能耗奖励消融 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_tl2/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_tl2_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_tl2_SL_Loose_seed1.pid
+
+四、查看训练状态（以下以PD3QN的SS / Tight为例）
+--------------------------------
+tail -f outputs/server_console_logs/pd3qn_SS_Tight_seed1.log
+ps -p "$(cat outputs/server_console_logs/pd3qn_SS_Tight_seed1.pid)" -o pid,etime,cmd
+watch -n 2 nvidia-smi
+
+此文档只提供训练命令，没有在服务器启动训练。

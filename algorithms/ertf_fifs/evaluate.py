@@ -13,6 +13,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.experiment_measurements import EvaluationRecorder, episode_duration
 
 SCENARIO = Scenario(mode="eval")
 from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents
@@ -205,7 +206,7 @@ def _compute_metrics(env: CloudWorkflowEnv_VMAgents) -> Dict[str, float]:
     wf_avg_tardiness = wf_tardiness_sum / max(wf_cnt, 1)
     wf_pct_tardy = wf_tardy_cnt / max(wf_cnt, 1)
     wf_avg_success = 1.0 - wf_pct_tardy
-    makespan = float(getattr(env, "current_time", 0.0))
+    makespan = episode_duration(env)
     total_energy = float(getattr(env, "total_energy", 0.0))
     recs = _get_records(env)
     if len(recs) > 0 and hasattr(env, "hosts"):
@@ -248,8 +249,9 @@ def run_one_episode(env_cls, env_kwargs: dict, seed: int) -> Dict[str, float]:
     ctor_kwargs["random_seed"] = int(seed)
     env = env_cls(**ctor_kwargs)
     _ = env.reset()
+    measurement = EvaluationRecorder(SCENARIO, 'ertf_fifs', env, {})
     _sync_env_scales(env, env_kwargs)
-    _force_fcfs_manager(env)
+    measurement.measure(_force_fcfs_manager, 'TA')(env)
     done = bool(getattr(env, "done_flag", False))
     phase_cnt = 0
     vm_phase_reward_sum = 0.0
@@ -263,13 +265,13 @@ def run_one_episode(env_cls, env_kwargs: dict, seed: int) -> Dict[str, float]:
             if not has_next:
                 break
             host_mask = np.asarray(st_host["mask"], dtype=np.float32)
-            a_host = _pick_first_idle_host(env, host_mask)
+            a_host = measurement.measure(_pick_first_idle_host, 'HA')(env, host_mask)
             env.host_select(int(a_host))
             st_vm, ok_vm = env.get_vm_state_for_current_task()
             if not ok_vm:
                 break
             vm_mask = np.asarray(st_vm["mask"], dtype=np.float32)
-            a_vm = _pick_fifs_vm(env, vm_mask, selected_host_action=int(a_host))
+            a_vm = measurement.measure(_pick_fifs_vm, 'VA')(env, vm_mask, selected_host_action=int(a_host))
             r_host, r_vm, _info_task = env.vm_assign(int(a_vm))
             host_rewards.append(float(r_host))
             vm_rewards.append(float(r_vm))
@@ -281,7 +283,7 @@ def run_one_episode(env_cls, env_kwargs: dict, seed: int) -> Dict[str, float]:
         done = bool(getattr(env, "done_flag", False))
         if done:
             break
-        _force_fcfs_manager(env)
+        measurement.measure(_force_fcfs_manager, 'TA')(env)
     metrics = _compute_metrics(env)
     metrics.update(
         {
@@ -292,6 +294,7 @@ def run_one_episode(env_cls, env_kwargs: dict, seed: int) -> Dict[str, float]:
             "seed": int(seed),
         }
     )
+    measurement.finish()
     return metrics
 
 

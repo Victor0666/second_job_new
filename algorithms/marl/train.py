@@ -15,6 +15,7 @@ from common.f11 import LocalDecisionTrace, F11Logger, protect_training_outputs, 
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
+from common.experiment_measurements import TrainingRecorder, collect_validation
 from common.workflow_opt import energy_from_records
 from algorithms.marl.agents import A2CAgent, A2CConfig, LocalSharedActorIndependentCriticA2C
 from environments.marl import CloudWorkflowEnv_MARL
@@ -114,6 +115,7 @@ def evaluate_marl(
             start_time=float(env.arrival_times[0]) if len(env.arrival_times) else 0.0,
             end_time=float(env.current_time),
         ))
+        collect_validation(env)
         E_acc = float(env.total_energy)
         diff = abs(E_re - E_acc)
         print(f"[EnergyCheck] E_acc={E_acc:.6f}  E_re={E_re:.6f}  diff={diff:.6f}")
@@ -267,6 +269,7 @@ def train():
     global_step = 0
     episode_idx = 0
     f11_log = F11Logger(os.path.dirname(log_path))
+    recorder = TrainingRecorder(os.path.dirname(log_path), SCENARIO, 'marl', env, {'Global': global_agent, 'Local': local_agent})
     while episode_idx < max_episodes:
         train_seed = SCENARIO.training_seed(episode_idx)
         obs, _info = env.reset(
@@ -405,7 +408,7 @@ def train():
                 eval_total_late,
                 eval_avg_late,
                 eval_wf_avg_late,
-            ) = evaluate_marl(
+            ) = recorder.validation(evaluate_marl,
                 env_kwargs,
                 global_agent,
                 local_agent,
@@ -466,6 +469,7 @@ def train():
     print(f"  best_local    ={best_local_path}")
     print(f"  log_path      ={log_path}")
 
+    recorder.close()
     logger.close()
 
 

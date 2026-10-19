@@ -12,6 +12,7 @@ PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
+from common.experiment_measurements import EvaluationRecorder, episode_duration
 from common.f18_state_normalization import bind_normalization, check_checkpoint
 from common.f11 import LEARNING_MODEL
 
@@ -255,6 +256,7 @@ def evaluate_one_seed(env_kwargs: dict, task_selector, ppo, seed: int) -> dict:
     kw["random_seed"] = int(seed)
     env = IRWSEnvRouteA(**kw)
     env.reset()
+    measurement = EvaluationRecorder(SCENARIO, 'irws', env, {'Task':task_selector,'VM':ppo})
     steps = 0
     with torch.no_grad():
         while not env.done_flag:
@@ -284,6 +286,7 @@ def evaluate_one_seed(env_kwargs: dict, task_selector, ppo, seed: int) -> dict:
             m["energy_check_diff"] = float("nan")
     except Exception:
         m["energy_check_diff"] = float("nan")
+    measurement.finish()
     return m
 
 

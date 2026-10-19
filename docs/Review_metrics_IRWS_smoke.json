@@ -1,0 +1,41 @@
+{
+  "model_version": "irws_cloud_energy_tardiness_v2",
+  "common_mahdrl_physical_trace": {
+    "assignments": 54,
+    "max_execution_component_gap": 0.0,
+    "max_energy_window_gap": 1.4551915228366852e-11,
+    "final_energy_gap": 1.4551915228366852e-11,
+    "deadlines_identical": true,
+    "host_loads_identical": true
+  },
+  "parameter_max_changes": {
+    "embedding": 6.582241068864292e-07,
+    "selector": 2.2058226217813726e-09,
+    "actor": 9.999996355560675e-06,
+    "critic": 9.999999251003588e-05,
+    "intrinsic": 9.698719522027721e-06
+  },
+  "checkpoint_deterministic_roundtrip": true,
+  "formal_training_executed": false,
+  "train_metrics": {
+    "total_energy": 39301.94831627652,
+    "makespan": 686.9462180770454,
+    "task_count": 54.0,
+    "task_tardy_count": 0.0,
+    "task_total_lateness": -17710.339133684567,
+    "task_total_tardiness": 0.0,
+    "task_avg_lateness": -327.96924321638085,
+    "task_avg_tardiness": 0.0,
+    "pct_tardy": 0.0,
+    "task_success_rate": 1.0,
+    "wf_count": 2.0,
+    "wf_tardy_count": 0.0,
+    "wf_total_lateness": -452.08045048407973,
+    "wf_total_tardiness": 0.0,
+    "wf_avg_lateness": -226.04022524203987,
+    "wf_avg_tardiness": 0.0,
+    "wf_pct_tardy": 0.0,
+    "wf_success_rate": 1.0,
+    "wf_avg_tardy": 0.0
+  }
+}

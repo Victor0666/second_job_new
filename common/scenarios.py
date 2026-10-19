@@ -16,12 +16,12 @@ ROOT = Path(__file__).resolve().parents[1]
 VM_COUNTS = {"S": (9, 8, 8), "M": (9, 9, 8, 8, 8, 8), "L": (9, 9, 9, 8, 8, 8, 8, 8, 8)}
 SMALL_PROBABILITY = {"Tight": 0.8, "Medium": 0.5, "Loose": 0.2}
 DAX_GROUPS = (
-    ("CyberShake_30.xml", "Epigenomics_24.xml", "LIGO_30.xml", "Montage_25.xml", "Sipht_29.xml"),
-    ("CyberShake_50.xml", "Epigenomics_47.xml", "LIGO_50.xml", "Montage_50.xml", "Sipht_58.xml"),
+    ("CyberShake_30.xml", "Epigenomics_24.xml", "Ligo_30.xml", "Montage_25.xml", "Sipht_29.xml"),
+    ("CyberShake_50.xml", "Epigenomics_47.xml", "Ligo_50.xml", "Montage_50.xml", "Sipht_58.xml"),
     (
         "CyberShake_100.xml",
         "Epigenomics_100.xml",
-        "LIGO_100.xml",
+        "Ligo_100.xml",
         "Montage_100.xml",
         "Sipht_97.xml",
     ),

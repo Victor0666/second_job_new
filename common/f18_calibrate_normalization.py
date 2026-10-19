@@ -14,6 +14,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 import numpy as np
 from common.scenarios import Scenario, parse_seeds
+from common.read_xml_opt_Tsize import dax_template_id
 from common.experiment_protocol import ExperimentProtocol, DEFAULT_PROTOCOL, protocol_binding
 from common.precompute_deadlines import build_env_kwargs as reference_env_kwargs
 from common.f18_state_normalization import VERSION, SCALE_UNITS, scene_id, queue_metrics
@@ -65,7 +66,7 @@ def cache_info(scenario, seeds):
             if meta.get(key) != target:raise ValueError('Cache configuration mismatch: ' + key)
         if meta.get('task') != scenario.task or meta.get('resource') != scenario.resource:
             raise ValueError('Cache task/resource mismatch')
-        if meta.get('dax_paths') != [Path(p).name for p in expected['dax_paths']]:
+        if [dax_template_id(p) for p in meta.get('dax_paths', [])] != [dax_template_id(p) for p in expected['dax_paths']]:
             raise ValueError('Cache DAX mixture mismatch')
         return dict(path=str(path), sha256=hashlib.sha256(raw).hexdigest(), meta=meta)
     except (OSError, ValueError, KeyError) as exc:

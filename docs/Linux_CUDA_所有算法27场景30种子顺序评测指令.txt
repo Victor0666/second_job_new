@@ -1,0 +1,537 @@
+Linux / Bash：全部算法27场景、30种子顺序泛化评测指令
+==============================================================
+
+共10个算法/变体：9个学习算法及消融，外加ERTF-H-FIFS启发式；不使用旧简化IRWS入口。
+每个算法：9个独立命令组 × 每组3场景 × 每场景30种子 = 810次实例评测。全部合计8100次。
+九个命令组对应：源训练SS/SM/SL × Tight/Medium/Loose。命令只评测，不训练。
+资源S：SS -> MS -> LS；资源M：SM -> MM -> LM；资源L：SL -> ML -> LL。
+同组始终使用同一资源、同一截止期、S任务训练得到的best模型，模型种子1。
+每场景种子为700–729；先完成S场景的30个种子，再M，最后L。
+
+一、准备（在项目根目录执行）
+--------------------------------------------------------------
+# 确保服务器已更新至包含逐种子保存修复的代码；Python使用3.12，PyTorch需支持服务器GPU。
+# 激活服务器上的实际Conda环境，例如：conda activate second_job_new
+python --version
+git log -1 --oneline
+mkdir -p outputs/server_eval_logs
+python launch.py common/f22_cache.py --all
+python -m unittest common.test_incremental_evaluation -q
+
+二、执行与保存规则
+--------------------------------------------------------------
+1. 每个命令块单独启动一个后台任务，内部三个场景依次运行；不同命令块可以按资源情况并行。
+2. 每个命令块已包含mkdir，避免日志目录缺失。不要一次启动全部90个任务。
+3. GPU默认0，修改CUDA_VISIBLE_DEVICES=0即可选其他GPU；使用作业调度器时遵守其设备分配。
+4. 学习算法先检查CUDA是否可用，否则停止；MARL和新版IRWS显式传--device cuda。启发式没有网络推理，不要求CUDA。
+5. 所有场景固定F22、模型种子1、测试种子700–729、F19编码。默认读取已冻结的校准配置。
+6. 源训练模型必须已存在；缺失或某场景出错，该命令组停止，不会悄悄改用其他模型。
+7. 每完成一个种子，立即刷新主结果CSV和该种子明细文件，不等待30个种子全部完成。
+   新版IRWS的summary.json仍在30个种子完成后生成；中断前已保存的CSV/明细保留。
+8. 场景之间使用独立结果路径，不会将SS/MS/LS写进同一张场景CSV。控制台日志按源训练组保存。
+9. 不要重复启动同一算法/资源/截止期组。旧式主CSV重跑会追加重复seed，IRWS主CSV则重新开始。
+   重跑前备份对应场景输出；本文不承诺自动断点续评。
+10. 不修改训练脚本，不新增checkpoint，不重生成缓存与校准；评测的是best模型。
+
+三、独立命令（每块整体复制执行）
+==============================================================
+
+【PD3QN：pd3qn】
+--------------------------------------------------------------
+
+# PD3QN | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSS_Tight_model1.pid
+
+# PD3QN | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSS_Medium_model1.pid
+
+# PD3QN | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSS_Loose_model1.pid
+
+# PD3QN | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSM_Tight_model1.pid
+
+# PD3QN | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSM_Medium_model1.pid
+
+# PD3QN | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSM_Loose_model1.pid
+
+# PD3QN | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSL_Tight_model1.pid
+
+# PD3QN | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSL_Medium_model1.pid
+
+# PD3QN | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== pd3qn task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/pd3qn/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_pd3qn_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_sourceSL_Loose_model1.pid
+
+【MARL：marl】
+--------------------------------------------------------------
+
+# MARL | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSS_Tight_model1.pid
+
+# MARL | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSS_Medium_model1.pid
+
+# MARL | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSS_Loose_model1.pid
+
+# MARL | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSM_Tight_model1.pid
+
+# MARL | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSM_Medium_model1.pid
+
+# MARL | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSM_Loose_model1.pid
+
+# MARL | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSL_Tight_model1.pid
+
+# MARL | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSL_Medium_model1.pid
+
+# MARL | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== marl task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/marl/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_marl_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_marl_sourceSL_Loose_model1.pid
+
+【新版IRWS：irws_paper】
+--------------------------------------------------------------
+
+# 新版IRWS | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSS_Tight_model1.pid
+
+# 新版IRWS | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSS_Medium_model1.pid
+
+# 新版IRWS | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSS_Loose_model1.pid
+
+# 新版IRWS | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSM_Tight_model1.pid
+
+# 新版IRWS | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSM_Medium_model1.pid
+
+# 新版IRWS | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSM_Loose_model1.pid
+
+# 新版IRWS | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSL_Tight_model1.pid
+
+# 新版IRWS | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSL_Medium_model1.pid
+
+# 新版IRWS | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== irws_paper task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/irws_paper/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_irws_paper_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_irws_paper_sourceSL_Loose_model1.pid
+
+【MAHDRL主算法：mahdrl】
+--------------------------------------------------------------
+
+# MAHDRL主算法 | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSS_Tight_model1.pid
+
+# MAHDRL主算法 | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSS_Medium_model1.pid
+
+# MAHDRL主算法 | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSS_Loose_model1.pid
+
+# MAHDRL主算法 | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSM_Tight_model1.pid
+
+# MAHDRL主算法 | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSM_Medium_model1.pid
+
+# MAHDRL主算法 | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSM_Loose_model1.pid
+
+# MAHDRL主算法 | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSL_Tight_model1.pid
+
+# MAHDRL主算法 | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSL_Medium_model1.pid
+
+# MAHDRL主算法 | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/mahdrl/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_sourceSL_Loose_model1.pid
+
+【随机主机消融：ablation_hostrand】
+--------------------------------------------------------------
+
+# 随机主机消融 | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSS_Tight_model1.pid
+
+# 随机主机消融 | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSS_Medium_model1.pid
+
+# 随机主机消融 | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSS_Loose_model1.pid
+
+# 随机主机消融 | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSM_Tight_model1.pid
+
+# 随机主机消融 | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSM_Medium_model1.pid
+
+# 随机主机消融 | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSM_Loose_model1.pid
+
+# 随机主机消融 | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSL_Tight_model1.pid
+
+# 随机主机消融 | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSL_Medium_model1.pid
+
+# 随机主机消融 | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_hostrand task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_hostrand/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_hostrand_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_hostrand_sourceSL_Loose_model1.pid
+
+【随机任务管理消融：ablation_mgrrand】
+--------------------------------------------------------------
+
+# 随机任务管理消融 | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSS_Tight_model1.pid
+
+# 随机任务管理消融 | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSS_Medium_model1.pid
+
+# 随机任务管理消融 | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSS_Loose_model1.pid
+
+# 随机任务管理消融 | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSM_Tight_model1.pid
+
+# 随机任务管理消融 | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSM_Medium_model1.pid
+
+# 随机任务管理消融 | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSM_Loose_model1.pid
+
+# 随机任务管理消融 | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSL_Tight_model1.pid
+
+# 随机任务管理消融 | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSL_Medium_model1.pid
+
+# 随机任务管理消融 | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_mgrrand task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_mgrrand/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_mgrrand_sourceSL_Loose_model1.pid
+
+【随机VM消融：ablation_vmrand】
+--------------------------------------------------------------
+
+# 随机VM消融 | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSS_Tight_model1.pid
+
+# 随机VM消融 | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSS_Medium_model1.pid
+
+# 随机VM消融 | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSS_Loose_model1.pid
+
+# 随机VM消融 | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSM_Tight_model1.pid
+
+# 随机VM消融 | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSM_Medium_model1.pid
+
+# 随机VM消融 | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSM_Loose_model1.pid
+
+# 随机VM消融 | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSL_Tight_model1.pid
+
+# 随机VM消融 | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSL_Medium_model1.pid
+
+# 随机VM消融 | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_vmrand task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_vmrand/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_vmrand_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_vmrand_sourceSL_Loose_model1.pid
+
+【TL消融：ablation_nohost】
+--------------------------------------------------------------
+
+# TL消融 | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSS_Tight_model1.pid
+
+# TL消融 | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSS_Medium_model1.pid
+
+# TL消融 | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSS_Loose_model1.pid
+
+# TL消融 | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSM_Tight_model1.pid
+
+# TL消融 | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSM_Medium_model1.pid
+
+# TL消融 | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSM_Loose_model1.pid
+
+# TL消融 | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSL_Tight_model1.pid
+
+# TL消融 | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSL_Medium_model1.pid
+
+# TL消融 | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_nohost task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_nohost/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_nohost_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_nohost_sourceSL_Loose_model1.pid
+
+【TL_2消融：ablation_tl2】
+--------------------------------------------------------------
+
+# TL_2消融 | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSS_Tight_model1.pid
+
+# TL_2消融 | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSS_Medium_model1.pid
+
+# TL_2消融 | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSS_Loose_model1.pid
+
+# TL_2消融 | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSM_Tight_model1.pid
+
+# TL_2消融 | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSM_Medium_model1.pid
+
+# TL_2消融 | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSM_Loose_model1.pid
+
+# TL_2消融 | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSL_Tight_model1.pid
+
+# TL_2消融 | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSL_Medium_model1.pid
+
+# TL_2消融 | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== ablation_tl2 task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/ablation_tl2/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_ablation_tl2_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ablation_tl2_sourceSL_Loose_model1.pid
+
+【ERTF-H-FIFS启发式：ertf_fifs】
+--------------------------------------------------------------
+
+# ERTF-H-FIFS启发式 | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSS_Tight_model1.pid
+
+# ERTF-H-FIFS启发式 | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSS_Medium_model1.pid
+
+# ERTF-H-FIFS启发式 | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSS_Loose_model1.pid
+
+# ERTF-H-FIFS启发式 | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSM_Tight_model1.pid
+
+# ERTF-H-FIFS启发式 | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSM_Medium_model1.pid
+
+# ERTF-H-FIFS启发式 | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSM_Loose_model1.pid
+
+# ERTF-H-FIFS启发式 | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSL_Tight_model1.pid
+
+# ERTF-H-FIFS启发式 | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSL_Medium_model1.pid
+
+# ERTF-H-FIFS启发式 | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do echo "=== ertf_fifs task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/ertf_fifs/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json; done' > outputs/server_eval_logs/eval_ertf_fifs_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_ertf_fifs_sourceSL_Loose_model1.pid
+
+四、结果位置与查看方法
+--------------------------------------------------------------
+# 示例：查看MAHDRL、源SS、Tight这一组的进度（依次SS/MS/LS）
+tail -f outputs/server_eval_logs/eval_mahdrl_sourceSS_Tight_model1.log
+# 查看进程
+ps -p "$(cat outputs/server_eval_logs/eval_mahdrl_sourceSS_Tight_model1.pid)" -o pid,etime,cmd
+# 查找所有主结果CSV（每个场景自己的CSV）
+find outputs/run -type f -name "*.csv"
+
+所有算法新增统一明细：
+  episodes/seed700.json 等：逐种子指标与决策计时；
+  workflows/seed700.csv 等：该种子的逐工作流明细；
+  decisions/seed700.json 等：该种子的逐分配计时。
+除新版IRWS外，统一明细位于：
+outputs/run/review_metrics_v1/<algorithm>/<output_version>/<场景_截止期_model1>/
+新版IRWS位于其outputs/run/irws_cloud_energy_tardiness_v2/.../<场景_截止期>/measurements/。
+主CSV保留各算法原有目录；控制台会显示保存路径。
+
+本文件提供命令，不会自动执行正式评测。

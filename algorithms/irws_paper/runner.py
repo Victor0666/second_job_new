@@ -125,7 +125,7 @@ def load_checkpoint(path,scenario,device='cpu',restore_training=False):
     return learner,obj
 
 
-def evaluate(learner,scenario,seeds,split='test',kwargs=None):
+def evaluate(learner,scenario,seeds,split='test',kwargs=None,on_result=None):
     protocol=scenario.protocol()
     allowed=protocol.validation if split=='validation' else seeds
     if not set(seeds)<=set(allowed) or set(seeds)&set(protocol.train) or (split!='validation' and set(seeds)&set(protocol.validation)):
@@ -136,7 +136,9 @@ def evaluate(learner,scenario,seeds,split='test',kwargs=None):
         directory=output_dir(scenario,'run')/(scenario.task+scenario.resource+'_'+scenario.deadline)/'measurements'
         result=run_episode(env,learner,seed,False,evaluation=(scenario,directory) if split=='test' else None)
         collect_validation(env)
-        rows.append(dict(seed=seed,**result['metrics']))
+        row=dict(seed=seed,**result['metrics'])
+        rows.append(row)
+        if on_result is not None:on_result(row)
     names=[k for k in rows[0] if k!='seed']
     summary={k:dict(mean=float(np.mean([r[k] for r in rows])),std=float(np.std([r[k] for r in rows],ddof=1)) if len(rows)>1 else 0.) for k in names}
     return rows,summary
@@ -190,11 +192,17 @@ def evaluate_main():
     scenario=parse_scenario('eval','irws_paper');device=(scenario.paper_options or {}).get('device','cpu')
     directory=Path(scenario.checkpoint_override) if scenario.checkpoint_override else output_dir(scenario,'ckpts')
     learner,_=load_checkpoint(directory/'best.pth',scenario,device)
-    rows,summary=evaluate(learner,scenario,scenario.seeds)
     out=output_dir(scenario,'run')/(scenario.task+scenario.resource+'_'+scenario.deadline)
     out.mkdir(parents=True,exist_ok=True)
     with (out/'episodes.csv').open('w',encoding='utf-8',newline='') as f:
-        writer=csv.DictWriter(f,fieldnames=list(rows[0]));writer.writeheader();writer.writerows(rows)
+        writer=None
+        def save_seed(row):
+            nonlocal writer
+            if writer is None:
+                writer=csv.DictWriter(f,fieldnames=list(row));writer.writeheader()
+            writer.writerow(row);f.flush()
+            print(f'[IRWS eval] task={scenario.task} resource={scenario.resource} deadline={scenario.deadline} seed={row["seed"]} energy={row["total_energy"]:.6f} saved',flush=True)
+        rows,summary=evaluate(learner,scenario,scenario.seeds,on_result=save_seed)
     (out/'summary.json').write_text(json.dumps(dict(summary=summary,normalization=scenario.normalization_metadata(),
         protocol=scenario.protocol().metadata(),reward_protocol=REWARD_PROTOCOL,
         reward_settings=COMMON_REWARD,source_checkpoint=str(directory/'best.pth')),indent=2),encoding='utf-8')

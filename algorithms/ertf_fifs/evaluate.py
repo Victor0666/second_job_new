@@ -305,7 +305,7 @@ def _mean_std(rows: List[Dict[str, float]], key: str) -> Tuple[float, float]:
     return (float(np.mean(vals)), float(np.std(vals)))
 
 
-def save_csv(rows: List[Dict[str, float]], save_path: str):
+def save_csv(rows: List[Dict[str, float]], save_path: str, *, append=False):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     if len(rows) == 0:
         return
@@ -329,9 +329,10 @@ def save_csv(rows: List[Dict[str, float]], save_path: str):
         "wf_finished",
         "phase_count",
     ]
-    with open(save_path, "w", newline="", encoding="utf-8-sig") as f:
+    has_header = append and os.path.isfile(save_path) and os.path.getsize(save_path) > 0
+    with open(save_path, "a" if append else "w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
+        if not has_header:writer.writeheader()
         for r in rows:
             writer.writerow({k: r.get(k, "") for k in fieldnames})
 
@@ -407,13 +408,13 @@ def main():
     for sd in eval_seeds:
         metrics = run_one_episode(CloudWorkflowEnv_VMAgents, env_kwargs, sd)
         rows.append(metrics)
+        save_csv([metrics], save_csv_path, append=True)
         e0 = metrics["total_energy"]
         e1 = metrics["energy_check"]
         delta_e = abs(e0 - e1) if not math.isnan(e1) else float("nan")
         print(
             f"[seed={sd:02d}] Energy={metrics['total_energy']:.3f} | EnergyCheck={metrics['energy_check']:.3f} | |Δ|={delta_e:.6f} | Makespan={metrics['makespan']:.3f} | TaskLate={metrics['task_avg_lateness']:.3f} | TaskTard={metrics['task_avg_tardiness']:.3f} | TaskSucc={metrics['task_avg_success']:.3f} | WFLate={metrics['wf_avg_lateness']:.3f} | WFTard={metrics['wf_avg_tardiness']:.3f} | WFSucc={metrics['wf_avg_success']:.3f}"
         )
-    save_csv(rows, save_csv_path)
     print("\n" + "-" * 100)
     for k in [
         "total_energy",

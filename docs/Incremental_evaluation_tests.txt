@@ -1,0 +1,9 @@
+Incremental evaluation verification
+3 targeted tests: OK
+- IRWS first seed CSV row readable before the second seed starts and fails.
+- ERTF-H-FIFS per-seed append closes the file, preserves both rows, writes one header.
+- IRWS callback leaves returned rows and summary unchanged.
+All 270 generated CLI scenario configurations parsed, source-S mappings and seeds700-729 checked.
+90 independently launchable Bash command groups; each group evaluates S -> M -> L at fixed resource/deadline.
+Full regression: Ran 185 tests in 93.234s: OK.
+No formal checkpoint evaluation or training executed.

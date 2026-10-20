@@ -31,6 +31,7 @@ python -c "from common.f18_calibrate_normalization import nine_scenarios; [s.nor
 6. nohup允许退出终端后继续运行。PID文件记录进程号，不代表训练成功；请检查日志。
 7. 当前命令使用已安装的默认校准配置和F22协议，不重新校准，不改动已有缓存。
 8. 如使用不同--model-seed重复训练，需同步修改日志和PID文件名。已有训练目录会受到覆盖保护。
+9. 新版IRWS成功完成后打印[IRWS train completed]，并列出best.pth、final.pth及带场景训练日志的绝对路径。
 
 三、独立训练命令
 ================================

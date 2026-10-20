@@ -27,11 +27,13 @@ python -m unittest common.test_incremental_evaluation -q
 5. 所有场景固定F22、模型种子1、测试种子700–729、F19编码。默认读取已冻结的校准配置。
 6. 源训练模型必须已存在；缺失或某场景出错，该命令组停止，不会悄悄改用其他模型。
 7. 每完成一个种子，立即刷新主结果CSV和该种子明细文件，不等待30个种子全部完成。
-   新版IRWS的summary.json仍在30个种子完成后生成；中断前已保存的CSV/明细保留。
+   新版IRWS的summary_irws_paper_taskS_resS_30seeds_Tight_model1.json等带场景汇总在全部种子完成后生成；中断前已保存的CSV/明细保留。
 8. 场景之间使用独立结果路径，不会将SS/MS/LS写进同一张场景CSV。控制台日志按源训练组保存。
 9. 不要重复启动同一算法/资源/截止期组。旧式主CSV重跑会追加重复seed，IRWS主CSV则重新开始。
    重跑前备份对应场景输出；本文不承诺自动断点续评。
 10. 不修改训练脚本，不新增checkpoint，不重生成缓存与校准；评测的是best模型。
+11. 新版IRWS主结果使用eval_irws_paper_taskS_resS_30seeds_Tight_model1.csv等带场景文件名。
+    看到[IRWS eval completed]后可从日志末尾复制CSV/JSON绝对路径；泛化文件名还包含源训练场景。
 
 三、独立命令（每块整体复制执行）
 ==============================================================

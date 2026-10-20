@@ -296,7 +296,7 @@ def main():
     result_dir = os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, "irws_fcfs_wfInfo_Mix_Alpha_rn")
     _ensure_dir(result_dir)
     csv_path = os.path.join(
-        result_dir, f"eval_task{SCENARIO.task}_res{SCENARIO.resource}_{SCENARIO.deadline}.csv"
+        result_dir, f"eval_irws_task{SCENARIO.task}_res{SCENARIO.resource}_{len(seeds)}seeds_{SCENARIO.deadline}_model{SCENARIO.model_seed}.csv"
     )
     logger = CSVLogger(
         filepath=csv_path,
@@ -408,7 +408,7 @@ def main():
         energy_check_diff=col_mean("energy_check_diff"),
     )
     logger.log(**mean_row)
-    print("\n================= IRWS（30 seeds）汇总 =================")
+    print(f"\n================= IRWS（{len(seeds)} seeds）汇总 =================")
     print(f"avg_steps              = {_fmt(mean_row['steps'], 3)}")
     print(f"avg_energy             = {_fmt(mean_row['total_energy'], 3)} J")
     print(f"avg_makespan           = {_fmt(mean_row['makespan'], 3)}")
@@ -427,7 +427,9 @@ def main():
     print(f"avg_wf_avg_tardy(old)  = {_fmt(mean_row['wf_avg_tardy'])}")
     print(f"energy_check_diff_mean = {_fmt(mean_row['energy_check_diff'])}")
     print("=========================================================")
-    print(f"结果已写入 CSV: {csv_path}")
+    logger.close()
+    print(f"[IRWS eval completed] 评测完成：{len(rows)}/{len(seeds)} seeds | task={SCENARIO.task} resource={SCENARIO.resource} deadline={SCENARIO.deadline}", flush=True)
+    print(f"评测 CSV 已保存到: {os.path.abspath(csv_path)}", flush=True)
 
 
 if __name__ == "__main__":

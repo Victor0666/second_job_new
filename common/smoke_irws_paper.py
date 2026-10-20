@@ -16,7 +16,7 @@ from common.f18_calibrate_normalization import sample_episode,summarize
 from algorithms.irws_paper.config import PaperConfig,COMMON_REWARD
 from algorithms.irws_paper.environment import PaperCloudEnv
 from algorithms.irws_paper.learner import PaperLearner
-from algorithms.irws_paper.runner import train,evaluate,env_kwargs,seed_everything,load_checkpoint
+from algorithms.irws_paper.runner import train,evaluate,env_kwargs,seed_everything,load_checkpoint,artifact_name
 
 
 def parameters(module):return torch.cat([p.detach().cpu().flatten() for p in module.parameters()])
@@ -94,7 +94,7 @@ def run():
         rows,summary=evaluate(loaded,scene,[2],kwargs=kwargs)
         rows2,_=evaluate(learner,scene,[2],kwargs=kwargs)
         assert rows==rows2
-        result=json.loads((out/'training.jsonl').read_text(encoding='utf-8').splitlines()[-1])
+        result=json.loads((out/artifact_name(scene,'train')).read_text(encoding='utf-8').splitlines()[-1])
         assert result['updates'] and all(np.isfinite(list(u['losses'].values())).all() for u in result['updates'])
         return dict(common_mahdrl_physical_trace=physical_trace,model_version=obj['model_version'],paper_config=cfg.as_dict(),training_result=result,
             parameter_max_changes=changes,checkpoint_deterministic_roundtrip=True,test_rows=rows,test_summary=summary,

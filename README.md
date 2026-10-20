@@ -248,3 +248,9 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 ### 审稿实验记录
 
 训练和评测默认启用 `review_metrics_v1` 记录：训练/验证/保存耗时、各优化器更新和样本预算、验证成功率及超期量；评测另存统一结果、逐工作流明细和决策延迟。Makespan统一为最后完成时刻减首次到达时刻。奖励、随机种子、学习及选模规则不变；计时同步与日志有运行开销。输出路径、离线统计与对照验证见 [记录说明](docs/Review_metrics_logging.md)。
+
+### IRWS 完成提示与可下载文件名
+
+新版 `irws_paper` 训练完成后打印 `[IRWS train completed]`、最佳/最终模型和训练日志的绝对路径；评测完成后打印 `[IRWS eval completed]`、主 CSV、汇总 JSON 和逐种子明细目录。主文件直接携带场景信息，例如 `train_irws_paper_taskS_resS_Tight_model1.jsonl`、`eval_irws_paper_taskS_resS_30seeds_Tight_model1.csv` 和 `summary_irws_paper_taskS_resS_30seeds_Tight_model1.json`。泛化评测在文件名中追加 `_from_taskS_resS_Tight` 等源训练场景信息。目录及 `best.pth` / `final.pth` 名称保持现有规则，已训练的模型仍可加载。
+
+逐种子 CSV 刷新保持不变，汇总和完成提示只在全部种子成功后出现。历史简化 `algorithms/irws` 同步增加完成提示及含算法、场景和模型种子的主日志/CSV 名称。旧 `episodes.csv`、`summary.json`、`training.jsonl` 不自动改名或迁移；更新后新生成的主文件使用新名称。详见 [IRWS 输出说明](docs/IRWS_output_files.md)。

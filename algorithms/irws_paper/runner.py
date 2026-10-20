@@ -42,6 +42,17 @@ def output_dir(scenario,kind):
     return ROOT/'outputs'/kind/MODEL_VERSION/(source+'_'+digest+'_'+norm['normalization_config_hash'][:12]+encoding+'_'+ENERGY_ACCOUNTING)
 
 
+def artifact_name(scenario,kind):
+    count = f'_{len(scenario.seeds)}seeds' if kind != 'train' else ''
+    stem = (f'{kind}_irws_paper_task{scenario.task}_res{scenario.resource}{count}'
+            f'_{scenario.deadline}_model{scenario.model_seed}')
+    source = (scenario.train_task, scenario.train_resource or scenario.resource,
+              scenario.train_deadline or scenario.deadline)
+    if kind != 'train' and source != (scenario.task, scenario.resource, scenario.deadline):
+        stem += f'_from_task{source[0]}_res{source[1]}_{source[2]}'
+    return stem + {'train': '.jsonl', 'eval': '.csv', 'summary': '.json'}[kind]
+
+
 def run_episode(env,learner,seed,training=False,evaluation=None):
     if any(getattr(env,k)!=v for k,v in COMMON_REWARD.items()):
         raise ValueError("Adapted IRWS must use the shared energy-tardiness coefficients")
@@ -164,7 +175,11 @@ def train(scenario,config=None,kwargs=None,out=None,resume=None):
     else:learner=PaperLearner(env.num_vms,cfg)
     from common.f22_instances import write_run_metadata
     write_run_metadata(directory,scenario)
-    directory.mkdir(parents=True,exist_ok=True);log=directory/'training.jsonl'
+    directory.mkdir(parents=True,exist_ok=True);log=directory/artifact_name(scenario,'train')
+    print(f'[IRWS train] task={scenario.task} resource={scenario.resource} deadline={scenario.deadline} '
+          f'model_seed={scenario.model_seed} episodes={scenario.episodes} start_episode={start}',flush=True)
+    print(f'训练日志: {log.resolve()}',flush=True)
+    print(f'模型保存目录: {directory.resolve()}',flush=True)
     recorder=TrainingRecorder(directory/'logs',scenario,'irws_paper',env,{'IRWS':learner})
     recorder.index=start
     for episode in range(start,scenario.episodes):
@@ -181,6 +196,12 @@ def train(scenario,config=None,kwargs=None,out=None,resume=None):
         recorder.checkpoint(save_checkpoint)(directory/'final.pth',learner,scenario,episode,best,kwargs)
         print(f'IRWS-paper episode={episode} seed={seed} energy={result["metrics"]["total_energy"]:.6f} validation_energy={energy:.6f}',flush=True)
     recorder.close()
+    print(f'[IRWS train completed] 训练完成：{scenario.episodes}/{scenario.episodes} episodes | '
+          f'task={scenario.task} resource={scenario.resource} deadline={scenario.deadline}',flush=True)
+    print(f'最佳模型已保存到: {(directory/"best.pth").resolve()}',flush=True)
+    print(f'最终模型已保存到: {(directory/"final.pth").resolve()}',flush=True)
+    print(f'训练日志已保存到: {log.resolve()}',flush=True)
+    print(f'训练统计目录: {(directory/"logs").resolve()}',flush=True)
     return learner,directory
 
 
@@ -195,15 +216,29 @@ def evaluate_main():
     learner,_=load_checkpoint(directory/'best.pth',scenario,device)
     out=output_dir(scenario,'run')/(scenario.task+scenario.resource+'_'+scenario.deadline)
     out.mkdir(parents=True,exist_ok=True)
-    with (out/'episodes.csv').open('w',encoding='utf-8',newline='') as f:
+    csv_path=out/artifact_name(scenario,'eval')
+    summary_path=out/artifact_name(scenario,'summary')
+    print(f'[IRWS eval] task={scenario.task} resource={scenario.resource} deadline={scenario.deadline} '
+          f'model_seed={scenario.model_seed} seeds={scenario.seed_spec}',flush=True)
+    print(f'加载模型: {(directory/"best.pth").resolve()}',flush=True)
+    print(f'评测 CSV: {csv_path.resolve()}',flush=True)
+    with csv_path.open('w',encoding='utf-8',newline='') as f:
         writer=None
+        completed=0
         def save_seed(row):
-            nonlocal writer
+            nonlocal writer,completed
             if writer is None:
                 writer=csv.DictWriter(f,fieldnames=list(row));writer.writeheader()
             writer.writerow(row);f.flush()
-            print(f'[IRWS eval] task={scenario.task} resource={scenario.resource} deadline={scenario.deadline} seed={row["seed"]} energy={row["total_energy"]:.6f} saved',flush=True)
+            completed+=1
+            print(f'[IRWS eval {completed}/{len(scenario.seeds)}] task={scenario.task} resource={scenario.resource} deadline={scenario.deadline} seed={row["seed"]} energy={row["total_energy"]:.6f} saved',flush=True)
         rows,summary=evaluate(learner,scenario,scenario.seeds,on_result=save_seed)
-    (out/'summary.json').write_text(json.dumps(dict(summary=summary,normalization=scenario.normalization_metadata(),
+    summary_path.write_text(json.dumps(dict(summary=summary,normalization=scenario.normalization_metadata(),
         protocol=scenario.protocol().metadata(),reward_protocol=REWARD_PROTOCOL,
         reward_settings=COMMON_REWARD,source_checkpoint=str(directory/'best.pth')),indent=2),encoding='utf-8')
+    print(f'[IRWS eval completed] 评测完成：{len(rows)}/{len(scenario.seeds)} seeds | '
+          f'task={scenario.task} resource={scenario.resource} deadline={scenario.deadline}',flush=True)
+    print(f'平均能耗: {summary["total_energy"]["mean"]:.6f} J',flush=True)
+    print(f'评测 CSV 已保存到: {csv_path.resolve()}',flush=True)
+    print(f'汇总 JSON 已保存到: {summary_path.resolve()}',flush=True)
+    print(f'逐种子明细目录: {(out/"measurements").resolve()}',flush=True)

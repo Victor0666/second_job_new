@@ -184,7 +184,7 @@ def train():
     os.makedirs(log_dir, exist_ok=True)
     write_run_metadata(save_dir, SCENARIO)
     write_run_metadata(log_dir, SCENARIO)
-    log_path = os.path.join(log_dir, "train_metrics_irws.csv")
+    log_path = os.path.join(log_dir, f"train_irws_task{SCENARIO.task}_res{SCENARIO.resource}_{SCENARIO.deadline}_model{SCENARIO.model_seed}.csv")
     logger = CSVLogger(
         filepath=log_path,
         fieldnames=[
@@ -346,10 +346,10 @@ def train():
             print(f"⭐ best updated: eval_energy={best_eval_energy:.3f}J -> saved {best_path}")
         episode += 1
     save_joint(final_path)
-    print(f"训练结束。\nbest={best_path}\nfinal={final_path}\nlog={log_path}")
-
     recorder.close()
     logger.close()
+    print(f"[IRWS train completed] 训练完成：{episode}/{MAX_EPISODES} episodes | task={SCENARIO.task} resource={SCENARIO.resource} deadline={SCENARIO.deadline}", flush=True)
+    print(f"最佳模型已保存到: {os.path.abspath(best_path)}\n最终模型已保存到: {os.path.abspath(final_path)}\n训练日志已保存到: {os.path.abspath(log_path)}", flush=True)
 
 
 if __name__ == "__main__":

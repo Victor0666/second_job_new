@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import subprocess
 from common.read_xml_opt_Tsize import data_model_metadata, workflow_instance_hash, dax_template_id
+from common.workflow_opt import ENERGY_ACCOUNTING
 
 
 def stable_hash(value):
@@ -32,6 +33,7 @@ def git_commit():
 def reproducibility_metadata(scenario):
     protocol = scenario.protocol()
     return dict(data_split=protocol.metadata() if protocol else 'Legacy', model_seed=scenario.model_seed,
+                energy_accounting=ENERGY_ACCOUNTING,
                 source_train_scene=scenario.normalization_kwargs()['source_train_scene'],
                 git_commit=git_commit(), deadline_cache=artifact_info(scenario.cache_path),
                 instance_generator=data_model_metadata(), instance_identity_version='f22_instance_v1')

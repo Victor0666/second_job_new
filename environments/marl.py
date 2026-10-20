@@ -568,6 +568,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         self._host_running_pc = {h: 0.0 for h in self.host_ids}
         self._energy_last_t = float(self.current_time)
         self._energy_by_host_J = {h: 0.0 for h in self.host_ids}
+        self._energy_last_busy = {}
 
         self._cur_task_gid = None
         self.host_pending_tasks = {h: deque() for h in self.host_ids}
@@ -694,59 +695,30 @@ class CloudWorkflowEnv_MARL(gym.Env):
     def _no_more_arrivals(self):
         return self.next_arrival_idx >= len(self.arrival_times)
 
-    def _in_accounting_window(self) -> bool:
-        started = (len(self.workflows) > 0)
-        if not started:
-            return False
-        if self.workflows_per_episode is not None:
-            return self.completed_workflows < self.workflows_per_episode
-        return any(s != "Finished" for s in self.task_state)
-
-    def _append_idle_records(self, t0: float, t1: float):
-        if not self._in_accounting_window():
-            return
-        if t1 <= t0 + 1e-15:
-            return
-        for h in self.host_ids:
-            self._records.append(LoadRecord(float(t0), float(t1), int(h), 0.0))
-
     def _energy_rewards_to_current_time(self):
         t_now = float(self.current_time)
-        t_last = float(getattr(self, "_energy_last_t", t_now))
-        dt = t_now - t_last
-        if dt <= 1e-15:
+        t_last = float(self._energy_last_t)
+        if t_now <= t_last:
             return 0.0, {h: 0.0 for h in self.host_ids}
-
-        if not self._in_accounting_window():
-            self._energy_last_t = t_now
-            return 0.0, {h: 0.0 for h in self.host_ids}
-
-        dE_total = 0.0
         dE_by_host = {h: 0.0 for h in self.host_ids}
-
         for h in self.host_ids:
             running_pc = float(self._host_running_pc.get(h, 0.0))
-            total_pc = float(self.hosts[h].total_pc)
-            load_ratio = running_pc / max(total_pc, 1e-9)
-
-            if load_ratio < 0.0:
-                load_ratio = 0.0
-            elif load_ratio > 1.0:
-                load_ratio = 1.0
-
-            p = float(self.hosts[h].power(load_ratio))
-            dE_h = p * dt
-
-            dE_by_host[h] = dE_h
-            dE_total += dE_h
-            self._energy_by_host_J[h] = float(self._energy_by_host_J.get(h, 0.0) + dE_h)
-
+            if running_pc <= 1e-12:
+                continue
+            host = self.hosts[h]
+            ratio = max(0.0, min(1.0, running_pc / max(float(host.total_pc), 1e-9)))
+            last_busy = self._energy_last_busy.get(h)
+            # Count deferred idle only when a subsequent task makes it an internal gap.
+            gap = max(0.0, t_last - last_busy) if last_busy is not None else 0.0
+            dE_by_host[h] = float(host.power(ratio)) * (t_now - t_last) + float(host.power(0.0)) * gap
+            self._energy_last_busy[h] = t_now
+            self._energy_by_host_J[h] += dE_by_host[h]
+        dE_total = sum(dE_by_host.values())
         self.total_energy += dE_total
         self.lifetime_energy += dE_total
         self._energy_last_t = t_now
-
-        r_total = -(dE_total * self.energy_reward_scale)
-        r_by_host = {h: -(dE_by_host[h] * self.energy_reward_scale) for h in self.host_ids}
+        r_total = -dE_total * self.energy_reward_scale
+        r_by_host = {h: -dE_by_host[h] * self.energy_reward_scale for h in self.host_ids}
         return float(r_total), r_by_host
 
     def _advance_until_decision(self):
@@ -777,10 +749,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
             if next_t <= self.current_time + 1e-12:
                 next_t = self.current_time + 1e-9
 
-            t_prev = float(self.current_time)
             self.current_time = float(next_t)
-
-            self._append_idle_records(t_prev, float(self.current_time))
 
             r0, rb = self._energy_rewards_to_current_time()
             rE_total_acc += r0

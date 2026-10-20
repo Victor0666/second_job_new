@@ -138,7 +138,7 @@ def checkpoint_metadata(agent):
 def check_checkpoint(actual, expected):
     actual = actual or {'normalization_version':'legacy'}
     expected = expected or {'normalization_version':'legacy'}
-    for key in ('normalization_version', 'source_train_scene', 'normalization_config_hash', 'R_ref', 'T_ref', 'experiment_protocol_hash', 'io_ratio_encoding', 'io_ratio_ref', 'scale_config_version'):
+    for key in ('normalization_version', 'source_train_scene', 'normalization_config_hash', 'R_ref', 'T_ref', 'experiment_protocol_hash', 'io_ratio_encoding', 'io_ratio_ref', 'scale_config_version', 'energy_accounting'):
         if actual.get(key) != expected.get(key):
             raise ValueError('Checkpoint normalization mismatch: ' + key)
 

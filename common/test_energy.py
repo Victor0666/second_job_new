@@ -1,4 +1,4 @@
-"""All environments integrate all hosts over one episode window."""
+"""All environments count each host's own task window, including internal gaps."""
 
 from contextlib import ExitStack
 from copy import deepcopy
@@ -17,29 +17,71 @@ class EnergyWindowTests(unittest.TestCase):
     def setUp(self):
         self.hosts, _ = create_cluster(num_hosts=3, vms_per_host=(1, 1, 1), pc_tiers=(1.0,), bw_tiers=(1.0,))
 
-    def test_unused_hosts_share_common_record_window(self):
-        self.assertAlmostEqual(energy_from_records([LoadRecord(5, 15, 0, 1)], self.hosts), 750.0)
+    def test_unused_hosts_are_not_counted(self):
+        self.assertAlmostEqual(energy_from_records([LoadRecord(5, 15, 0, 1)], self.hosts), 451.0)
 
-    def test_each_host_includes_idle_before_and_after_its_own_tasks(self):
+    def test_each_host_excludes_idle_before_and_after_its_own_tasks(self):
         records = [LoadRecord(5, 10, 0, 1), LoadRecord(10, 15, 1, 1)]
-        expected = (self.hosts[0].power(1) * 5 + self.hosts[0].power(0) * 5
-                    + self.hosts[1].power(0) * 5 + self.hosts[1].power(1) * 5
-                    + self.hosts[2].power(0) * 10)
+        expected = self.hosts[0].power(1) * 5 + self.hosts[1].power(1) * 5
         self.assertAlmostEqual(energy_from_records(records, self.hosts), expected)
 
-    def test_explicit_window_includes_head_tail_and_empty_hosts(self):
+    def test_explicit_window_only_clips_task_windows(self):
         records = [LoadRecord(10, 20, 0, 1)]
-        self.assertAlmostEqual(energy_from_records(records, self.hosts, start_time=5, end_time=25), 1208.0)
-        self.assertAlmostEqual(energy_from_records([], self.hosts, start_time=5, end_time=25), 916.0)
+        self.assertAlmostEqual(energy_from_records(records, self.hosts, start_time=5, end_time=25), 451.0)
+        self.assertAlmostEqual(energy_from_records([], self.hosts, start_time=5, end_time=25), 0.0)
         self.assertEqual(energy_from_records([], self.hosts), 0.0)
         self.assertEqual(energy_from_records(records, self.hosts, start_time=5, end_time=5), 0.0)
 
     def test_clipping_overlaps_and_zero_load_records(self):
         hosts, _ = create_cluster(num_hosts=1, vms_per_host=(2,), pc_tiers=(1.0,), bw_tiers=(1.0,))
         records = [LoadRecord(0, 10, 0, 1), LoadRecord(5, 15, 0, 1), LoadRecord(0, 20, 0, 0)]
-        expected = hosts[0].power(0.5) * 10 + hosts[0].power(1) * 5 + hosts[0].power(0) * 5
+        expected = hosts[0].power(0.5) * 10 + hosts[0].power(1) * 5
         self.assertAlmostEqual(energy_from_records(records, hosts), expected)
         self.assertAlmostEqual(energy_from_records(records, hosts, start_time=6, end_time=8), hosts[0].power(1) * 2)
+
+    def test_internal_idle_gap_counts_but_zero_load_markers_do_not_extend_window(self):
+        records = [LoadRecord(5, 15, 0, 1), LoadRecord(25, 35, 0, 1),
+                   LoadRecord(0, 100, 0, 0), LoadRecord(0, 100, 1, 0)]
+        self.assertAlmostEqual(energy_from_records(records, self.hosts), 451 * 2 + 15.9 * 10)
+        self.assertEqual(energy_from_records(records[2:], self.hosts), 0)
+
+    def test_window_is_per_host_not_per_vm(self):
+        hosts, _ = create_cluster(num_hosts=1, vms_per_host=(2,), pc_tiers=(1.0,), bw_tiers=(1.0,))
+        # Two different VMs can leave a host-wide gap: that gap still counts.
+        records = [LoadRecord(0, 2, 0, 1), LoadRecord(8, 10, 0, 1)]
+        expected = hosts[0].power(0.5) * 4 + hosts[0].power(0) * 6
+        self.assertAlmostEqual(energy_from_records(records, hosts), expected)
+
+    def test_historical_full_cluster_replay_is_explicit(self):
+        records = [LoadRecord(5, 15, 0, 1)]
+        self.assertAlmostEqual(energy_from_records(records, self.hosts, accounting='full_cluster_v1'), 750)
+
+    def test_new_models_and_results_are_isolated_and_old_checkpoints_rejected(self):
+        from common.scenarios import Scenario
+        from common.f18_state_normalization import check_checkpoint
+        scene = Scenario(mode='train', normalization_mode='legacy', experiment_protocol=None, legacy_split=True)
+        metadata = scene.normalization_metadata()
+        self.assertEqual(metadata['energy_accounting'], 'host_task_window_v1')
+        self.assertIn('host_task_window_v1', scene.model_name('mahdrl'))
+        self.assertIn('host_task_window_v1', scene.output_version)
+        previous = dict(metadata)
+        previous.pop('energy_accounting')
+        with self.assertRaisesRegex(ValueError, 'energy_accounting'):
+            check_checkpoint(previous, metadata)
+
+    def test_incremental_segment_windows_include_gaps_and_exclude_unused_hosts(self):
+        for module_name, class_name in [('pd3qn', 'CloudWorkflowEnv_PD3QN_Cost'), ('irws', 'IRWSEnvRouteA')]:
+            cls = getattr(importlib.import_module('environments.' + module_name), class_name)
+            env = cls.__new__(cls)
+            env.hosts, _ = create_cluster(num_hosts=3, vms_per_host=(2, 2, 2),
+                                         pc_tiers=(1.0,), bw_tiers=(1.0,))
+            env._host_segments = {hid: [] for hid in env.hosts}
+            env.total_energy = 0.
+            records = []
+            for start, end, pc in [(5, 10, 1), (25, 30, 1), (8, 15, 1), (0, 40, 0), (0, 2, 1)]:
+                records.append(LoadRecord(start, end, 0, pc))
+                env._add_interval_load(0, start, end, pc)
+                self.assertAlmostEqual(env.total_energy, energy_from_records(records, env.hosts))
 
     def run_synthetic(self, module_name, arrivals):
         module = importlib.import_module('environments.' + module_name)
@@ -91,7 +133,7 @@ class EnergyWindowTests(unittest.TestCase):
                     reward_energy += env._advance_until_decision_energy_only()
             self.assertTrue(env.done_flag)
             end = arrivals[-1] + 10.0
-            expected = 750.0 * len(arrivals) + 45.8 * (end - arrivals[0] - 10 * len(arrivals))
+            expected = 451.0 * len(arrivals) + 15.9 * (end - arrivals[0] - 10 * len(arrivals))
             self.assertAlmostEqual(env.current_time, end)
             self.assertAlmostEqual(env.total_energy, expected)
             records = env.records if hasattr(env, 'records') else env._records
@@ -99,11 +141,11 @@ class EnergyWindowTests(unittest.TestCase):
             self.assertAlmostEqual(reward_energy, -expected * env.energy_reward_scale)
             if hasattr(env, '_energy_cache_by_host'):
                 self.assertAlmostEqual(sum(env._energy_cache_by_host.values()), expected)
-                self.assertAlmostEqual(env._energy_cache_by_host[1], 13.1 * (end - arrivals[0]))
-                self.assertAlmostEqual(env._energy_cache_by_host[2], 16.8 * (end - arrivals[0]))
+                self.assertAlmostEqual(env._energy_cache_by_host[1], 0.0)
+                self.assertAlmostEqual(env._energy_cache_by_host[2], 0.0)
 
     def test_all_environment_families_single_task_and_idle_gap(self):
-        for module_name in ('mahdrl_heft', 'mahdrl_fcfs', 'ablation_nohost', 'base_heft', 'base_fcfs', 'marl', 'irws', 'pd3qn'):
+        for module_name in ('mahdrl_heft', 'mahdrl_fcfs', 'ablation_nohost', 'ablation_tl2', 'base_heft', 'base_fcfs', 'marl', 'irws', 'pd3qn'):
             for arrivals in ((5.0,), (5.0, 25.0)):
                 with self.subTest(environment=module_name, arrivals=arrivals):
                     self.run_synthetic(module_name, arrivals)

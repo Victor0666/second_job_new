@@ -1,0 +1,111 @@
+{
+  "energy_accounting": "host_task_window_v1",
+  "verification_only": true,
+  "formal_training_executed": false,
+  "regression": {
+    "tests": 190,
+    "passed": true,
+    "command": "python -X utf8 -B -m unittest discover -s common -p test_*.py -q"
+  },
+  "final_incremental_marl_checks": {
+    "tests": 46,
+    "passed": true,
+    "modules": [
+      "common.test_energy",
+      "common.test_communication",
+      "common.test_f11",
+      "common.test_experiment_measurements"
+    ]
+  },
+  "training_smoke": {
+    "episodes": 1,
+    "workflows_per_episode": 2,
+    "small_networks": true,
+    "algorithms": {
+      "mahdrl": {
+        "optimizer_steps": {
+          "TA.optim": 20,
+          "HA.optim": 56,
+          "VA.optim": 56
+        },
+        "total_energy": 22106.306356940557
+      },
+      "pd3qn": {
+        "optimizer_steps": {
+          "PD3QN.optim": 56
+        },
+        "total_energy": 21865.86968403811
+      },
+      "marl": {
+        "optimizer_steps": {
+          "Global.optim": 59,
+          "Local.optim": 59
+        },
+        "total_energy": 21504.117065332586
+      },
+      "ablation_hostrand": {
+        "optimizer_steps": {
+          "TA.optim": 20,
+          "VA.optim": 56
+        },
+        "total_energy": 22892.282659623725
+      },
+      "ablation_mgrrand": {
+        "optimizer_steps": {
+          "HA.optim": 56,
+          "VA.optim": 56
+        },
+        "total_energy": 21882.619861752195
+      },
+      "ablation_vmrand": {
+        "optimizer_steps": {
+          "TA.optim": 20,
+          "HA.optim": 56
+        },
+        "total_energy": 23448.561161085843
+      },
+      "ablation_nohost": {
+        "optimizer_steps": {
+          "TA.optim": 20,
+          "VA.optim": 56
+        },
+        "total_energy": 30388.013715970596
+      },
+      "ablation_tl2": {
+        "optimizer_steps": {
+          "TA.optim": 20,
+          "VA.optim": 56
+        },
+        "total_energy": 30388.013715970596
+      },
+      "irws": {
+        "optimizer_steps": {
+          "VM.opt": 4
+        },
+        "total_energy": 24319.019076833032
+      },
+      "ertf_fifs": {
+        "optimizer_steps": {},
+        "total_energy": 32095.945063307587
+      }
+    }
+  },
+  "irws_paper": {
+    "checkpoint_deterministic_roundtrip": true,
+    "common_mahdrl_physical_trace": {
+      "assignments": 54,
+      "max_execution_component_gap": 0.0,
+      "max_energy_window_gap": 0.0,
+      "final_energy_gap": 0.0,
+      "deadlines_identical": true,
+      "host_loads_identical": true
+    },
+    "parameter_max_changes": {
+      "embedding": 5.501590175371884e-07,
+      "selector": 2.439083879313131e-09,
+      "actor": 9.99999696561435e-06,
+      "critic": 9.999999213801403e-05,
+      "intrinsic": 9.669624993491333e-06
+    }
+  }
+}

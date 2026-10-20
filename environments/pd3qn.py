@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
-"""PD3QN with DAG completion events and full-cluster episode energy.
+"""PD3QN with DAG completion events and per-host task-window energy.
 
-The step energy reward includes assignment energy and all hosts' idle energy
-added while advancing to the next decision or episode end. Legacy reward
-parameters remain supported.
+The step energy reward includes assignment energy and idle gaps inside used
+hosts' own task windows. Unused hosts and window head/tail idle are excluded.
 """
 
 from common.f18_state_normalization import checked_observation, load_normalizer, queue_features, observe_rr
@@ -326,7 +325,19 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         if end <= start + 1e-12:
             return 0.0
 
+        if delta_pc <= 0.0:
+            return 0.0
         segs = self._host_segments[int(host_id)]
+        # A later assignment makes the intervening idle gap part of this host's window.
+        extension_energy = 0.0
+        if segs:
+            left, right = segs[0][0], segs[-1][1]
+            if start < left:
+                segs = [(start, left, 0.0)] + segs
+                extension_energy += self._seg_energy(host_id, 0.0, left - start)
+            if end > right:
+                segs = segs + [(right, end, 0.0)]
+                extension_energy += self._seg_energy(host_id, 0.0, end - right)
         new_segs: List[Tuple[float, float, float]] = []
 
         i = 0
@@ -335,7 +346,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
             i += 1
 
         cur = start
-        dE = 0.0
+        dE = extension_energy
 
         while cur < end - 1e-12:
             if i >= len(segs) or segs[i][0] >= end - 1e-12:
@@ -490,11 +501,6 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         if not self.energy_window_started:
             self.current_time = new_t
             return
-
-        for hid in self.hosts.keys():
-            hid = int(hid)
-            self.records.append(LoadRecord(start_time=self.current_time, end_time=new_t, server_id=hid, vm_pc=0.0))
-            self._add_interval_load(hid, self.current_time, new_t, 0.0)
 
         self.current_time = new_t
 
@@ -797,7 +803,7 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
             "r_energy_host": float(r_energy_host),
             "r_energy_total": float(r_energy_total),
             "alpha_delay_vm": float(self.alpha_delay_vm),
-            "reward_mode": "full_cluster_energy",
+            "reward_mode": "host_task_window_v1",
         }
         return self._build_obs(), float(reward), bool(self.done_flag), False, info
 

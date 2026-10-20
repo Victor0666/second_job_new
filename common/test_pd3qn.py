@@ -62,12 +62,11 @@ class PD3QNCompletionTests(unittest.TestCase):
         self.assertEqual(env.wf_remaining_tasks[0], 0)
         self.assertEqual(env.completed_workflows, 1)
         self.assertEqual(env.get_episode_metrics()["makespan"], 30.0)
-        for hid in env.hosts:
-            self.assertEqual(max(r.end_time for r in env.records if r.server_id == hid), 30.0)
+        self.assertEqual(max(r.end_time for r in env.records if r.server_id == 0), 30.0)
+        self.assertFalse(any(r.server_id == 1 for r in env.records))
         expected = (env.hosts[0].power(1.0) * 10.0
                     + env.hosts[0].power(2 / 3) * 15.0
-                    + env.hosts[0].power(1 / 3) * 5.0
-                    + env.hosts[1].power(0.0) * 30.0)
+                    + env.hosts[0].power(1 / 3) * 5.0)
         self.assertAlmostEqual(env.total_energy, expected)
         self.assertAlmostEqual(env.total_energy, energy_from_records(env.records, env.hosts))
 

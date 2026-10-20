@@ -216,13 +216,20 @@ def exec_time_components(
     return tau_in, tau_comp, tau_out, tau_exec
 
 
-def energy_from_records(records, hosts, *, start_time=None, end_time=None):
-    """Integrate every host over one common window, including idle power.
+ENERGY_ACCOUNTING = "host_task_window_v1"
 
-    Explicit endpoints define the episode window. If omitted, use the common
-    span of all records, rather than a different span for each host.
+
+def energy_from_records(records, hosts, *, start_time=None, end_time=None,
+                        accounting=ENERGY_ACCOUNTING):
+    """Integrate each host between its first task start and last task end.
+
+    Idle gaps inside that host window count; unused hosts and zero-load
+    bookkeeping records do not extend it. Explicit endpoints only clip the
+    host windows. full_cluster_v1 is available for historical figure replay.
     """
-    records = list(records)
+    if accounting not in (ENERGY_ACCOUNTING, "full_cluster_v1"):
+        raise ValueError("Unknown energy accounting: " + str(accounting))
+    records = [r for r in records if r.vm_pc > 0 and r.end_time > r.start_time]
     if start_time is None:
         start_time = min((r.start_time for r in records), default=0.0)
     if end_time is None:
@@ -233,10 +240,25 @@ def energy_from_records(records, hosts, *, start_time=None, end_time=None):
     if end_time == start_time:
         return 0.0
 
-    events = {hid: {start_time: 0.0, end_time: 0.0} for hid in hosts}
+    windows = {}
+    for hid in hosts:
+        recs = [r for r in records if r.server_id == hid]
+        if accounting == "full_cluster_v1":
+            left, right = start_time, end_time
+        elif recs:
+            left = max(start_time, min(float(r.start_time) for r in recs))
+            right = min(end_time, max(float(r.end_time) for r in recs))
+        else:
+            continue
+        if right > left:
+            windows[hid] = (left, right)
+    events = {hid: {left: 0.0, right: 0.0} for hid, (left, right) in windows.items()}
     for r in records:
-        start = max(start_time, float(r.start_time))
-        end = min(end_time, float(r.end_time))
+        if r.server_id not in windows:
+            continue
+        left, right = windows[r.server_id]
+        start = max(left, float(r.start_time))
+        end = min(right, float(r.end_time))
         if end <= start:
             continue
         host_events = events[r.server_id]
@@ -244,10 +266,11 @@ def energy_from_records(records, hosts, *, start_time=None, end_time=None):
         host_events[end] = host_events.get(end, 0.0) - float(r.vm_pc)
 
     total_energy = 0.0
-    for hid, host in hosts.items():
+    for hid, host_events in events.items():
+        host = hosts[hid]
         load = 0.0
-        previous = start_time
-        for t, delta in sorted(events[hid].items()):
+        previous = windows[hid][0]
+        for t, delta in sorted(host_events.items()):
             ratio = max(0.0, min(1.0, load / max(float(host.total_pc), 1e-9)))
             total_energy += float(host.power(ratio)) * (t - previous)
             load += delta

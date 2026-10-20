@@ -16,7 +16,7 @@ IRWS 环境（Route-A）——对齐 HRL 公平口径版本（6点全对齐）�
 
 (3) 能耗记账一致（含 idle）：
     - 任务执行段写 LoadRecord(start,end,host_id,vm_pc)
-    - 时间推进段对每个 host 写 0-load LoadRecord（idle energy 计入）
+    - 每台主机只计自身任务首尾之间的能耗，包含内部 idle，未用主机不计
     - episode end 可做 EnergyCheck：env.total_energy == energy_from_records(records,hosts)
 
 (4) max_ready_tasks 候选集一致：
@@ -33,8 +33,8 @@ IRWS 环境（Route-A）——对齐 HRL 公平口径版本（6点全对齐）�
 - 支持“每个 workflow 独立采样 ddlAlpha”
 - 使用由 seed 和工作流编号决定的公共 alpha 采样器，不消耗模板随机流
 
-Energy reward uses the full-cluster increment from assignment through the
-next decision or episode end, including idle hosts and gaps between workflows.
+Energy reward sums host-task-window increments across the cluster. Only
+internal idle gaps of used hosts count; unused hosts and head/tail idle do not.
 The selected-host assignment increment is retained in info for diagnostics.
 """
 
@@ -413,7 +413,19 @@ class IRWSEnvRouteA(gym.Env):
         if end <= start + 1e-12:
             return 0.0
 
+        if delta_pc <= 0.0:
+            return 0.0
         segs = self._host_segments[int(host_id)]
+        # A later assignment makes the intervening idle gap part of this host's window.
+        extension_energy = 0.0
+        if segs:
+            left, right = segs[0][0], segs[-1][1]
+            if start < left:
+                segs = [(start, left, 0.0)] + segs
+                extension_energy += self._seg_energy(host_id, 0.0, left - start)
+            if end > right:
+                segs = segs + [(right, end, 0.0)]
+                extension_energy += self._seg_energy(host_id, 0.0, end - right)
         new_segs: List[Tuple[float, float, float]] = []
 
         i = 0
@@ -422,7 +434,7 @@ class IRWSEnvRouteA(gym.Env):
             i += 1
 
         cur = start
-        dE = 0.0
+        dE = extension_energy
 
         while cur < end - 1e-12:
             if i >= len(segs) or segs[i][0] >= end - 1e-12:
@@ -585,7 +597,7 @@ class IRWSEnvRouteA(gym.Env):
         r_energy_total = -dE_total * float(self.energy_reward_scale)
         reward = (1.0 - self.alpha_delay_vm) * r_energy_total + self.alpha_delay_vm * info["r_delay"]
         info.update(delta_energy_total=dE_total, r_energy_total=r_energy_total,
-                    reward_mode="full_cluster_energy")
+                    reward_mode="host_task_window_v1")
 
         terminated = bool(self.done_flag)
         truncated = False
@@ -801,11 +813,6 @@ class IRWSEnvRouteA(gym.Env):
             t1 = float(t_next)
             if t1 < t0 + 1e-12:
                 t1 = t0
-
-            if t1 > t0 + 1e-12:
-                for hid in range(self.num_hosts):
-                    self.records.append(LoadRecord(start_time=t0, end_time=t1, server_id=int(hid), vm_pc=0.0))
-                    self._add_interval_load(int(hid), t0, t1, 0.0)
 
             self.current_time = float(t1)
 

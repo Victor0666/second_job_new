@@ -7,6 +7,7 @@ from collections import Counter
 import json
 
 from common.read_xml_opt_Tsize import DATA_MODEL
+from common.workflow_opt import ENERGY_ACCOUNTING
 from common.f11 import LEARNING_MODEL
 from common.experiment_protocol import ExperimentProtocol, protocol_hash, DEFAULT_PROTOCOL
 from common.f18_state_normalization import VERSION, CURRENT_VERSION, SHARED_VERSIONS, DEFAULT_CONFIG, scene_id, load_normalizer
@@ -110,6 +111,7 @@ class Scenario:
             metadata.update(experiment_protocol_hash=protocol_hash(self.experiment_protocol),
                             experiment_protocol=self.protocol().metadata())
         metadata['reproducibility'] = self.reproducibility_metadata()
+        metadata['energy_accounting'] = ENERGY_ACCOUNTING
         return metadata
 
     def validate_calibration(self):
@@ -214,11 +216,12 @@ class Scenario:
             task=task, resource=(self.train_resource or self.resource) if self.mode == "eval" else self.resource,
             deadline=(self.train_deadline or self.deadline) if self.mode == "eval" else self.deadline
         ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "") + ("_" + self.normalization_mode if self.normalization_mode in SHARED_VERSIONS else "") + ("_protocol_" + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else "")
+        name += "_" + ENERGY_ACCOUNTING
         return name.replace("_seed1_", "_seed" + str(self.first_training_seed()) + "_") if self.protocol() else name
 
     @property
     def output_version(self):
-        return self.normalization_mode + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy')
+        return self.normalization_mode + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING
 
     def checkpoint_dir(self, algorithm):
         if self.mode == "eval" and self.checkpoint_override:

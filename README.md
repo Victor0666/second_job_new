@@ -113,11 +113,11 @@ MARL 额外保留 `--deadline-cache`、`--ckpt-global`、`--ckpt-local`、`--out
 
 ## 统一能耗计量
 
-所有算法的 episode 能耗统一为：从首个工作流到达到最后一个任务完成，对全部主机积分功耗。未使用主机、各主机任务执行前后的空闲时段，以及工作流之间的空闲间隔均计入；首个到达之前不计入。
+所有算法的 episode 能耗统一为 `host_task_window_v1`：每台主机只在自身第一个任务开始到自身最后一个任务完成之间积分功耗。完全未使用的主机不计；该主机首个任务之前、最后一个任务之后不计；窗口内部的任务间空闲仍计入。
 
-公共函数 `energy_from_records(records, hosts, start_time=..., end_time=...)` 接收明确的共同窗口。主算法及消融的总能耗奖励和分主机奖励使用同一窗口；IRWS、PD3QN 的步骤能耗奖励包含分配增量及推进期间全部主机的空闲能耗，`info.r_energy_total` 对应该分量。原有 `r_energy_host` 保留作所选主机分配增量的诊断字段。
+窗口按 Host 而不是 VM 划定。公共函数 `energy_from_records(records, hosts, start_time=..., end_time=...)` 的显式端点仅裁剪各主机自身窗口；零负载记账记录不能扩展窗口。HA/VA 的全局或局部奖励范围保持原设计，但物理能耗均采用此口径。PD3QN、IRWS 在新增任务扩展主机窗口时补计内部空闲；MARL、MAHDRL 及消融在实际时间推进时结算，后续使用同一主机时补计被纳入窗口的间隔。
 
-能耗窗口回归检查：`.\.venv\Scripts\python.exe -m unittest common.test_energy`。历史模型、日志和统计图表不应与修正后的新结果混用。
+能耗窗口回归检查：`.\.venv\Scripts\python.exe -m unittest common.test_energy`。新模型与评测路径追加 `host_task_window_v1`，Checkpoint 校验此标识，旧全系统窗口模型需要重训。任务、通信、截止期与物理轨迹规则不变，不要求重建截止期缓存。详细例子见 [主机级能耗说明](docs/Host_task_window_energy.md)。此前四算法甘特图及其数据保留为全系统窗口历史示例，不会因本次修改自动变成新口径结果。
 
 ## 统一父子通信规则
 

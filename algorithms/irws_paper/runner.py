@@ -12,6 +12,7 @@ from common.f18_state_normalization import VERSION,CURRENT_VERSION,SHARED_VERSIO
 from common.f11 import protect_training_outputs
 from common.experiment_measurements import TrainingRecorder, EvaluationRecorder, collect_validation
 from common.scenarios import ROOT,parse_scenario
+from common.workflow_opt import ENERGY_ACCOUNTING
 from .config import MODEL_VERSION,REWARD_PROTOCOL,COMMON_REWARD,PaperConfig
 from .environment import PaperCloudEnv
 from .learner import PaperLearner
@@ -38,7 +39,7 @@ def output_dir(scenario,kind):
     norm=scenario.normalization_metadata()
     if norm['normalization_version'] not in SHARED_VERSIONS:raise ValueError('Formal IRWS must use the existing F18 shared configuration')
     encoding = '_'+norm['normalization_version'] if norm['normalization_version'] != VERSION else ''
-    return ROOT/'outputs'/kind/MODEL_VERSION/(source+'_'+digest+'_'+norm['normalization_config_hash'][:12]+encoding)
+    return ROOT/'outputs'/kind/MODEL_VERSION/(source+'_'+digest+'_'+norm['normalization_config_hash'][:12]+encoding+'_'+ENERGY_ACCOUNTING)
 
 
 def run_episode(env,learner,seed,training=False,evaluation=None):

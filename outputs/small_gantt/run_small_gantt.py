@@ -1,4 +1,4 @@
-"""Small, isolated training demonstration; never a formal benchmark."""
+"""Archived full-cluster example (fc90400); saved summary supports figure replay."""
 from pathlib import Path
 import sys
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,7 +19,7 @@ from matplotlib.patches import Patch
 from common.scenarios import Scenario
 from common.precompute_deadlines import main as precompute
 from common.experiment_measurements import TrainingRecorder, EvaluationRecorder
-from common.workflow_opt import energy_from_records
+from common.workflow_opt import energy_from_records, ENERGY_ACCOUNTING
 from common.f22_instances import instance_identity
 
 OUT = Path(__file__).resolve().parent
@@ -67,7 +67,7 @@ def inspect_result(name, env, scene):
     start=float(env.arrival_times[0]);end=float(env.current_time)
     records=env.records if hasattr(env,'records') else env._records
     busy=[r for r in records if r.vm_pc>0]
-    full=energy_from_records(busy,env.hosts,start_time=start,end_time=end)
+    full=energy_from_records(busy,env.hosts,start_time=start,end_time=end,accounting='full_cluster_v1')
     old=0.
     for hid,host in env.hosts.items():
         rr=[r for r in busy if r.server_id==hid]
@@ -193,6 +193,8 @@ def main():
     torch.set_num_threads(1);RUN.mkdir(parents=True,exist_ok=True)
     if (RUN/'summary.json').exists():
         draw(json.loads((RUN/'summary.json').read_text())['results']);return
+    if ENERGY_ACCOUNTING != 'full_cluster_v1':
+        raise RuntimeError('Historical full-cluster training reproduction requires commit fc90400; existing summary can still be redrawn.')
     dax=RUN/'Example_8.xml'
     if not dax.exists():
         dax.write_text('<adag xmlns="http://pegasus.isi.edu/schema/DAX">'+''.join(f'<job id="T{i}"/>' for i in range(8))+''.join(f'<child ref="T{c}"><parent ref="T{p}"/></child>' for p,c in EDGES)+'</adag>',encoding='utf-8')

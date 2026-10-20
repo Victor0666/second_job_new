@@ -1,0 +1,757 @@
+{
+  "verification_only": true,
+  "episodes": 20,
+  "policy": "final trained parameters; deterministic evaluation, no test selection",
+  "train_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19
+  ],
+  "validation_seed": 600,
+  "test_seed": 700,
+  "workflows": 2,
+  "tasks_per_workflow": 8,
+  "resources": "3 hosts x 2 VMs; each host PC=(1,2) MI/s and BW=(1000,2000) Mb/s",
+  "normalization": "f19_shared_v1; existing SS/Tight training reference, not recalibrated on synthetic DAG",
+  "networks": [
+    32,
+    16
+  ],
+  "dqn_batch": 8,
+  "dqn_buffer": 256,
+  "irws_implementation": "algorithms/irws (historical adapted implementation, not irws_paper)",
+  "results": [
+    {
+      "algorithm": "mahdrl",
+      "origin": 30.872368863489008,
+      "duration_s": 399.6438064031698,
+      "total_J": 35341.50643753347,
+      "idle_baseline_J": 18303.686333265174,
+      "load_extra_J": 17037.820104268296,
+      "old_window_J": 26011.541844241685,
+      "omitted_idle_J": 9329.964593291785,
+      "old_to_new_pct": 35.86855653986236,
+      "instance": {
+        "version": "f22_instance_v1",
+        "task": "S",
+        "resource": "S",
+        "deadline": "Tight",
+        "instance_seed": 700,
+        "content_hash": "86c7c8f14e5856804baf309c3fbb5d7f8c612d34a5bb1d79deebbfb890b0c692",
+        "instance_hash": "34e57db81ff38b2583afa67458c94e5f815b2616455a49f1b5690a6e26779746"
+      },
+      "arrivals": [
+        0.0,
+        19.976596551631694
+      ],
+      "gantt": [
+        {
+          "gid": 1,
+          "workflow": 0,
+          "task": 1,
+          "vm": 0,
+          "host": 0,
+          "start": 0.0,
+          "end": 108.26845442528875
+        },
+        {
+          "gid": 0,
+          "workflow": 0,
+          "task": 0,
+          "vm": 1,
+          "host": 0,
+          "start": 0.0,
+          "end": 39.542964585194035
+        },
+        {
+          "gid": 8,
+          "workflow": 1,
+          "task": 0,
+          "vm": 2,
+          "host": 1,
+          "start": 19.976596551631694,
+          "end": 135.29863230556592
+        },
+        {
+          "gid": 9,
+          "workflow": 1,
+          "task": 1,
+          "vm": 3,
+          "host": 1,
+          "start": 19.976596551631694,
+          "end": 70.34035065857637
+        },
+        {
+          "gid": 2,
+          "workflow": 0,
+          "task": 2,
+          "vm": 1,
+          "host": 0,
+          "start": 39.542964585194035,
+          "end": 81.24783922547215
+        },
+        {
+          "gid": 12,
+          "workflow": 1,
+          "task": 4,
+          "vm": 3,
+          "host": 1,
+          "start": 70.34035065857637,
+          "end": 114.90122130962368
+        },
+        {
+          "gid": 4,
+          "workflow": 0,
+          "task": 4,
+          "vm": 0,
+          "host": 0,
+          "start": 108.26845442528875,
+          "end": 189.91442211386877
+        },
+        {
+          "gid": 3,
+          "workflow": 0,
+          "task": 3,
+          "vm": 1,
+          "host": 0,
+          "start": 108.26845442528875,
+          "end": 158.3004640125176
+        },
+        {
+          "gid": 10,
+          "workflow": 1,
+          "task": 2,
+          "vm": 2,
+          "host": 1,
+          "start": 135.29863230556592,
+          "end": 208.49389953482807
+        },
+        {
+          "gid": 11,
+          "workflow": 1,
+          "task": 3,
+          "vm": 3,
+          "host": 1,
+          "start": 135.29863230556592,
+          "end": 181.57896600588617
+        },
+        {
+          "gid": 5,
+          "workflow": 0,
+          "task": 5,
+          "vm": 1,
+          "host": 0,
+          "start": 158.3004640125176,
+          "end": 204.76563463580774
+        },
+        {
+          "gid": 14,
+          "workflow": 1,
+          "task": 6,
+          "vm": 3,
+          "host": 1,
+          "start": 181.57896600588617,
+          "end": 219.9296666404094
+        },
+        {
+          "gid": 6,
+          "workflow": 0,
+          "task": 6,
+          "vm": 0,
+          "host": 0,
+          "start": 189.91442211386877,
+          "end": 299.84110415553783
+        },
+        {
+          "gid": 13,
+          "workflow": 1,
+          "task": 5,
+          "vm": 1,
+          "host": 0,
+          "start": 208.49389953482807,
+          "end": 266.1490963143104
+        },
+        {
+          "gid": 15,
+          "workflow": 1,
+          "task": 7,
+          "vm": 1,
+          "host": 0,
+          "start": 266.1490963143104,
+          "end": 312.2469253395551
+        },
+        {
+          "gid": 7,
+          "workflow": 0,
+          "task": 7,
+          "vm": 0,
+          "host": 0,
+          "start": 299.84110415553783,
+          "end": 399.6438064031698
+        }
+      ],
+      "host_idle_W": {
+        "0": 15.9,
+        "1": 13.1,
+        "2": 16.8
+      },
+      "optimizer_steps": {
+        "TA.optim": 213,
+        "HA.optim": 313,
+        "VA.optim": 313
+      }
+    },
+    {
+      "algorithm": "marl",
+      "origin": 30.872368863489008,
+      "duration_s": 392.9558433484879,
+      "total_J": 42797.342719128006,
+      "idle_baseline_J": 17997.377625360747,
+      "load_extra_J": 24799.96509376726,
+      "old_window_J": 37626.05279303931,
+      "omitted_idle_J": 5171.289926088699,
+      "old_to_new_pct": 13.743907591192684,
+      "instance": {
+        "version": "f22_instance_v1",
+        "task": "S",
+        "resource": "S",
+        "deadline": "Tight",
+        "instance_seed": 700,
+        "content_hash": "86c7c8f14e5856804baf309c3fbb5d7f8c612d34a5bb1d79deebbfb890b0c692",
+        "instance_hash": "34e57db81ff38b2583afa67458c94e5f815b2616455a49f1b5690a6e26779746"
+      },
+      "arrivals": [
+        0.0,
+        19.976596551631694
+      ],
+      "gantt": [
+        {
+          "gid": 0,
+          "workflow": 0,
+          "task": 0,
+          "vm": 4,
+          "host": 2,
+          "start": 0.0,
+          "end": 79.08592917038808
+        },
+        {
+          "gid": 1,
+          "workflow": 0,
+          "task": 1,
+          "vm": 5,
+          "host": 2,
+          "start": 0.0,
+          "end": 54.13422721264437
+        },
+        {
+          "gid": 8,
+          "workflow": 1,
+          "task": 0,
+          "vm": 0,
+          "host": 0,
+          "start": 19.976596551631694,
+          "end": 135.29863230556592
+        },
+        {
+          "gid": 9,
+          "workflow": 1,
+          "task": 1,
+          "vm": 1,
+          "host": 0,
+          "start": 19.976596551631694,
+          "end": 70.34035065857637
+        },
+        {
+          "gid": 4,
+          "workflow": 0,
+          "task": 4,
+          "vm": 5,
+          "host": 2,
+          "start": 54.13422721264437,
+          "end": 94.95721105693437
+        },
+        {
+          "gid": 12,
+          "workflow": 1,
+          "task": 4,
+          "vm": 1,
+          "host": 0,
+          "start": 70.34035065857637,
+          "end": 114.90122130962368
+        },
+        {
+          "gid": 2,
+          "workflow": 0,
+          "task": 2,
+          "vm": 4,
+          "host": 2,
+          "start": 79.08592917038808,
+          "end": 162.49567845094433
+        },
+        {
+          "gid": 3,
+          "workflow": 0,
+          "task": 3,
+          "vm": 2,
+          "host": 1,
+          "start": 79.08592917038808,
+          "end": 185.36990231924065
+        },
+        {
+          "gid": 10,
+          "workflow": 1,
+          "task": 2,
+          "vm": 5,
+          "host": 2,
+          "start": 135.29863230556592,
+          "end": 178.10250820276872
+        },
+        {
+          "gid": 11,
+          "workflow": 1,
+          "task": 3,
+          "vm": 0,
+          "host": 0,
+          "start": 135.29863230556592,
+          "end": 220.97728289074053
+        },
+        {
+          "gid": 5,
+          "workflow": 0,
+          "task": 5,
+          "vm": 4,
+          "host": 2,
+          "start": 185.36990231924065,
+          "end": 294.697432617681
+        },
+        {
+          "gid": 6,
+          "workflow": 0,
+          "task": 6,
+          "vm": 5,
+          "host": 2,
+          "start": 185.36990231924065,
+          "end": 240.33324334007514
+        },
+        {
+          "gid": 13,
+          "workflow": 1,
+          "task": 5,
+          "vm": 0,
+          "host": 0,
+          "start": 220.97728289074053,
+          "end": 323.8828533294608
+        },
+        {
+          "gid": 14,
+          "workflow": 1,
+          "task": 6,
+          "vm": 1,
+          "host": 0,
+          "start": 220.97728289074053,
+          "end": 265.530395085386
+        },
+        {
+          "gid": 7,
+          "workflow": 0,
+          "task": 7,
+          "vm": 4,
+          "host": 2,
+          "start": 294.697432617681,
+          "end": 392.9558433484879
+        },
+        {
+          "gid": 15,
+          "workflow": 1,
+          "task": 7,
+          "vm": 5,
+          "host": 2,
+          "start": 323.8828533294608,
+          "end": 375.8688039320949
+        }
+      ],
+      "host_idle_W": {
+        "0": 15.9,
+        "1": 13.1,
+        "2": 16.8
+      },
+      "optimizer_steps": {
+        "Global.optim": 320,
+        "Local.optim": 320
+      }
+    },
+    {
+      "algorithm": "pd3qn",
+      "origin": 30.872368863489008,
+      "duration_s": 326.0224525893068,
+      "total_J": 33155.05179708256,
+      "idle_baseline_J": 14931.82832859025,
+      "load_extra_J": 18223.22346849231,
+      "old_window_J": 29330.11119195242,
+      "omitted_idle_J": 3824.940605130141,
+      "old_to_new_pct": 13.041002743213692,
+      "instance": {
+        "version": "f22_instance_v1",
+        "task": "S",
+        "resource": "S",
+        "deadline": "Tight",
+        "instance_seed": 700,
+        "content_hash": "86c7c8f14e5856804baf309c3fbb5d7f8c612d34a5bb1d79deebbfb890b0c692",
+        "instance_hash": "34e57db81ff38b2583afa67458c94e5f815b2616455a49f1b5690a6e26779746"
+      },
+      "arrivals": [
+        0.0,
+        19.976596551631694
+      ],
+      "gantt": [
+        {
+          "gid": 0,
+          "workflow": 0,
+          "task": 0,
+          "vm": 1,
+          "host": 0,
+          "start": 0.0,
+          "end": 39.542964585194035
+        },
+        {
+          "gid": 1,
+          "workflow": 0,
+          "task": 1,
+          "vm": 3,
+          "host": 1,
+          "start": 0.0,
+          "end": 54.13422721264437
+        },
+        {
+          "gid": 8,
+          "workflow": 1,
+          "task": 0,
+          "vm": 5,
+          "host": 2,
+          "start": 19.976596551631694,
+          "end": 77.63761442859882
+        },
+        {
+          "gid": 9,
+          "workflow": 1,
+          "task": 1,
+          "vm": 0,
+          "host": 0,
+          "start": 19.976596551631694,
+          "end": 120.70410476552107
+        },
+        {
+          "gid": 2,
+          "workflow": 0,
+          "task": 2,
+          "vm": 1,
+          "host": 0,
+          "start": 39.542964585194035,
+          "end": 81.24783922547215
+        },
+        {
+          "gid": 3,
+          "workflow": 0,
+          "task": 3,
+          "vm": 3,
+          "host": 1,
+          "start": 54.13422721264437,
+          "end": 99.85167647752141
+        },
+        {
+          "gid": 4,
+          "workflow": 0,
+          "task": 4,
+          "vm": 2,
+          "host": 1,
+          "start": 54.13422721264437,
+          "end": 150.62926952032282
+        },
+        {
+          "gid": 10,
+          "workflow": 1,
+          "task": 2,
+          "vm": 5,
+          "host": 2,
+          "start": 77.63761442859882,
+          "end": 114.23524804322989
+        },
+        {
+          "gid": 5,
+          "workflow": 0,
+          "task": 5,
+          "vm": 1,
+          "host": 0,
+          "start": 99.85167647752141,
+          "end": 154.51544162674153
+        },
+        {
+          "gid": 11,
+          "workflow": 1,
+          "task": 3,
+          "vm": 3,
+          "host": 1,
+          "start": 120.70410476552107,
+          "end": 169.7496723406801
+        },
+        {
+          "gid": 12,
+          "workflow": 1,
+          "task": 4,
+          "vm": 5,
+          "host": 2,
+          "start": 120.70410476552107,
+          "end": 168.03020929140715
+        },
+        {
+          "gid": 6,
+          "workflow": 0,
+          "task": 6,
+          "vm": 0,
+          "host": 0,
+          "start": 150.62926952032282,
+          "end": 266.4147688916738
+        },
+        {
+          "gid": 13,
+          "workflow": 1,
+          "task": 5,
+          "vm": 1,
+          "host": 0,
+          "start": 169.7496723406801,
+          "end": 227.40486912016237
+        },
+        {
+          "gid": 14,
+          "workflow": 1,
+          "task": 6,
+          "vm": 3,
+          "host": 1,
+          "start": 169.7496723406801,
+          "end": 218.89442101736043
+        },
+        {
+          "gid": 15,
+          "workflow": 1,
+          "task": 7,
+          "vm": 1,
+          "host": 0,
+          "start": 227.40486912016237,
+          "end": 273.5026981454071
+        },
+        {
+          "gid": 7,
+          "workflow": 0,
+          "task": 7,
+          "vm": 3,
+          "host": 1,
+          "start": 266.4147688916738,
+          "end": 326.0224525893068
+        }
+      ],
+      "host_idle_W": {
+        "0": 15.9,
+        "1": 13.1,
+        "2": 16.8
+      },
+      "optimizer_steps": {
+        "PD3QN.optim": 313
+      }
+    },
+    {
+      "algorithm": "irws",
+      "origin": 30.872368863489008,
+      "duration_s": 378.34096091196875,
+      "total_J": 35801.399646131584,
+      "idle_baseline_J": 17328.01600976817,
+      "load_extra_J": 18473.383636363415,
+      "old_window_J": 33605.661060739134,
+      "omitted_idle_J": 2195.7385853924497,
+      "old_to_new_pct": 6.533835419645095,
+      "instance": {
+        "version": "f22_instance_v1",
+        "task": "S",
+        "resource": "S",
+        "deadline": "Tight",
+        "instance_seed": 700,
+        "content_hash": "86c7c8f14e5856804baf309c3fbb5d7f8c612d34a5bb1d79deebbfb890b0c692",
+        "instance_hash": "34e57db81ff38b2583afa67458c94e5f815b2616455a49f1b5690a6e26779746"
+      },
+      "arrivals": [
+        0.0,
+        19.976596551631694
+      ],
+      "gantt": [
+        {
+          "gid": 0,
+          "workflow": 0,
+          "task": 0,
+          "vm": 4,
+          "host": 2,
+          "start": 0.0,
+          "end": 79.08592917038808
+        },
+        {
+          "gid": 1,
+          "workflow": 0,
+          "task": 1,
+          "vm": 3,
+          "host": 1,
+          "start": 0.0,
+          "end": 54.13422721264437
+        },
+        {
+          "gid": 9,
+          "workflow": 1,
+          "task": 1,
+          "vm": 2,
+          "host": 1,
+          "start": 19.976596551631694,
+          "end": 120.70410476552107
+        },
+        {
+          "gid": 8,
+          "workflow": 1,
+          "task": 0,
+          "vm": 1,
+          "host": 0,
+          "start": 19.976596551631694,
+          "end": 77.63761442859882
+        },
+        {
+          "gid": 4,
+          "workflow": 0,
+          "task": 4,
+          "vm": 3,
+          "host": 1,
+          "start": 54.13422721264437,
+          "end": 94.95721105693437
+        },
+        {
+          "gid": 10,
+          "workflow": 1,
+          "task": 2,
+          "vm": 1,
+          "host": 0,
+          "start": 77.63761442859882,
+          "end": 114.23524804322989
+        },
+        {
+          "gid": 3,
+          "workflow": 0,
+          "task": 3,
+          "vm": 4,
+          "host": 2,
+          "start": 79.08592917038808,
+          "end": 179.1499483448458
+        },
+        {
+          "gid": 2,
+          "workflow": 0,
+          "task": 2,
+          "vm": 0,
+          "host": 0,
+          "start": 79.08592917038808,
+          "end": 168.71563242533918
+        },
+        {
+          "gid": 12,
+          "workflow": 1,
+          "task": 4,
+          "vm": 3,
+          "host": 1,
+          "start": 120.70410476552107,
+          "end": 168.03020929140715
+        },
+        {
+          "gid": 11,
+          "workflow": 1,
+          "task": 3,
+          "vm": 2,
+          "host": 1,
+          "start": 120.70410476552107,
+          "end": 213.26477216616158
+        },
+        {
+          "gid": 6,
+          "workflow": 0,
+          "task": 6,
+          "vm": 4,
+          "host": 2,
+          "start": 179.1499483448458,
+          "end": 278.5382586643368
+        },
+        {
+          "gid": 5,
+          "workflow": 0,
+          "task": 5,
+          "vm": 3,
+          "host": 1,
+          "start": 179.1499483448458,
+          "end": 240.50004647382391
+        },
+        {
+          "gid": 13,
+          "workflow": 1,
+          "task": 5,
+          "vm": 2,
+          "host": 1,
+          "start": 213.26477216616158,
+          "end": 316.1703426048818
+        },
+        {
+          "gid": 14,
+          "workflow": 1,
+          "task": 6,
+          "vm": 1,
+          "host": 0,
+          "start": 213.26477216616158,
+          "end": 268.6119324029641
+        },
+        {
+          "gid": 7,
+          "workflow": 0,
+          "task": 7,
+          "vm": 4,
+          "host": 2,
+          "start": 278.5382586643368,
+          "end": 378.34096091196875
+        },
+        {
+          "gid": 15,
+          "workflow": 1,
+          "task": 7,
+          "vm": 3,
+          "host": 1,
+          "start": 316.1703426048818,
+          "end": 368.1562932075159
+        }
+      ],
+      "host_idle_W": {
+        "0": 15.9,
+        "1": 13.1,
+        "2": 16.8
+      },
+      "optimizer_steps": {
+        "VM.opt": 80
+      }
+    }
+  ]
+}

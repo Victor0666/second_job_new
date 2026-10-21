@@ -2,6 +2,8 @@
 
 `algorithms/` 按算法分目录，每个算法集中保存统一训练/评测入口及专用智能体；环境集中在 `environments/`。场景由命令行参数选择。
 
+新增独立变式 `mahdrl_oe`（MAHDRL-OE），实施截止期/功耗/候选主机观测增强与按分配结算能耗奖励，保留原 MAHDRL。用 `run.cmd algorithms/mahdrl_oe/train.py` 或 `run.cmd algorithms/mahdrl_oe/evaluate.py` 启动，场景参数相同，模型与输出独立；详见 [MAHDRL-OE 说明](docs/MAHDRL_OE.md)。
+
 ```text
 algorithms/                    每个算法一个目录
   mahdrl/                      train.py、evaluate.py

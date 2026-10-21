@@ -29,6 +29,7 @@ DAX_GROUPS = (
 )
 MODEL_NAMES = {
     "mahdrl": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
+    "mahdrl_oe": "mahdrl_oe_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
     "ablation_hostrand": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_hostrand_hv_{deadline}",
     "ablation_mgrrand": "mahdrl_task{task}_res{resource}_seed1_mgrrand_r075_ddlMix_hv_{deadline}",
     "ablation_vmrand": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_vmrand_hv_{deadline}",

@@ -266,3 +266,9 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 ### MAHDRL 性能引导探索与候选筛选
 
 新增两个独立变式：`mahdrl_ge` 在 HA/VA 的 epsilon 探索中以 50% 概率选择预计最快候选；`mahdrl_pf` 在训练和评估中保留预计时长不超过该层最快候选 1.25 倍的动作。HA 按主机内最快可用 VM 比较，VA 按所选主机内的候选 VM 比较，时长复用原计算与通信模型。原 MAHDRL 的算法、模型和结果保持不变，两变式也不互相叠加。设计、输出隔离、检查与训练评估命令见 [GE/PF 说明](docs/MAHDRL_GE_PF.md)。
+
+### MAHDRL 的 OE＋GE 与 OE＋GE＋PF 组合
+
+新增独立的 `mahdrl_oe_ge` 和 `mahdrl_oe_ge_pf`。前者结合 OE 观测/逐分配能耗奖励与 GE 探索；后者再加 PF，按筛选后的候选计算 OE 摘要、执行 GE，并一致限制 TD 后继动作。原 MAHDRL 及 OE/GE/PF/TS/UB 各单独变式保持原样；两组合的模型、日志和评测结果独立，拒绝错版本权重。实现、验证和 50/600 代训练评测命令见 [组合说明](docs/MAHDRL_OE_GE_combinations.md)。
+
+另新增独立的 `mahdrl_oe_pf`，保留 OE 观测/逐分配能耗奖励与 PF 筛选，使用原 epsilon-greedy，不加入 GE 引导探索。原版、各单独变式及已有两个组合保持不变；本版模型与输出独立。实现、检查和训练评估命令见 [OE＋PF 说明](docs/MAHDRL_OE_PF.md)。

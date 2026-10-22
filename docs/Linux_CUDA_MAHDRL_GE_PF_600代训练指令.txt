@@ -1,0 +1,86 @@
+# Linux / Bash：MAHDRL-GE、MAHDRL-PF 各九场景，训练 600 代
+# 从项目根目录、已激活的 Python/CUDA 环境执行；每组为可单独复制的后台命令。
+# 固定训练 task=S，resource=S/M/L × deadline=Tight/Medium/Loose；模型种子=1，F22，F19。
+# 显式检查 CUDA；不可用时停止该组，不自动回落 CPU。
+# 注意：50 与 600 代使用同一算法/场景的模型及训练日志目录，不支持续训，也不允许覆盖非空训练目录。
+# 若先跑50代，先评测并归档该变式的模型、训练日志和评测结果，再从头跑600代。
+# ep600 仅区分这里的控制台 .log/.pid，不会自动隔离模型目录。
+# GE 与 PF 的模型/日志/结果彼此隔离；这些清单没有建立组合版本。
+
+# 【MAHDRL-GE（引导探索）：mahdrl_ge】
+# --------------------------------
+
+# MAHDRL-GE（引导探索） | SS | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SS_Tight_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SS_Tight_ep600_seed1.pid
+
+# MAHDRL-GE（引导探索） | SS | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SS_Medium_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SS_Medium_ep600_seed1.pid
+
+# MAHDRL-GE（引导探索） | SS | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SS_Loose_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SS_Loose_ep600_seed1.pid
+
+# MAHDRL-GE（引导探索） | SM | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SM_Tight_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SM_Tight_ep600_seed1.pid
+
+# MAHDRL-GE（引导探索） | SM | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SM_Medium_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SM_Medium_ep600_seed1.pid
+
+# MAHDRL-GE（引导探索） | SM | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SM_Loose_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SM_Loose_ep600_seed1.pid
+
+# MAHDRL-GE（引导探索） | SL | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SL_Tight_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SL_Tight_ep600_seed1.pid
+
+# MAHDRL-GE（引导探索） | SL | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SL_Medium_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SL_Medium_ep600_seed1.pid
+
+# MAHDRL-GE（引导探索） | SL | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_ge/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_ge_SL_Loose_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_ge_SL_Loose_ep600_seed1.pid
+
+# 【MAHDRL-PF（性能候选筛选）：mahdrl_pf】
+# --------------------------------
+
+# MAHDRL-PF（性能候选筛选） | SS | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SS_Tight_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SS_Tight_ep600_seed1.pid
+
+# MAHDRL-PF（性能候选筛选） | SS | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SS_Medium_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SS_Medium_ep600_seed1.pid
+
+# MAHDRL-PF（性能候选筛选） | SS | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SS_Loose_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SS_Loose_ep600_seed1.pid
+
+# MAHDRL-PF（性能候选筛选） | SM | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SM_Tight_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SM_Tight_ep600_seed1.pid
+
+# MAHDRL-PF（性能候选筛选） | SM | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SM_Medium_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SM_Medium_ep600_seed1.pid
+
+# MAHDRL-PF（性能候选筛选） | SM | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SM_Loose_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SM_Loose_ep600_seed1.pid
+
+# MAHDRL-PF（性能候选筛选） | SL | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SL_Tight_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SL_Tight_ep600_seed1.pid
+
+# MAHDRL-PF（性能候选筛选） | SL | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SL_Medium_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SL_Medium_ep600_seed1.pid
+
+# MAHDRL-PF（性能候选筛选） | SL | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_pf/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_pf_SL_Loose_ep600_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_pf_SL_Loose_ep600_seed1.pid

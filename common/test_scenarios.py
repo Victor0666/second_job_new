@@ -20,6 +20,8 @@ EVAL_BUILDERS = {
     "mahdrl_oe": "build_env_kwargs_hrl_mix",
     "mahdrl_ts": "build_env_kwargs_hrl_mix",
     "mahdrl_ub": "build_env_kwargs_hrl_mix",
+    "mahdrl_ge": "build_env_kwargs_hrl_mix",
+    "mahdrl_pf": "build_env_kwargs_hrl_mix",
     "ablation_hostrand": "build_env_kwargs_hostrand",
     "ablation_mgrrand": "build_env_kwargs_mgrrand",
     "ablation_vmrand": "build_env_kwargs_vm_random",

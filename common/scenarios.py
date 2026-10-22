@@ -32,6 +32,8 @@ MODEL_NAMES = {
     "mahdrl_oe": "mahdrl_oe_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
     "mahdrl_ts": "mahdrl_ts_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
     "mahdrl_ub": "mahdrl_ub_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
+    "mahdrl_ge": "mahdrl_ge_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
+    "mahdrl_pf": "mahdrl_pf_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
     "ablation_hostrand": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_hostrand_hv_{deadline}",
     "ablation_mgrrand": "mahdrl_task{task}_res{resource}_seed1_mgrrand_r075_ddlMix_hv_{deadline}",
     "ablation_vmrand": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_vmrand_hv_{deadline}",

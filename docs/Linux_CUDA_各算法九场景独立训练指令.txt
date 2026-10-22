@@ -31,7 +31,6 @@ python -c "from common.f18_calibrate_normalization import nine_scenarios; [s.nor
 6. nohup允许退出终端后继续运行。PID文件记录进程号，不代表训练成功；请检查日志。
 7. 当前命令使用已安装的默认校准配置和F22协议，不重新校准，不改动已有缓存。
 8. 如使用不同--model-seed重复训练，需同步修改日志和PID文件名。已有训练目录会受到覆盖保护。
-9. 新版IRWS成功完成后打印[IRWS train completed]，并列出best.pth、final.pth及带场景训练日志的绝对路径。
 
 三、独立训练命令
 ================================
@@ -246,7 +245,7 @@ CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cud
 # 随机 VM 选择消融 | SL | Loose
 CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/ablation_vmrand/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/ablation_vmrand_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/ablation_vmrand_SL_Loose_seed1.pid
 
-【TL：去主机层消融：ablation_nohost】
+【TL：去主机层消融：ablation_nohost】  这个暂时不跑
 --------------------------------
 
 # TL：去主机层消融 | SS | Tight

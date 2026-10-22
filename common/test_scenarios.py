@@ -18,6 +18,8 @@ from common.precompute_deadlines import build_env_kwargs as precompute_kwargs
 EVAL_BUILDERS = {
     "mahdrl": "build_env_kwargs_hrl_mix",
     "mahdrl_oe": "build_env_kwargs_hrl_mix",
+    "mahdrl_ts": "build_env_kwargs_hrl_mix",
+    "mahdrl_ub": "build_env_kwargs_hrl_mix",
     "ablation_hostrand": "build_env_kwargs_hostrand",
     "ablation_mgrrand": "build_env_kwargs_mgrrand",
     "ablation_vmrand": "build_env_kwargs_vm_random",

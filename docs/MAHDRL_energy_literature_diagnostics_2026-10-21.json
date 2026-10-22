@@ -1,0 +1,18 @@
+{
+  "purpose": "diagnostic toy example; not a scheduling benchmark",
+  "resource": "S",
+  "vms_per_host": [
+    9,
+    8,
+    8
+  ],
+  "host0_total_pc": 34.0,
+  "host0_idle_power_w": 15.9,
+  "task_added_pc": 1.0,
+  "task_duration_s": 10.0,
+  "unused_host_old_proxy_j": 12.941176470588243,
+  "unused_host_exact_delta_j": 171.94117647058823,
+  "reuse_host_after_100s_gap_exact_delta_j": 1761.9411764705883,
+  "assertions": "passed",
+  "formal_mahdrl_checkpoints_found": 0
+}

@@ -4,9 +4,15 @@
 
 新增独立变式 `mahdrl_oe`（MAHDRL-OE），实施截止期/功耗/候选主机观测增强与按分配结算能耗奖励，保留原 MAHDRL。用 `run.cmd algorithms/mahdrl_oe/train.py` 或 `run.cmd algorithms/mahdrl_oe/evaluate.py` 启动，场景参数相同，模型与输出独立；详见 [MAHDRL-OE 说明](docs/MAHDRL_OE.md)。
 
+新增 TA 稳定性测试变式 `mahdrl_ts`（MAHDRL-TS），基于原 MAHDRL，仅将 TA 学习率从 `0.0003` 改为 `0.0001`、目标网络软更新系数从 `0.01` 改为 `0.005`。训练、模型、日志和评测目录独立，原 MAHDRL 与 MAHDRL-OE 保持不变；详见 [MAHDRL-TS 说明](docs/MAHDRL_TS.md)。
+
+新增未来价值上界测试变式 `mahdrl_ub`（MAHDRL-UB），基于原 MAHDRL，仅在 TA 的 TD 目标中使用 `min(Q_next, 0)`，选动作仍使用原始 Q；TA 学习率 `0.0003`、tau `0.01` 及 HA/VA 保持原配置。模型和输出独立，保留约束前估值与触发比例；详见 [MAHDRL-UB 说明](docs/MAHDRL_UB.md)。
+
 ```text
 algorithms/                    每个算法一个目录
   mahdrl/                      train.py、evaluate.py
+  mahdrl_ts/                   train.py、evaluate.py（TA 稳定性测试）
+  mahdrl_ub/                   train.py、evaluate.py、agent.py（TA 未来价值上界测试）
   marl/                        train.py、evaluate.py、agents.py
   irws/                        train.py、evaluate.py、task_ranker.py、vm_agent.py、intrinsic_reward.py
   pd3qn/                       train.py、evaluate.py

@@ -1,0 +1,86 @@
+Linux/Bash，项目根目录执行；GPU编号按需修改。
+
+【训练指令】
+
+【MAHDRL-OE：mahdrl_oe】
+--------------------------------
+
+mkdir -p outputs/server_console_logs
+
+# MAHDRL-OE | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SS_Tight_seed1.pid
+
+# MAHDRL-OE | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SS_Medium_seed1.pid
+
+# MAHDRL-OE | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SS_Loose_seed1.pid
+
+# MAHDRL-OE | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SM_Tight_seed1.pid
+
+# MAHDRL-OE | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SM_Medium_seed1.pid
+
+# MAHDRL-OE | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SM_Loose_seed1.pid
+
+# MAHDRL-OE | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SL_Tight_seed1.pid
+
+# MAHDRL-OE | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SL_Medium_seed1.pid
+
+# MAHDRL-OE | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/mahdrl_oe/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1' > outputs/server_console_logs/mahdrl_oe_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/mahdrl_oe_SL_Loose_seed1.pid
+
+
+【评测指令】
+
+【MAHDRL-OE：mahdrl_oe】
+--------------------------------------------------------------
+
+# MAHDRL-OE | 源训练SS | Tight | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=S deadline=Tight seeds=700-729 source=SS ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource S --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSS_Tight_model1.pid
+
+# MAHDRL-OE | 源训练SS | Medium | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=S deadline=Medium seeds=700-729 source=SS ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource S --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSS_Medium_model1.pid
+
+# MAHDRL-OE | 源训练SS | Loose | SS -> MS -> LS
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=S deadline=Loose seeds=700-729 source=SS ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource S --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSS_Loose_model1.pid
+
+# MAHDRL-OE | 源训练SM | Tight | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=M deadline=Tight seeds=700-729 source=SM ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource M --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSM_Tight_model1.pid
+
+# MAHDRL-OE | 源训练SM | Medium | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=M deadline=Medium seeds=700-729 source=SM ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource M --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSM_Medium_model1.pid
+
+# MAHDRL-OE | 源训练SM | Loose | SM -> MM -> LM
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=M deadline=Loose seeds=700-729 source=SM ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource M --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSM_Loose_model1.pid
+
+# MAHDRL-OE | 源训练SL | Tight | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=L deadline=Tight seeds=700-729 source=SL ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource L --deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSL_Tight_model1.pid
+
+# MAHDRL-OE | 源训练SL | Medium | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=L deadline=Medium seeds=700-729 source=SL ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource L --deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSL_Medium_model1.pid
+
+# MAHDRL-OE | 源训练SL | Loose | SL -> ML -> LL
+mkdir -p outputs/server_eval_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c '"'"'import torch; assert torch.cuda.is_available(), "CUDA unavailable: evaluation stopped"; torch.ones(1, device="cuda"); print(torch.cuda.get_device_name(0))'"'"'; for task in S M L; do echo "=== mahdrl_oe task=${task} resource=L deadline=Loose seeds=700-729 source=SL ==="; python -u launch.py algorithms/mahdrl_oe/evaluate.py --task "$task" --resource L --deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --train-task S --normalization-mode f19_shared_v1; done' > outputs/server_eval_logs/eval_mahdrl_oe_sourceSL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_oe_sourceSL_Loose_model1.pid

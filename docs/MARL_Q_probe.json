@@ -1,0 +1,47 @@
+{
+  "description": "Production widths; real decision observations repeated only to form one update batch. Not a convergence run.",
+  "learners": {
+    "MARL_Global": {
+      "loss": 3.7839430433450616e-07,
+      "parameters": 4027908,
+      "diagnostics": {
+        "transitions": 1,
+        "nonterminal": 1,
+        "nonterminal_ratio": 1.0,
+        "gradient_updates": 1,
+        "sampled_targets": 1,
+        "last_loss": 3.7839430433450616e-07,
+        "max_abs_loss": 0.009267700836062431,
+        "bootstrap_nonzero_ratio": 1.0,
+        "future_abs_mean": 0.008212280459702015,
+        "target_mean": -0.008212280459702015,
+        "last_rollout_value": null,
+        "nonterminal_rollouts": 0,
+        "last_nonterminal_rollout_value": null,
+        "truncation_cutoffs": 0,
+        "terminal_transitions": 0
+      }
+    },
+    "MARL_Local": {
+      "loss": 7.753138561383821e-06,
+      "parameters": 4098058,
+      "diagnostics": {
+        "transitions": 1,
+        "nonterminal": 1,
+        "nonterminal_ratio": 1.0,
+        "gradient_updates": 1,
+        "sampled_targets": 1,
+        "last_loss": 7.753138561383821e-06,
+        "max_abs_loss": 0.13261838257312775,
+        "bootstrap_nonzero_ratio": 1.0,
+        "future_abs_mean": 0.056541867554187775,
+        "target_mean": -0.056541867554187775,
+        "last_rollout_value": null,
+        "nonterminal_rollouts": 0,
+        "last_nonterminal_rollout_value": null,
+        "truncation_cutoffs": 0,
+        "terminal_transitions": 0
+      }
+    }
+  }
+}

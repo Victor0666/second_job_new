@@ -1,0 +1,23 @@
+{
+  "description": "128 real-environment transitions, one production-network update, checkpoint save/load; deadline_mode=none. Not a validation-best or convergence test.",
+  "model": "paper_minimal_v3",
+  "hidden_dims": [
+    1024,
+    1024,
+    512,
+    512,
+    256
+  ],
+  "input_dim": 106,
+  "output_dim": 25,
+  "parameters": 2216218,
+  "learning_rate": 0.0003,
+  "transitions": 128,
+  "updates": 1,
+  "loss": 314823.21875,
+  "parameters_changed": true,
+  "parameters_finite": true,
+  "checkpoint_round_trip": true,
+  "model_directory": "pd3qn_paper_v3_taskS_resS_model1_Tight_f11_real_decisions_v1_pd3qn_units_v1_protocol_64d2c570d2fd_host_task_window_v1",
+  "output_version": "pd3qn_units_v1_task6_vm4_parentdata_v2_paper_minimal_v3_protocol_64d2c570d2fd_host_task_window_v1"
+}

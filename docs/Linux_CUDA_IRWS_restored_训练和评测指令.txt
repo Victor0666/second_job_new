@@ -1,0 +1,68 @@
+【修改后的 IRWS（独立副本）：irws_restored】
+--------------------------------
+
+# 在项目根目录运行，先激活安装了 CUDA 版 PyTorch 的环境。
+# 正式 Deadline Cache 和共享归一化文件须已准备完成。
+# 每条为独立启动指令；相应场景训练完成后再执行对应评测。
+# 固定设置：model-seed=1，F22，f19_shared_v1，queue-capacity=10，slot-duration=1。
+mkdir -p outputs/server_console_logs
+
+【训练：600 Episodes】
+--------------------------------
+
+# 修改后的 IRWS（独立副本）训练 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SS_Tight_seed1.pid
+
+# 修改后的 IRWS（独立副本）训练 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SS_Medium_seed1.pid
+
+# 修改后的 IRWS（独立副本）训练 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SS_Loose_seed1.pid
+
+# 修改后的 IRWS（独立副本）训练 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SM_Tight_seed1.pid
+
+# 修改后的 IRWS（独立副本）训练 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SM_Medium_seed1.pid
+
+# 修改后的 IRWS（独立副本）训练 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SM_Loose_seed1.pid
+
+# 修改后的 IRWS（独立副本）训练 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SL_Tight_seed1.pid
+
+# 修改后的 IRWS（独立副本）训练 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SL_Medium_seed1.pid
+
+# 修改后的 IRWS（独立副本）训练 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/irws_restored_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/irws_restored_SL_Loose_seed1.pid
+
+【评测：同任务规模 S，测试种子 700–729，共30个实例】
+--------------------------------
+
+# 修改后的 IRWS（独立副本）评测 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SS_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SS_Tight_seed1.pid
+
+# 修改后的 IRWS（独立副本）评测 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource S --deadline Medium --train-task S --train-resource S --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SS_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SS_Medium_seed1.pid
+
+# 修改后的 IRWS（独立副本）评测 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource S --deadline Loose --train-task S --train-resource S --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SS_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SS_Loose_seed1.pid
+
+# 修改后的 IRWS（独立副本）评测 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource M --deadline Tight --train-task S --train-resource M --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SM_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SM_Tight_seed1.pid
+
+# 修改后的 IRWS（独立副本）评测 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource M --deadline Medium --train-task S --train-resource M --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SM_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SM_Medium_seed1.pid
+
+# 修改后的 IRWS（独立副本）评测 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource M --deadline Loose --train-task S --train-resource M --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SM_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SM_Loose_seed1.pid
+
+# 修改后的 IRWS（独立副本）评测 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource L --deadline Tight --train-task S --train-resource L --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SL_Tight_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SL_Tight_seed1.pid
+
+# 修改后的 IRWS（独立副本）评测 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource L --deadline Medium --train-task S --train-resource L --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SL_Medium_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SL_Medium_seed1.pid
+
+# 修改后的 IRWS（独立副本）评测 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: training stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_restored/evaluate.py --task S --resource L --deadline Loose --train-task S --train-resource L --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 1 --device cuda' > outputs/server_console_logs/eval_irws_restored_SL_Loose_seed1.log 2>&1 & echo $! > outputs/server_console_logs/eval_irws_restored_SL_Loose_seed1.pid

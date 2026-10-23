@@ -10,14 +10,15 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
-from common.f18_state_normalization import bind_normalization, check_checkpoint, normalization_diagnostics
-from common.f11 import LocalDecisionTrace, F11Logger, protect_training_outputs, LEARNING_MODEL, valid_decision
+from common.f18_state_normalization import bind_normalization, normalization_diagnostics
+from common.f11 import F11Logger, protect_training_outputs, valid_decision
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
 from common.experiment_measurements import TrainingRecorder, collect_validation
 from common.workflow_opt import energy_from_records
-from algorithms.marl.agents import A2CAgent, A2CConfig, LocalSharedActorIndependentCriticA2C
+from algorithms.marl.q_agents import MODEL_VERSION, QAgent, QConfig, IndependentLocalAgents, Decision, QDecisionTrace, learner_map
+from algorithms.marl.identity import DISPLAY_NAME
 from environments.marl import CloudWorkflowEnv_MARL
 
 
@@ -58,8 +59,8 @@ def _load_cache_seeds(deadline_cache_path: str):
 
 def evaluate_marl(
     env_kwargs,
-    global_agent: A2CAgent,
-    local_agent: LocalSharedActorIndependentCriticA2C,
+    global_agent: QAgent,
+    local_agent: IndependentLocalAgents,
     eval_seeds,
     episode_id_base: int = 0,
 ):
@@ -136,6 +137,7 @@ def evaluate_marl(
 
 
 def train():
+    print(f"[{DISPLAY_NAME}] algorithm={MODEL_VERSION}")
     random_seed = SCENARIO.first_training_seed()
     set_seed(SCENARIO.model_seed)
     dax_dir = os.path.join(ROOT_DIR, "data/dax")
@@ -170,7 +172,7 @@ def train():
         dump_deadlines=True,
         print_deadlines=True,
         deadlines_out_dir=os.path.join(str(SCENARIO.log_dir("marl")), "deadlines"),
-        deadlines_file_prefix="marl",
+        deadlines_file_prefix=MODEL_VERSION,
     )
     env_kwargs.update(SCENARIO.normalization_kwargs())
     protect_training_outputs(SCENARIO.checkpoint_dir("marl"), SCENARIO.log_dir("marl"))
@@ -196,40 +198,42 @@ def train():
     )
     print(f"[device] {device}")
     hid_host = (1024, 1024, 512, 512, 256)
-    cfg_global = A2CConfig(
+    cfg_global = QConfig(
         lr=0.0003,
         gamma=0.95,
-        vf_coef=0.5,
-        ent_coef=0.01,
-        grad_clip=10.0,
+        ent_coef=0.0,
+        grad_clip=0.0,
         device=device,
         hidden_dims=hid_host,
     )
     hid_vm = (1024, 1024, 512, 512, 256)
-    cfg_local = A2CConfig(
+    cfg_local = QConfig(
         lr=0.0003,
         gamma=0.95,
-        vf_coef=0.5,
-        ent_coef=0.01,
-        grad_clip=10.0,
+        ent_coef=0.0,
+        grad_clip=0.0,
         device=device,
         hidden_dims=hid_vm,
     )
-    global_agent = A2CAgent(global_obs_dim, global_act_dim, cfg_global)
+    global_agent = QAgent(global_obs_dim, global_act_dim, cfg_global, peer_act_dim=local_act_dim)
     bind_normalization(global_agent, SCENARIO)
-    local_agent = LocalSharedActorIndependentCriticA2C(
+    local_agent = IndependentLocalAgents(
         local_obs_dim, local_act_dim, num_hosts=SCENARIO.num_hosts, cfg=cfg_local
     )
     bind_normalization(local_agent, SCENARIO)
+    learners = learner_map(global_agent, local_agent)
+    for agent in local_agent.agents:
+        bind_normalization(agent, SCENARIO)
     save_dir = str(SCENARIO.checkpoint_dir("marl"))
     log_path = os.path.join(
-        ROOT_DIR, "outputs", "logs", SCENARIO.model_name("marl"), "train_metrics_marl.csv"
+        ROOT_DIR, "outputs", "logs", SCENARIO.model_name("marl"), f"train_metrics_{MODEL_VERSION}.csv"
     )
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)
     logger = CSVLogger(
         filepath=log_path,
         fieldnames=[
+            "algorithm",
             "step",
             "episode",
             "type",
@@ -269,7 +273,8 @@ def train():
     global_step = 0
     episode_idx = 0
     f11_log = F11Logger(os.path.dirname(log_path))
-    recorder = TrainingRecorder(os.path.dirname(log_path), SCENARIO, 'marl', env, {'Global': global_agent, 'Local': local_agent})
+    recorder = TrainingRecorder(os.path.dirname(log_path), SCENARIO, MODEL_VERSION, env, learners)
+    save_locals = recorder.checkpoint(local_agent.save)
     while episode_idx < max_episodes:
         train_seed = SCENARIO.training_seed(episode_idx)
         obs, _info = env.reset(
@@ -282,7 +287,8 @@ def train():
             },
         )
         done = bool(env.done_flag)
-        local_trace = LocalDecisionTrace(local_agent)
+        global_trace = QDecisionTrace(global_agent)
+        local_traces = [QDecisionTrace(agent) for agent in local_agent.agents]
         ep_energy0 = float(env.total_energy)
         ep_ret_g = 0.0
         ep_ret_l = 0.0
@@ -293,6 +299,12 @@ def train():
             gobs = np.array(obs["global_obs"], copy=True)
             gmask = np.array(obs["global_mask"], copy=True)
             valid_decision(gobs, gmask)
+            if global_trace.pending is not None:
+                peer_probabilities = {}
+                for h in np.flatnonzero(gmask > .5):
+                    peer_obs, peer_mask, _ = env.get_local_state(env.host_ids[int(h)])
+                    peer_probabilities[int(h)] = local_agent.agents[int(h)].action_probabilities(peer_obs, peer_mask)
+                global_trace.advance(gobs, gmask, peer_probabilities)
             a_host = global_agent.select_action(gobs, gmask, deterministic=False)
             host_id = env.host_ids[int(a_host)]
             host_index = int(a_host)
@@ -300,25 +312,24 @@ def train():
             if not vm_map or not np.any(lmask > 0.5):
                 raise RuntimeError("Global selected a legal Host without a real Local VM decision")
             lobs, lmask = np.array(lobs, copy=True), np.array(lmask, copy=True)
-            local_trace.advance(lobs, lmask, host_index=host_index)
+            local_trace = local_traces[host_index]
+            local_trace.advance(lobs, lmask)
             a_vm = local_agent.select_action(lobs, lmask, host_index=host_index, deterministic=False)
+            global_decision = Decision(gobs, gmask, a_host, peer_action=a_vm)
+            local_decision = Decision(lobs, lmask, a_vm)
             obs2, r_g, r_l, done, info2 = env.step(int(a_host), int(a_vm))
             late, _wf = _update_lateness_stats(info2, ep_wf_late)
             ep_total_late += late
             ep_task_cnt += 1
-            gobs2 = obs2["global_obs"]
-            gmask2 = obs2["global_mask"]
-            if info2.get("truncated", False):
-                global_agent.f11.truncation_cutoffs += 1
-            _loss_g = global_agent.update_one_step(
-                gobs, gmask, int(a_host), float(r_g), gobs2, gmask2, float(done)
-            )
-            local_trace.record(lobs, lmask, a_vm, r_l, host_index=host_index)
+            global_trace.record(global_decision, r_g)
+            local_trace.record(local_decision, r_l)
             if done:
-                local_trace.finish(truncated=bool(info2.get("truncated", False)))
+                for trace in (global_trace, *local_traces):
+                    trace.finish(truncated=bool(info2.get("truncated", False)))
             ep_ret_g += float(r_g)
             ep_ret_l += float(r_l)
             logger.log(
+                algorithm=MODEL_VERSION,
                 step=global_step,
                 episode=episode_idx,
                 type="step",
@@ -351,14 +362,18 @@ def train():
             obs = obs2
             global_step += 1
         ep_energy = float(env.total_energy - ep_energy0)
-        local_trace.finish()
-        f11_log.log(episode_idx, {"Global": global_agent, "Local": local_agent}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO),
-                    pending=int(local_trace.pending is not None),
-                    local_reward_balance=local_trace.recorded_reward - local_trace.emitted_reward)
+        for trace in (global_trace, *local_traces):
+            trace.finish()
+        f11_log.log(episode_idx, learners, algorithm_version=MODEL_VERSION,
+                    normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO),
+                    pending=sum(t.pending is not None for t in (global_trace, *local_traces)),
+                    global_reward_balance=global_trace.recorded_reward - global_trace.emitted_reward,
+                    local_reward_balance=sum(t.recorded_reward - t.emitted_reward for t in local_traces))
         ep_total_late, ep_avg_late, ep_wf_avg_late = _finalize_lateness_stats(
             ep_total_late, ep_task_cnt, ep_wf_late
         )
         logger.log(
+            algorithm=MODEL_VERSION,
             step=global_step,
             episode=episode_idx,
             type="episode",
@@ -416,6 +431,7 @@ def train():
                 episode_id_base=100000 + episode_idx * 10,
             )
             logger.log(
+                algorithm=MODEL_VERSION,
                 step=global_step,
                 episode=episode_idx,
                 type="eval",
@@ -451,7 +467,7 @@ def train():
             if eval_energy < best_eval_energy:
                 best_eval_energy = eval_energy
                 global_agent.save(best_global_path)
-                local_agent.save(best_local_path)
+                save_locals(best_local_path)
                 print(
                     f"  ⭐ save best: {best_eval_energy:.3f}J -> {best_global_path} / {best_local_path}"
                 )
@@ -459,7 +475,7 @@ def train():
     global_final = os.path.join(save_dir, "global_final.pth")
     local_final = os.path.join(save_dir, "local_final.pth")
     global_agent.save(global_final)
-    local_agent.save(local_final)
+    save_locals(local_final)
     print("训练结束：")
     print(f"  total_episodes={episode_idx}")
     print(f"  total_steps   ={global_step}")

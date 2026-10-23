@@ -1,0 +1,17 @@
+{
+  "physical_methods_unchanged": [
+    "step",
+    "_assign_task_to_vm",
+    "_task_duration",
+    "_energy_rewards_to_current_time",
+    "_advance_until_decision",
+    "_add_workflow_if_arrived",
+    "_process_finish_events",
+    "_update_current_task_fcfs"
+  ],
+  "assignments": 59,
+  "local_features_identical_except_removed_host_onehot": true,
+  "step_rewards_identical": true,
+  "episode_metrics_identical": true,
+  "energy_J": 20677.504233291886
+}

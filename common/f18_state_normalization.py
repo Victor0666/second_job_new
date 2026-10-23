@@ -8,6 +8,8 @@ from common.f19_numerics import NumericalDiagnostics
 VERSION = 'f18_shared_v1'
 CURRENT_VERSION = 'f19_shared_v1'
 SHARED_VERSIONS = (VERSION, CURRENT_VERSION)
+PD3QN_UNITS = 'pd3qn_units_v1'
+PD3QN_OBSERVATION = 'task6_vm4_parentdata_host2_v3'
 DEFAULT_CONFIG = Path(__file__).resolve().parents[1] / 'outputs/f18_normalization_calibration/f18_shared_normalization_v1.json'
 SCALE_UNITS = dict(R_ref='tasks', T_ref='s', workload_mi_ref='MI', input_bits_ref='bit',
                    output_bits_ref='bit', up_rank_ref='s', down_rank_ref='s',
@@ -69,9 +71,29 @@ class StateNormalizer:
         return min(1., max(0., self.scale(count, 'R_ref')))
 
 
+class PD3QNUnitNormalizer(StateNormalizer):
+    """Fixed physical units only: no calibration, fitted statistics or clipping."""
+    def __init__(self, source_scene=None):
+        self.version = PD3QN_UNITS
+        self.scales = dict(R_ref=1., T_ref=1000., workload_mi_ref=100.,
+                           input_bits_ref=8.*1024**3, output_bits_ref=8.*1024**3,
+                           vm_pc_ref=1., vm_bw_ref=1000.)
+        self.numerics = NumericalDiagnostics()
+        self.metadata = dict(normalization_version=PD3QN_UNITS, source_train_scene=source_scene,
+                             observation_layout=PD3QN_OBSERVATION,
+                             normalization_config_hash=hashlib.sha256(
+                                 json.dumps(self.scales, sort_keys=True).encode()).hexdigest(),
+                             observation_scales=dict(self.scales), R_ref=1., T_ref=1000.)
+
+    def rr(self, count):
+        return self.scale(count, 'R_ref')
+
+
 def load_normalizer(mode='legacy', path=None, source_scene=None):
     if mode == 'legacy':
         return None
+    if mode == PD3QN_UNITS:
+        return PD3QNUnitNormalizer(source_scene)
     if mode not in SHARED_VERSIONS or not source_scene:
         raise ValueError('Specify f19_shared_v1/f18_shared_v1 and a source training scene, or explicit legacy')
     return StateNormalizer(path or DEFAULT_CONFIG, source_scene, version=mode)
@@ -138,7 +160,7 @@ def checkpoint_metadata(agent):
 def check_checkpoint(actual, expected):
     actual = actual or {'normalization_version':'legacy'}
     expected = expected or {'normalization_version':'legacy'}
-    for key in ('normalization_version', 'source_train_scene', 'normalization_config_hash', 'R_ref', 'T_ref', 'experiment_protocol_hash', 'io_ratio_encoding', 'io_ratio_ref', 'scale_config_version', 'energy_accounting'):
+    for key in ('normalization_version', 'observation_layout', 'source_train_scene', 'normalization_config_hash', 'R_ref', 'T_ref', 'experiment_protocol_hash', 'io_ratio_encoding', 'io_ratio_ref', 'scale_config_version', 'energy_accounting'):
         if actual.get(key) != expected.get(key):
             raise ValueError('Checkpoint normalization mismatch: ' + key)
 
@@ -149,7 +171,7 @@ def bind_normalization(agent, scenario):
 
 def observe_rr(env, ready_count):
     n = getattr(env, 'state_normalizer', None)
-    if n is None or ready_count <= 0:
+    if n is None or n.version == PD3QN_UNITS or ready_count <= 0:
         return
     episode = (env.random_seed, id(env.task_state))
     if getattr(env, '_f18_rr_episode', None) != episode:

@@ -2,6 +2,7 @@
 """
 b_marl_FCFS/marl_agents.py
 
+Historical A2C compatibility fixtures. Formal train/evaluate use q_agents.py.
 A2C with action-mask support.
 
 - GlobalAgent: 标准 A2C（actor+critic共享一套）

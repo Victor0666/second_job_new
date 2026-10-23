@@ -73,6 +73,7 @@ class F19Tests(unittest.TestCase):
         self.assertEqual(reference[0],reference[1])
 
     def test_cli_default_version_and_old_override(self):
+        from common.f18_state_normalization import PD3QN_UNITS
         for name in ('mahdrl','pd3qn','marl','irws','irws_paper','ablation_nohost','ablation_hostrand','ablation_vmrand','ablation_mgrrand'):
             for mode in ('train','eval'):
                 for encoding in (CURRENT_VERSION,VERSION):
@@ -80,7 +81,8 @@ class F19Tests(unittest.TestCase):
                     with patch('sys.argv',flags),redirect_stdout(io.StringIO()) as stream:
                         with self.assertRaises(SystemExit):parse_scenario(mode,name)
                     data=json.loads(stream.getvalue())
-                    self.assertEqual(data['normalization']['normalization_mode'],encoding)
+                    expected = PD3QN_UNITS if name == 'pd3qn' and encoding == CURRENT_VERSION else encoding
+                    self.assertEqual(data['normalization']['normalization_mode'],expected)
                     self.assertEqual(data['model_seed'],1)
 
     def test_versioned_paths_and_checkpoint_rejection(self):

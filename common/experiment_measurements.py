@@ -12,6 +12,7 @@ import time
 import numpy as np
 import torch
 from common.scenarios import MODEL_NAMES
+from algorithms.marl.identity import MODEL_VERSION as MARL_VERSION
 
 VERSION = 'review_metrics_v1'
 _active_validation = ContextVar('active_validation_recorder', default=None)
@@ -306,8 +307,16 @@ class EvaluationRecorder:
         self.excluded_seconds=0.;self.cached_state_seconds=0.;self.in_environment=False;self.api_samples=[]
         root=Path(__file__).resolve().parents[1]
         self.directory=Path(directory) if directory else root/'outputs/run'/VERSION/algorithm/scenario.output_version/(scenario.task+scenario.resource+'_'+scenario.deadline+'_model'+str(scenario.model_seed))
-        self.checkpoint_directory=checkpoint_directory or (str(scenario.checkpoint_override or scenario.checkpoint_dir(algorithm)) if algorithm in MODEL_NAMES else None)
+        checkpoint_algorithm = 'marl' if algorithm == MARL_VERSION else algorithm
+        self.checkpoint_directory=checkpoint_directory or (str(scenario.checkpoint_override or scenario.checkpoint_dir(checkpoint_algorithm)) if checkpoint_algorithm in MODEL_NAMES else None)
         if not self.enabled:return
+        if algorithm in (MARL_VERSION, 'pd3qn_dag'):
+            seed = int(getattr(env, 'episode_seed', env.random_seed))
+            for path in (self.directory/'episodes'/f'seed{seed}.json',
+                         self.directory/'workflows'/f'seed{seed}.csv',
+                         self.directory/'decisions'/f'seed{seed}.json'):
+                if path.exists():
+                    raise FileExistsError(f'{algorithm}: refusing to overwrite evaluation artifact: {path}')
         # A nested API call is already included in its outer measured interval.
         for name in ('get_manager_state','get_manager_action_mask','get_host_state_for_next_assignment',
             'get_vm_state_for_current_task','get_vm_state_for_next_assignment','get_action_mask','get_global_state','get_local_state',
@@ -381,7 +390,7 @@ class EvaluationRecorder:
             policy_call_counts={k:len(v) for k,v in self.by_role.items()})
         from common.f22_instances import artifact_info
         checkpoints=[artifact_info(p) for p in sorted(Path(self.checkpoint_directory).glob('best*.pth'))] if self.checkpoint_directory else []
-        if self.algorithm=='marl' and self.scenario.marl_options:
+        if self.algorithm in ('marl', MARL_VERSION) and self.scenario.marl_options:
             explicit=[self.scenario.marl_options[k] for k in ('ckpt_global','ckpt_local') if self.scenario.marl_options.get(k)]
             if explicit:checkpoints=[artifact_info(p) for p in explicit]
         record=dict(version=VERSION,algorithm=self.algorithm,model_seed=self.scenario.model_seed,seed=seed,

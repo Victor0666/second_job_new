@@ -9,10 +9,11 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
-from common.f18_state_normalization import bind_normalization, check_checkpoint, normalization_diagnostics
+from common.f18_state_normalization import PD3QN_UNITS, bind_normalization, normalization_diagnostics
 from common.f11 import pd3qn_transition, F11Logger, protect_training_outputs
+from algorithms.pd3qn.config import agent_kwargs, run_name
 
-SCENARIO = Scenario(mode="train")
+SCENARIO = Scenario(mode="train", normalization_mode=PD3QN_UNITS)
 from common.metrics_logger import CSVLogger
 from common.experiment_measurements import TrainingRecorder, collect_validation
 from common.d3qn_agent_PER import D3QNAgent
@@ -29,7 +30,7 @@ def set_seed(seed: int):
         torch.cuda.manual_seed_all(seed)
 
 
-def _warmup_ready(agent: D3QNAgent, warmup_frac: float = 0.03) -> bool:
+def _warmup_ready(agent: D3QNAgent, warmup_frac: float = 0.0) -> bool:
     maxlen = int(getattr(agent, "buffer_size", 0) or 0)
     need = int(maxlen * float(warmup_frac))
     need = max(need, int(agent.batch_size))
@@ -61,6 +62,9 @@ def evaluate_pd3qn(env_cls, env_kwargs: dict, agent: D3QNAgent, seeds):
 
 
 def train():
+    name = run_name(SCENARIO)
+    label = name.upper().replace('_', '-')
+    print(f'[{label} train]')
     dax_dir = os.path.join(ROOT_DIR, "data/dax")
     dax_list = SCENARIO.dax_paths(dax_dir)
     horizon = 1000000000.0
@@ -100,28 +104,14 @@ def train():
         deadline_cache_strict=True,
     )
     env_kwargs.update(SCENARIO.normalization_kwargs())
-    lr = 0.0003
-    gamma = 0.99
-    batch_size = 256
-    buffer_size = 120000
-    eps_start = 1.0
-    eps_end = 0.05
-    eps_decay_steps = 80000
-    target_update_tau = 0.005
-    grad_clip = 10.0
-    hidden_dims = (1024, 1024, 512, 512, 256)
-    use_per = True
-    per_alpha = 0.6
-    per_beta_start = 0.4
-    per_beta_end = 1.0
-    per_beta_steps = 80000
-    WARMUP_FRAC = 0.03
+    settings = agent_kwargs(SCENARIO)
+    WARMUP_FRAC = 0.0 if settings['paper_mode'] else 0.03
     MAX_EPISODES = SCENARIO.episodes
     SAVE_INTERVAL = 2000
     EVAL_SEEDS = SCENARIO.validation_seeds()
     save_dir = str(SCENARIO.checkpoint_dir("pd3qn"))
     log_path = os.path.join(
-        ROOT_DIR, "outputs", "logs", SCENARIO.model_name("pd3qn"), "train_metrics_pd3qn_cost.csv"
+        ROOT_DIR, "outputs", "logs", SCENARIO.model_name("pd3qn"), f"train_metrics_{name}_cost.csv"
     )
     protect_training_outputs(save_dir, os.path.dirname(log_path))
     os.makedirs(save_dir, exist_ok=True)
@@ -138,22 +128,8 @@ def train():
     agent = D3QNAgent(
         input_dim=obs_dim,
         output_dim=act_dim,
-        lr=lr,
-        gamma=gamma,
-        batch_size=batch_size,
-        buffer_size=buffer_size,
-        eps_start=eps_start,
-        eps_end=eps_end,
-        eps_decay_steps=eps_decay_steps,
-        target_update_tau=target_update_tau,
-        grad_clip=grad_clip,
-        hidden_dims=hidden_dims,
         device=device,
-        use_per=use_per,
-        per_alpha=per_alpha,
-        per_beta_start=per_beta_start,
-        per_beta_end=per_beta_end,
-        per_beta_steps=per_beta_steps,
+        **settings,
     )
     bind_normalization(agent, SCENARIO)
     logger = CSVLogger(
@@ -183,10 +159,11 @@ def train():
         ],
     )
     best_eval_energy = float("inf")
-    best_ckpt = os.path.join(save_dir, "best_pd3qn.pth")
+    best_ckpt = os.path.join(save_dir, f"best_{name}.pth")
     global_step = 0
     episode_idx = 0
     print(f"[env] obs_dim={obs_dim} act_dim={act_dim} | device={device}")
+    print(f"[agent] {settings}")
     print("torch.cuda.is_available():", torch.cuda.is_available())
     if torch.cuda.is_available():
         print("device_name:", torch.cuda.get_device_name(torch.cuda.current_device()))
@@ -198,12 +175,13 @@ def train():
         f"[reward shallow-align] alpha_delay_vm={ALPHA_DELAY_VM:.3f}, alpha_energy_vm={1.0 - ALPHA_DELAY_VM:.3f}, task_baseline_norm={TASK_BASELINE_NORM}, energy_reward_scale={ENERGY_REWARD_SCALE}"
     )
     f11_log = F11Logger(os.path.dirname(log_path))
-    recorder = TrainingRecorder(os.path.dirname(log_path), SCENARIO, 'pd3qn', env, {'PD3QN': agent})
+    recorder = TrainingRecorder(os.path.dirname(log_path), SCENARIO, name, env, {label: agent})
     HARD_MAX_STEPS = 10**9
     while episode_idx < MAX_EPISODES and global_step < HARD_MAX_STEPS:
         done = False
         ep_steps = 0
         obs, _ = env.reset()
+        agent.begin_episode()
         while not done:
             obs = np.array(obs, copy=True)
             mask = np.array(env.get_action_mask(), copy=True)
@@ -217,7 +195,7 @@ def train():
             obs = obs2
             ep_steps += 1
             global_step += 1
-        f11_log.log(episode_idx, {"PD3QN": agent}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO), pending=0,
+        f11_log.log(episode_idx, {label: agent}, normalization=normalization_diagnostics(env), instance=episode_identity(env, SCENARIO), pending=0,
                     terminated=bool(terminated), truncated=bool(truncated))
         m = env.get_episode_metrics()
         ep_energy = float(m["total_energy"])
@@ -248,20 +226,21 @@ def train():
             eval_makespan=float(eval_m["makespan"]),
         )
         print(
-            f"[episode={episode_idx}] steps={ep_steps} eps={agent.epsilon():.4f} energy={m['total_energy']:.3f}J | task_avg_tardy={m['task_avg_tardiness']:.6f} pct_tardy={m['pct_tardy']:.6f} | wf_avg_tardy={m['wf_avg_tardiness']:.6f} | makespan={m['makespan']:.3f} || eval_energy={eval_m['total_energy']:.3f}J (seeds={EVAL_SEEDS})"
+            f"[{label} episode={episode_idx}] steps={ep_steps} eps={agent.epsilon():.4f} energy={m['total_energy']:.3f}J | task_avg_tardy={m['task_avg_tardiness']:.6f} pct_tardy={m['pct_tardy']:.6f} | wf_avg_tardy={m['wf_avg_tardiness']:.6f} | makespan={m['makespan']:.3f} || eval_energy={eval_m['total_energy']:.3f}J (seeds={EVAL_SEEDS})"
         )
         if float(eval_m["total_energy"]) < best_eval_energy:
             best_eval_energy = float(eval_m["total_energy"])
             agent.save(best_ckpt)
             print(f"⭐ best updated: eval_energy={best_eval_energy:.3f}J -> saved {best_ckpt}")
         if global_step % SAVE_INTERVAL == 0:
-            agent.save(os.path.join(save_dir, f"pd3qn_step{global_step}.pth"))
+            agent.save(os.path.join(save_dir, f"{name}_step{global_step}.pth"))
         env.random_seed = SCENARIO.training_seed(episode_idx + 1) if episode_idx + 1 < SCENARIO.episodes else env.random_seed
         env_kwargs["random_seed"] = int(env.random_seed)
         episode_idx += 1
-    final_ckpt = os.path.join(save_dir, "pd3qn_final.pth")
+    final_ckpt = os.path.join(save_dir, f"{name}_final.pth")
     agent.save(final_ckpt)
-    print(f"训练结束：final={final_ckpt} \n best={best_ckpt} \n log={log_path}")
+    print(f"[{label} train completed] final={final_ckpt} | log={log_path}")
+    print(f"验证最优模型 best={best_ckpt}")
 
     recorder.close()
     logger.close()

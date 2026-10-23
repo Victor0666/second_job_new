@@ -1,0 +1,32 @@
+{
+  "description": "Two real 50-workflow training episodes, configured PD3QN settings; minimum-validation-energy best-model evaluation. Not a convergence test.",
+  "model": "paper_minimal_v5",
+  "normalization": "pd3qn_units_v1",
+  "observation_layout": "task6_vm4_parentdata_host2_v3",
+  "learning_rate": 0.01,
+  "training_seeds": [
+    0,
+    1
+  ],
+  "validation_seeds": [
+    600
+  ],
+  "test_seed": 700,
+  "transitions": 2735,
+  "updates": 2608,
+  "epsilon_steps": 2735,
+  "last_loss": 0.023257751017808914,
+  "parameters": 2222362,
+  "checkpoint": "best_pd3qn.pth",
+  "best_episode": 1,
+  "best_validation_energy": 315186.860625515,
+  "selected_checkpoint_epsilon_steps": 2735,
+  "final_checkpoint_saved": true,
+  "observation_dim": 112,
+  "calibration_file_needed": false,
+  "evaluation_assignments": 1370,
+  "evaluation_return": -75.93586541728568,
+  "evaluation_energy": 303743.46166914306,
+  "energy_balance": 5.238689482212067e-10,
+  "evaluation_changes_training_state": false
+}

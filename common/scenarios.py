@@ -10,8 +10,10 @@ from common.read_xml_opt_Tsize import DATA_MODEL
 from common.workflow_opt import ENERGY_ACCOUNTING
 from common.f11 import LEARNING_MODEL
 from common.experiment_protocol import ExperimentProtocol, protocol_hash, DEFAULT_PROTOCOL
-from common.f18_state_normalization import VERSION, CURRENT_VERSION, SHARED_VERSIONS, DEFAULT_CONFIG, scene_id, load_normalizer
+from common.f18_state_normalization import VERSION, CURRENT_VERSION, SHARED_VERSIONS, PD3QN_UNITS, PD3QN_OBSERVATION, DEFAULT_CONFIG, scene_id, load_normalizer
 from common.ta_weights import TA_WEIGHT_MODEL, TA_ALGORITHMS
+from algorithms.marl.identity import MODEL_VERSION as MARL_VERSION, DISPLAY_NAME as MARL_NAME, evaluation_directory, evaluation_csv
+from algorithms.pd3qn_dag.identity import RUN_NAME as PD3QN_DAG, MODEL_VERSION as PD3QN_DAG_VERSION
 
 ROOT = Path(__file__).resolve().parents[1]
 VM_COUNTS = {"S": (9, 8, 8), "M": (9, 9, 8, 8, 8, 8), "L": (9, 9, 9, 8, 8, 8, 8, 8, 8)}
@@ -43,7 +45,7 @@ MODEL_NAMES = {
     "ablation_vmrand": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_vmrand_hv_{deadline}",
     "ablation_nohost": "hrl2_task{task}_res{resource}_seed1_nohost_r075_ddlMix_{deadline}",
     "ablation_tl2": "tl2_task{task}_res{resource}_seed1_globalEnergy_r075_ddlMix_{deadline}",
-    "marl": "marl_task{task}_res{resource}_eval1_ep1000_mix_{deadline}",
+    "marl": MARL_VERSION + "_task{task}_res{resource}_model1_mix_{deadline}",
     "pd3qn": "pd3qn_task{task}_res{resource}_warmup_mix_nr_{deadline}",
     "irws": "irws_task{task}_res{resource}_mix_{deadline}_rewardPD3QN_{deadline}",
 }
@@ -109,7 +111,9 @@ class Scenario:
         source = scene_id(self.task if self.mode == 'train' else self.train_task,
                           self.resource if self.mode == 'train' else (self.train_resource or self.resource),
                           self.deadline if self.mode == 'train' else (self.train_deadline or self.deadline))
-        return dict(normalization_mode=self.normalization_mode, normalization_config=self.normalization_config, source_train_scene=source)
+        return dict(normalization_mode=self.normalization_mode,
+                    normalization_config=None if self.normalization_mode == PD3QN_UNITS else self.normalization_config,
+                    source_train_scene=source)
 
     def normalization_metadata(self):
         kw = self.normalization_kwargs()
@@ -131,7 +135,10 @@ class Scenario:
 
     def reproducibility_metadata(self):
         from common.f22_instances import reproducibility_metadata
-        return reproducibility_metadata(self)
+        metadata = reproducibility_metadata(self)
+        if self.normalization_mode == PD3QN_UNITS:
+            metadata['checkpoint_selection'] = 'minimum_validation_total_energy'
+        return metadata
 
 
     def __post_init__(self):
@@ -153,7 +160,7 @@ class Scenario:
             raise ValueError('Invalid source resource')
         if self.train_deadline is not None and self.train_deadline not in SMALL_PROBABILITY:
             raise ValueError('Invalid source deadline')
-        if self.normalization_mode not in ('legacy', *SHARED_VERSIONS):
+        if self.normalization_mode not in ('legacy', *SHARED_VERSIONS, PD3QN_UNITS):
             raise ValueError('Unknown observation normalization mode')
         if not self.legacy_split and not self.experiment_protocol:
             raise ValueError("Use explicit --legacy-split for historical overlapping protocols")
@@ -221,6 +228,11 @@ class Scenario:
 
     def model_name(self, algorithm):
         task = self.task if self.mode == "train" else self.train_task
+        if algorithm in ('pd3qn', PD3QN_DAG) and self.normalization_mode == PD3QN_UNITS:
+            resource = (self.train_resource or self.resource) if self.mode == 'eval' else self.resource
+            deadline = (self.train_deadline or self.deadline) if self.mode == 'eval' else self.deadline
+            name = f'{PD3QN_DAG}_task{task}_res{resource}_model{self.model_seed}_{deadline}_{LEARNING_MODEL}_{PD3QN_UNITS}'
+            return name + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING
         if algorithm == 'drl_gnn':
             name = MODEL_NAMES[algorithm].format(task=task,
                 resource=(self.train_resource or self.resource) if self.mode == 'eval' else self.resource,
@@ -232,11 +244,16 @@ class Scenario:
             deadline=(self.train_deadline or self.deadline) if self.mode == "eval" else self.deadline
         ) + "_" + LEARNING_MODEL + ("_" + TA_WEIGHT_MODEL if algorithm in TA_ALGORITHMS else "") + ("_" + self.normalization_mode if self.normalization_mode in SHARED_VERSIONS else "") + ("_protocol_" + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else "")
         name += "_" + ENERGY_ACCOUNTING
+        if algorithm == 'marl':
+            name = name.replace('_model1_', '_model' + str(self.model_seed) + '_')
         return name.replace("_seed1_", "_seed" + str(self.first_training_seed()) + "_") if self.protocol() else name
 
     @property
     def output_version(self):
-        return self.normalization_mode + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING
+        encoding = self.normalization_mode
+        if encoding == PD3QN_UNITS:
+            encoding = PD3QN_DAG_VERSION + '_' + PD3QN_OBSERVATION
+        return encoding + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING
 
     def checkpoint_dir(self, algorithm):
         if self.mode == "eval" and self.checkpoint_override:
@@ -277,11 +294,34 @@ class Scenario:
         if algorithm == 'drl_gnn':
             result['normalization'] = {'policy_input': 'source_raw_task4_vm3_bn_v1',
                 'additional_input_scaling': False, 'shared_calibration': self.normalization_kwargs()}
+        if algorithm == 'pd3qn':
+            from algorithms.pd3qn.config import agent_kwargs, run_name
+            result['algorithm'] = run_name(self)
+            result['display_name'] = run_name(self).upper().replace('_', '-')
+            result['agent'] = agent_kwargs(self)
+            if self.normalization_mode == PD3QN_UNITS:
+                result['normalization'] = load_normalizer(PD3QN_UNITS).metadata
+                result['normalization'].update(self.normalization_kwargs())
+                result['checkpoint_selection'] = 'minimum_validation_total_energy'
+                from algorithms.pd3qn_dag.identity import evaluation_directory as dag_eval_dir, evaluation_csv as dag_eval_csv
+                result['training_log_dir'] = str(self.log_dir('pd3qn'))
+                if self.mode == 'eval':
+                    result['evaluation_directory'] = str(dag_eval_dir(self, ROOT))
+                    result['evaluation_csv'] = str(dag_eval_csv(self, ROOT))
+        if algorithm == 'marl':
+            result.update(algorithm=MARL_VERSION, display_name=MARL_NAME,
+                          training_log_dir=str(self.log_dir('marl')))
+            if self.mode == 'eval':
+                result.update(evaluation_directory=str(evaluation_directory(self, ROOT)),
+                              evaluation_csv=str(evaluation_csv(self, ROOT)))
         return result
 
 
 def parse_scenario(mode, algorithm=None):
     parser = argparse.ArgumentParser(description=f'{algorithm or "Deadline cache"}: {mode}')
+    explicit_pd3qn_dag = algorithm in ('pd3qn_v5', PD3QN_DAG)
+    if explicit_pd3qn_dag:
+        algorithm = 'pd3qn'
     parser.add_argument("--task", choices=VM_COUNTS, default="S", help="Workflow size mixture")
     parser.add_argument("--resource", choices=VM_COUNTS, default="S", help="Cluster size")
     if mode != "precompute":
@@ -322,7 +362,11 @@ def parse_scenario(mode, algorithm=None):
         parser.add_argument('--legacy-split', action='store_true', help='Explicit historical data split; never labelled F22')
         parser.add_argument('--model-seed', type=int, default=1)
     if mode != 'precompute' and algorithm != 'ertf_fifs':
-        parser.add_argument('--normalization-mode', choices=(*SHARED_VERSIONS, 'legacy'), default=CURRENT_VERSION)
+        parser.add_argument('--normalization-mode',
+                            choices=(PD3QN_UNITS,) if explicit_pd3qn_dag else ((*SHARED_VERSIONS, 'legacy', PD3QN_UNITS) if algorithm == 'pd3qn' else (*SHARED_VERSIONS, 'legacy')),
+                            default=PD3QN_UNITS if algorithm == 'pd3qn' else CURRENT_VERSION,
+                            help=('PD3QN defaults to paper rules with fixed units; shared/legacy modes load the historical implementation'
+                                  if algorithm == 'pd3qn' else 'Observation preprocessing'))
         parser.add_argument('--normalization-config', default=str(DEFAULT_CONFIG))
         if mode == 'eval':
             parser.add_argument('--train-resource', choices=VM_COUNTS)

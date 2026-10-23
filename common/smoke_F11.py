@@ -51,11 +51,11 @@ def run_smoke(normalization_mode='legacy', normalization_config=None, irws_task=
                         return agent
                     patches = [patch.object(module, 'D3QNAgent', side_effect=make_agent)]
                 elif algorithm == 'marl':
-                    original_cfg = module.A2CConfig
+                    original_cfg = module.QConfig
                     def make_cfg(*args, **kwargs):
                         kwargs.update(hidden_dims=(16, 8), device='cpu')
                         return original_cfg(*args, **kwargs)
-                    patches = [patch.object(module, 'A2CConfig', side_effect=make_cfg)]
+                    patches = [patch.object(module, 'QConfig', side_effect=make_cfg)]
                 else:
                     original = module.PPOVMAgent
                     def make_ppo(cfg, hidden):
@@ -106,11 +106,11 @@ def run_smoke(normalization_mode='legacy', normalization_config=None, irws_task=
                                 return original_eval(*args,**kwargs)
                             eval_stack.enter_context(patch.object(ev,'D3QNAgent',side_effect=small_eval))
                         elif algorithm=='marl':
-                            original_eval_cfg=ev.A2CConfig
+                            original_eval_cfg=ev.QConfig
                             def small_eval_cfg(*args,**kwargs):
                                 kwargs.update(hidden_dims=(16,8),device='cpu')
                                 return original_eval_cfg(*args,**kwargs)
-                            eval_stack.enter_context(patch.object(ev,'A2CConfig',side_effect=small_eval_cfg))
+                            eval_stack.enter_context(patch.object(ev,'QConfig',side_effect=small_eval_cfg))
                         else:
                             original_eval_ppo=ev.PPOVMAgent
                             def small_eval_ppo(cfg,hidden):return original_eval_ppo(cfg,hidden=(16,8))

@@ -5,7 +5,7 @@ The step energy reward includes assignment energy and idle gaps inside used
 hosts' own task windows. Unused hosts and window head/tail idle are excluded.
 """
 
-from common.f18_state_normalization import checked_observation, load_normalizer, queue_features, observe_rr
+from common.f18_state_normalization import PD3QN_UNITS, checked_observation, load_normalizer, observe_rr
 
 import os
 import json
@@ -647,6 +647,12 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
                 ('workload_mi_ref', 'input_bits_ref', 'output_bits_ref', 'T_ref'))]
             obs[6:] = (np.stack([n.scale(av_in, 'T_ref'), n.scale(pc, 'vm_pc_ref'),
                                    n.scale(bw, 'vm_bw_ref')], axis=1)).reshape(-1)
+            if n.version == PD3QN_UNITS:
+                # Same-VM parent data is exempt from input transfer in the shared simulator.
+                local_bits = self._parent_input_bits_by_vm()
+                history = self._host_history_features()
+                history[:, 1] = n.scale(history[:, 1], 'T_ref')
+                obs = np.concatenate([obs, n.scale(local_bits, 'input_bits_ref'), history.reshape(-1)])
         elif self.normalize:
             obs = obs / (np.linalg.norm(obs) + 1e-6)
         return checked_observation(self, obs.astype(np.float32))
@@ -657,7 +663,30 @@ class CloudWorkflowEnv_PD3QN_Cost(gym.Env):
         idle = (self.vm_available_at <= self.current_time + 1e-12)
         return idle.astype(np.float32)
 
+    def _host_history_features(self) -> np.ndarray:
+        """Used flag and idle gap from the same host windows used for energy accounting."""
+        history = np.zeros((self.num_hosts, 2), dtype=np.float64)
+        for index, host_id in enumerate(self.hosts):
+            segments = self._host_segments[int(host_id)]
+            if segments:
+                history[index] = (1.0, max(0.0, self.current_time - segments[-1][1]))
+        return history
+
     # ---------------- helpers for parents_loc ----------------
+    def _parent_input_bits_by_vm(self) -> np.ndarray:
+        """Current task's parent input resident on each VM, using execution's placement map."""
+        local_bits = np.zeros(self.num_vms, dtype=np.float64)
+        if self._cur_task_gid is None:
+            return local_bits
+        task = self._get_task_obj_by_gid(self._cur_task_gid)
+        locations = self._build_parents_loc(self._cur_task_gid)
+        vm_indices = {vm_id: index for index, vm_id in enumerate(self.vm_ids)}
+        for parent, bits in task.parent_in_bits.items():
+            location = locations.get(parent)
+            if location is not None:
+                local_bits[vm_indices[location[0]]] += float(bits)
+        return local_bits
+
     def _get_task_obj_by_gid(self, gid: int):
         wf_id, local_id = self.task_meta[int(gid)]
         wf = self.workflows[int(wf_id)]

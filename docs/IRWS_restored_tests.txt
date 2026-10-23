@@ -1,0 +1,13 @@
+Restoring diagnostics after existing import side effect: {"F11_DIAGNOSTICS": "0", "F19_DIAGNOSTICS": "0", "EXPERIMENT_METRICS": "0"}
+9 historical caches: 450450 workflow template IDs match the current generator
+.........................................................................................................SS_T Resume scenario/seeds/cache mismatch
+SS seed=2 Tight: all 9 algorithms match on 50 complete workflow instances
+SS seed=2 Medium: all 9 algorithms match on 50 complete workflow instances
+SS seed=2 Loose: all 9 algorithms match on 50 complete workflow instances
+SS seed=2: parent 2 finish=101.793786, child 3 start=101.793786, finish=181.329154; tasks=1391, episode finish=2058.334148
+SS seed=2 alpha=2: 30 task deadlines, maximum gap=0.000000000000s
+..............................................................................................................................................................
+----------------------------------------------------------------------
+Ran 263 tests in 132.198s
+
+OK

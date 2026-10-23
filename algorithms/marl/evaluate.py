@@ -5,6 +5,7 @@ import os
 import sys
 import json
 import argparse
+from pathlib import Path
 from typing import Any, Dict, List
 import numpy as np
 import torch
@@ -14,8 +15,8 @@ if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
 from common.scenarios import Scenario, parse_scenario
 from common.experiment_measurements import EvaluationRecorder, episode_duration
-from common.f18_state_normalization import bind_normalization, check_checkpoint
-from common.f11 import LEARNING_MODEL
+from common.f18_state_normalization import bind_normalization
+from algorithms.marl.identity import MODEL_VERSION, DISPLAY_NAME, evaluation_directory, evaluation_csv
 
 SCENARIO = Scenario(mode="eval")
 
@@ -32,6 +33,14 @@ def set_seed(seed: int):
 
 def _ensure_dir(p: str):
     os.makedirs(p, exist_ok=True)
+
+
+def protect_evaluation_outputs(csv_path, directory):
+    csv_path, directory = Path(csv_path), Path(directory)
+    if csv_path.exists() or (directory.exists() and (not directory.is_dir() or any(directory.iterdir()))):
+        raise FileExistsError(
+            f'{DISPLAY_NAME}: refusing to append or overwrite evaluation results: {csv_path}; '
+            'use --out with a new CSV path for a separate evaluation')
 
 
 def _parse_seeds(s: str) -> List[int]:
@@ -80,7 +89,7 @@ def _mean(xs: List[float]) -> float:
 
 from common.metrics_logger import CSVLogger
 from common.workflow_opt import energy_from_records
-from algorithms.marl.agents import A2CAgent, A2CConfig, LocalSharedActorIndependentCriticA2C
+from algorithms.marl.q_agents import QAgent, QConfig, IndependentLocalAgents, learner_map
 from environments.marl import CloudWorkflowEnv_MARL
 
 
@@ -111,8 +120,8 @@ def build_env_kwargs(deadline_cache_path: str) -> Dict[str, Any]:
         strict_cache=True,
         dump_deadlines=True,
         print_deadlines=True,
-        deadlines_out_dir=os.path.join(PROJECT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, "marl", "deadlines"),
-        deadlines_file_prefix="marl",
+        deadlines_out_dir=str(evaluation_directory(SCENARIO, PROJECT_DIR) / 'deadlines'),
+        deadlines_file_prefix=MODEL_VERSION,
     )
 
 
@@ -141,34 +150,32 @@ def build_agents_and_probe_dims(
         env.close()
     del env
     hid_dims = (1024, 1024, 512, 512, 256)
-    cfg_global = A2CConfig(
+    cfg_global = QConfig(
         lr=0.0003,
         gamma=0.95,
-        vf_coef=0.5,
-        ent_coef=0.01,
-        grad_clip=10.0,
+        ent_coef=0.0,
+        grad_clip=0.0,
         device=device,
         hidden_dims=hid_dims,
     )
-    cfg_local = A2CConfig(
+    cfg_local = QConfig(
         lr=0.0003,
         gamma=0.95,
-        vf_coef=0.5,
-        ent_coef=0.01,
-        grad_clip=10.0,
+        ent_coef=0.0,
+        grad_clip=0.0,
         device=device,
         hidden_dims=hid_dims,
     )
-    global_agent = A2CAgent(global_obs_dim, global_act_dim, cfg_global)
+    global_agent = QAgent(global_obs_dim, global_act_dim, cfg_global, peer_act_dim=local_act_dim)
     bind_normalization(global_agent, SCENARIO)
-    local_agent = LocalSharedActorIndependentCriticA2C(
+    local_agent = IndependentLocalAgents(
         local_obs_dim, local_act_dim, num_hosts=SCENARIO.num_hosts, cfg=cfg_local
     )
     bind_normalization(local_agent, SCENARIO)
-    print(f"[MARL load] global: {ckpt_global}")
-    global_agent.load(ckpt_global, strict=True, require_learning_model=True)
-    print(f"[MARL load] local : {ckpt_local}")
-    local_agent.load(ckpt_local, strict=True, require_learning_model=True)
+    print(f"[{DISPLAY_NAME} load] global: {ckpt_global}")
+    global_agent.load(ckpt_global)
+    print(f"[{DISPLAY_NAME} load] local : {ckpt_local}")
+    local_agent.load(ckpt_local)
     dims = dict(
         global_obs_dim=global_obs_dim,
         global_act_dim=global_act_dim,
@@ -181,8 +188,8 @@ def build_agents_and_probe_dims(
 
 def evaluate_one_seed(
     env_kwargs: Dict[str, Any],
-    global_agent: A2CAgent,
-    local_agent: LocalSharedActorIndependentCriticA2C,
+    global_agent: QAgent,
+    local_agent: IndependentLocalAgents,
     seed: int,
     episode_id: int,
 ):
@@ -196,7 +203,8 @@ def evaluate_one_seed(
             "print_deadlines": False,
         },
     )
-    measurement = EvaluationRecorder(SCENARIO, 'marl', env, {'Global':global_agent,'Local':local_agent})
+    measurement = EvaluationRecorder(SCENARIO, MODEL_VERSION, env, learner_map(global_agent, local_agent),
+        directory=evaluation_directory(SCENARIO, PROJECT_DIR) / 'measurements')
     t_now = float(info0.get("current_time", getattr(env, "current_time", 0.0)))
     E0 = float(getattr(env, "total_energy", 0.0))
     arr = getattr(env, "arrival_times", [])
@@ -259,13 +267,14 @@ def evaluate_one_seed(
     host_r = float(ret_g)
     mgr_r = 0.0
     print(
-        f"[MARL0.75-MIX] vm={vm_r:.6f} host={host_r:.6f} mgr={mgr_r:.6f} energy={energy:.3f} J | task_avg_lateness={task_avg_lateness:.6f} task_avg_tardiness={task_avg_tardiness:.6f} task_success_rate={task_success_rate:.6f} task_pct_tardy={task_pct_tardy:.6f} | wf_avg_lateness={wf_avg_lateness:.6f} wf_avg_tardiness={wf_avg_tardiness:.6f} wf_success_rate={wf_success_rate:.6f} wf_pct_tardy={wf_pct_tardy:.6f} | makespan={makespan:.3f}"
+        f"[{DISPLAY_NAME}] vm={vm_r:.6f} host={host_r:.6f} mgr={mgr_r:.6f} energy={energy:.3f} J | task_avg_lateness={task_avg_lateness:.6f} task_avg_tardiness={task_avg_tardiness:.6f} task_success_rate={task_success_rate:.6f} task_pct_tardy={task_pct_tardy:.6f} | wf_avg_lateness={wf_avg_lateness:.6f} wf_avg_tardiness={wf_avg_tardiness:.6f} wf_success_rate={wf_success_rate:.6f} wf_pct_tardy={wf_pct_tardy:.6f} | makespan={makespan:.3f}"
     )
     measurement.finish()
     if hasattr(env, "close"):
         env.close()
     del env
     return dict(
+        algorithm=MODEL_VERSION,
         steps=float(steps),
         vm=float(vm_r),
         host=float(host_r),
@@ -289,15 +298,7 @@ def main():
     default_ckpt_dir = str(SCENARIO.checkpoint_dir("marl"))
     default_global = os.path.join(default_ckpt_dir, "best_global.pth")
     default_local = os.path.join(default_ckpt_dir, "best_local_actor_critics.pth")
-    default_out = os.path.join(
-        PROJECT_DIR,
-        "outputs",
-        "run",
-        SCENARIO.output_version,
-        LEARNING_MODEL,
-        "marl_fcfs_mix_ddlAlpha",
-        f"run_marl0p75_style_task{SCENARIO.task}_res{SCENARIO.resource}_ddlMix_{SCENARIO.deadline}.csv",
-    )
+    default_out = str(evaluation_csv(SCENARIO, PROJECT_DIR))
     args = argparse.Namespace(
         deadline_cache=default_cache,
         ckpt_global=default_global,
@@ -321,6 +322,7 @@ def main():
     if len(seeds) == 0:
         raise ValueError("seeds 为空")
     out_csv = os.path.abspath(args.out)
+    protect_evaluation_outputs(out_csv, evaluation_directory(SCENARIO, PROJECT_DIR))
     _ensure_dir(os.path.dirname(out_csv))
     device = args.device.strip().lower()
     if device == "cuda" and (not torch.cuda.is_available()):
@@ -331,13 +333,13 @@ def main():
     if missing:
         raise KeyError(f"strict_cache=True but these seeds not found in cache: {missing}")
     probe_seed = int(seeds[0])
-    print(f"[MARL-MIX] PROJECT_DIR={PROJECT_DIR}")
-    print(f"[MARL-MIX] deadline_cache={env_kwargs['deadline_cache_path']}")
-    print(f"[MARL-MIX] ckpt_global={ckpt_global}")
-    print(f"[MARL-MIX] ckpt_local ={ckpt_local}")
-    print(f"[MARL-MIX] seeds={seeds[0]}..{seeds[-1]} (n={len(seeds)}) device={device}")
+    print(f"[{DISPLAY_NAME}] PROJECT_DIR={PROJECT_DIR}")
+    print(f"[{DISPLAY_NAME}] deadline_cache={env_kwargs['deadline_cache_path']}")
+    print(f"[{DISPLAY_NAME}] ckpt_global={ckpt_global}")
+    print(f"[{DISPLAY_NAME}] ckpt_local ={ckpt_local}")
+    print(f"[{DISPLAY_NAME}] seeds={seeds[0]}..{seeds[-1]} (n={len(seeds)}) device={device}")
     print(
-        f"[MARL-MIX] ddlAlpha choices={env_kwargs['alpha_deadline_choices']} probs={env_kwargs['alpha_deadline_probs']}"
+        f"[{DISPLAY_NAME}] ddlAlpha choices={env_kwargs['alpha_deadline_choices']} probs={env_kwargs['alpha_deadline_probs']}"
     )
     global_agent, local_agent, dims = build_agents_and_probe_dims(
         env_kwargs=env_kwargs,
@@ -346,10 +348,13 @@ def main():
         ckpt_global=ckpt_global,
         ckpt_local=ckpt_local,
     )
-    print(f"[MARL-MIX probe] {dims}")
+    print(f"[{DISPLAY_NAME} probe] {dims}")
     logger = CSVLogger(
         filepath=out_csv,
         fieldnames=[
+            "algorithm",
+            "model_seed",
+            "source_train_scene",
             "run_idx",
             "seed",
             "vm",
@@ -385,6 +390,9 @@ def main():
             episode_id=100000 + idx,
         )
         logger.log(
+            algorithm=MODEL_VERSION,
+            model_seed=SCENARIO.model_seed,
+            source_train_scene=SCENARIO.normalization_kwargs()['source_train_scene'],
             run_idx=int(idx),
             seed=int(sd),
             vm=float(m["vm"]),
@@ -434,6 +442,9 @@ def main():
     steps_m = _mean(steps_list)
     diff_m = _mean(diff_list)
     logger.log(
+        algorithm=MODEL_VERSION,
+        model_seed=SCENARIO.model_seed,
+        source_train_scene=SCENARIO.normalization_kwargs()['source_train_scene'],
         run_idx="mean",
         seed="mean",
         vm=float(vm_m),
@@ -452,9 +463,10 @@ def main():
         steps=float(steps_m),
         energy_check_diff=float(diff_m),
     )
-    print("\n================= MARL0.75-MIX（multi-seed）汇总 =================")
+    logger.close()
+    print(f"\n================= {DISPLAY_NAME}（multi-seed）汇总 =================")
     print(
-        f"[MARL0.75-MIX] vm={vm_m:.6f} host={host_m:.6f} mgr={mgr_m:.6f} energy={e_m:.3f} J | task_avg_lateness={task_late_m:.6f} task_avg_tardiness={task_tard_m:.6f} task_success_rate={task_succ_m:.6f} task_pct_tardy={task_pct_m:.6f} | wf_avg_lateness={wf_late_m:.6f} wf_avg_tardiness={wf_tard_m:.6f} wf_success_rate={wf_succ_m:.6f} wf_pct_tardy={wf_pct_m:.6f} | makespan={ms_m:.3f}"
+        f"[{DISPLAY_NAME}] vm={vm_m:.6f} host={host_m:.6f} mgr={mgr_m:.6f} energy={e_m:.3f} J | task_avg_lateness={task_late_m:.6f} task_avg_tardiness={task_tard_m:.6f} task_success_rate={task_succ_m:.6f} task_pct_tardy={task_pct_m:.6f} | wf_avg_lateness={wf_late_m:.6f} wf_avg_tardiness={wf_tard_m:.6f} wf_success_rate={wf_succ_m:.6f} wf_pct_tardy={wf_pct_m:.6f} | makespan={ms_m:.3f}"
     )
     diffs = [x for x in diff_list if np.isfinite(x)]
     if diffs:

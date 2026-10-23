@@ -1,0 +1,9 @@
+{
+  "legacy_against_git_head": true,
+  "decisions": 8,
+  "updates": 7,
+  "actions_identical": true,
+  "losses_identical": true,
+  "priorities_identical": true,
+  "online_and_target_parameters_identical": true
+}

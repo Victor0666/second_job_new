@@ -61,10 +61,10 @@ def run(training_metrics=True):
                         return _original(*args,**kwargs)
                     stack.enter_context(patch.object(module,'D3QNAgent',side_effect=dqn))
                 elif entry=='marl':
-                    original=module.A2CConfig
+                    original=module.QConfig
                     def cfg(*args,**kwargs):
                         kwargs.update(hidden_dims=(16,8),device='cpu');return original(*args,**kwargs)
-                    stack.enter_context(patch.object(module,'A2CConfig',side_effect=cfg))
+                    stack.enter_context(patch.object(module,'QConfig',side_effect=cfg))
                 elif entry=='irws':
                     original=module.PPOVMAgent
                     def ppo(cfg,hidden):return original(cfg,hidden=(16,8))
@@ -86,7 +86,10 @@ def run(training_metrics=True):
                 elif name=='pd3qn':ev.evaluate_one_episode(env_factory,kw,agents['PD3QN'])
                 elif name=='marl':
                     with patch.object(ev,'CloudWorkflowEnv_MARL',side_effect=env_factory):
-                        ev.evaluate_one_seed(kw,agents['Global'],agents['Local'],700,0)
+                        locals = object.__new__(ev.IndependentLocalAgents)
+                        locals.agents = [agents[f'Local_{i}'] for i in range(scene.num_hosts)]
+                        locals.num_hosts = scene.num_hosts
+                        ev.evaluate_one_seed(kw,agents['Global'],locals,700,0)
                 elif name=='ablation_hostrand':ev.evaluate_hostrand_one_seed(env_factory,kw,agents['VA'],agents['TA'])
                 elif name=='ablation_mgrrand':ev.evaluate_mgrrand_one_seed(env_factory,kw,agents['VA'],agents['HA'])
                 elif name=='ablation_vmrand':ev.evaluate_hrl_vm_random_one_seed(env_factory,kw,agents['HA'],agents['TA'])

@@ -1,0 +1,41 @@
+test_cli_defaults_and_model_paths_are_isolated_without_calibration (common.test_pd3qn_paper.PD3QNPaperTests.test_cli_defaults_and_model_paths_are_isolated_without_calibration) ... ok
+test_epsilon_advances_on_training_decisions_only (common.test_pd3qn_paper.PD3QNPaperTests.test_epsilon_advances_on_training_decisions_only) ... ok
+test_eq29_differs_from_legacy_double_but_execution_uses_online (common.test_pd3qn_paper.PD3QNPaperTests.test_eq29_differs_from_legacy_double_but_execution_uses_online) ... ok
+test_eq29_masks_illegal_actions_and_zeroes_terminal_future (common.test_pd3qn_paper.PD3QNPaperTests.test_eq29_masks_illegal_actions_and_zeroes_terminal_future) ... ok
+test_evaluation_loads_best_checkpoint_in_paper_and_legacy_modes (common.test_pd3qn_paper.PD3QNPaperTests.test_evaluation_loads_best_checkpoint_in_paper_and_legacy_modes) ... ok
+test_explicit_old_v5_directory_can_load_its_previous_filename (common.test_pd3qn_paper.PD3QNPaperTests.test_explicit_old_v5_directory_can_load_its_previous_filename) ... ok
+test_explicit_v5_cli_identity_and_historical_mode_rejection (common.test_pd3qn_paper.PD3QNPaperTests.test_explicit_v5_cli_identity_and_historical_mode_rejection) ... ok
+test_fixed_units_change_observations_only_not_physics (common.test_pd3qn_paper.PD3QNPaperTests.test_fixed_units_change_observations_only_not_physics) ... ok
+test_fixed_units_preserve_sign_and_values_above_reference (common.test_pd3qn_paper.PD3QNPaperTests.test_fixed_units_preserve_sign_and_values_above_reference) ... ok
+test_hard_copy_uses_episode_decision_boundary (common.test_pd3qn_paper.PD3QNPaperTests.test_hard_copy_uses_episode_decision_boundary) ... ok
+test_host_history_disambiguates_equal_prefix_with_different_energy (common.test_pd3qn_paper.PD3QNPaperTests.test_host_history_disambiguates_equal_prefix_with_different_energy) ... ok
+test_host_history_uses_shared_window_and_clears_on_reset (common.test_pd3qn_paper.PD3QNPaperTests.test_host_history_uses_shared_window_and_clears_on_reset) ... ok
+test_new_priorities_and_training_share_eq29_target (common.test_pd3qn_paper.PD3QNPaperTests.test_new_priorities_and_training_share_eq29_target) ... ok
+test_old_agent_defaults_keep_update_clock_and_max_initial_priority (common.test_pd3qn_paper.PD3QNPaperTests.test_old_agent_defaults_keep_update_clock_and_max_initial_priority) ... ok
+test_paper_and_legacy_checkpoint_roundtrips (common.test_pd3qn_paper.PD3QNPaperTests.test_paper_and_legacy_checkpoint_roundtrips) ... ok
+test_parent_payload_sums_per_vm_with_workflow_global_ids (common.test_pd3qn_paper.PD3QNPaperTests.test_parent_payload_sums_per_vm_with_workflow_global_ids) ... ok
+test_parent_vm_location_disambiguates_identical_original_observations (common.test_pd3qn_paper.PD3QNPaperTests.test_parent_vm_location_disambiguates_identical_original_observations) ... ok
+test_proportional_replay_unweighted_mse_and_no_clipping (common.test_pd3qn_paper.PD3QNPaperTests.test_proportional_replay_unweighted_mse_and_no_clipping) ... ok
+test_train_eval_defaults_share_paper_settings_and_batch_only_warmup (common.test_pd3qn_paper.PD3QNPaperTests.test_train_eval_defaults_share_paper_settings_and_batch_only_warmup) ... ok
+test_unversioned_legacy_checkpoint_still_loads (common.test_pd3qn_paper.PD3QNPaperTests.test_unversioned_legacy_checkpoint_still_loads) ... ok
+test_v4_checkpoint_is_rejected_before_mutating_network (common.test_pd3qn_paper.PD3QNPaperTests.test_v4_checkpoint_is_rejected_before_mutating_network) ... ok
+test_all_evaluation_configurations (common.test_scenarios.ScenarioTests.test_all_evaluation_configurations) ... ok
+test_all_training_configurations (common.test_scenarios.ScenarioTests.test_all_training_configurations) ... ok
+test_precomputation_and_model_selection (common.test_scenarios.ScenarioTests.test_precomputation_and_model_selection) ... ok
+test_seed_validation (common.test_scenarios.ScenarioTests.test_seed_validation) ... ok
+test_actor_critic_updates_identical_and_profiles (common.test_f19.F19Tests.test_actor_critic_updates_identical_and_profiles) ... ok
+test_actual_mahdrl_marl_task_fields (common.test_f19.F19Tests.test_actual_mahdrl_marl_task_fields) ... ok
+test_bounded_per_field_quantiles_and_nonfinite (common.test_f19.F19Tests.test_bounded_per_field_quantiles_and_nonfinite) ... ok
+test_cli_default_version_and_old_override (common.test_f19.F19Tests.test_cli_default_version_and_old_override) ... ok
+test_dqn_updates_identical_with_diagnostics_disabled (common.test_f19.F19Tests.test_dqn_updates_identical_with_diagnostics_disabled) ... ok
+test_fixed_trace_physical_equivalence (common.test_f19.F19Tests.test_fixed_trace_physical_equivalence) ... ok
+test_gradients_observation_and_clipping (common.test_f19.F19Tests.test_gradients_observation_and_clipping) ... ok
+test_hooks_preserve_rng_outputs_and_weights (common.test_f19.F19Tests.test_hooks_preserve_rng_outputs_and_weights) ... ok
+test_paper_networks_and_meta_gradients_logged (common.test_f19.F19Tests.test_paper_networks_and_meta_gradients_logged) ... ok
+test_ratio_units_and_legacy (common.test_f19.F19Tests.test_ratio_units_and_legacy) ... ok
+test_versioned_paths_and_checkpoint_rejection (common.test_f19.F19Tests.test_versioned_paths_and_checkpoint_rejection) ... ok
+
+----------------------------------------------------------------------
+Ran 36 tests in 6.694s
+
+OK

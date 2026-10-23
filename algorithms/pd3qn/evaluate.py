@@ -12,10 +12,12 @@ if ROOT_DIR in sys.path:
 sys.path.insert(0, ROOT_DIR)
 from common.scenarios import Scenario, parse_scenario
 from common.experiment_measurements import EvaluationRecorder, episode_duration
-from common.f18_state_normalization import bind_normalization, check_checkpoint
+from common.f18_state_normalization import PD3QN_UNITS, bind_normalization
 from common.f11 import LEARNING_MODEL
+from algorithms.pd3qn.config import agent_kwargs, run_name
+from algorithms.pd3qn_dag.identity import RUN_NAME, evaluation_directory, evaluation_csv, protect_evaluation_outputs
 
-SCENARIO = Scenario(mode="eval")
+SCENARIO = Scenario(mode="eval", normalization_mode=PD3QN_UNITS)
 from common.metrics_logger import CSVLogger
 from common.workflow_opt import energy_from_records
 from common.d3qn_agent_PER import D3QNAgent
@@ -140,7 +142,10 @@ def _derive_workflow_metrics(metrics: dict) -> dict:
 def evaluate_one_episode(env_cls, env_kwargs: dict, agent: D3QNAgent, deterministic: bool = True):
     env = env_cls(**env_kwargs)
     ret = env.reset()
-    measurement = EvaluationRecorder(SCENARIO, 'pd3qn', env, {'PD3QN':agent})
+    name = run_name(SCENARIO)
+    directory = evaluation_directory(SCENARIO, ROOT_DIR) / 'measurements' if name == RUN_NAME else None
+    measurement = EvaluationRecorder(SCENARIO, name, env, {name.upper().replace('_', '-'):agent}, directory=directory,
+                                     checkpoint_directory=str(SCENARIO.checkpoint_dir('pd3qn')))
     obs = ret[0] if isinstance(ret, tuple) else ret
     t_now = getattr(env, "current_time", getattr(env, "time", getattr(env, "now", None)))
     E0 = getattr(env, "total_energy", None)
@@ -229,46 +234,43 @@ def build_agent_and_env_kwargs():
         except Exception:
             pass
     del tmp_env
-    print(f"[PD3QN-EVAL] obs_dim={obs_dim}, act_dim={act_dim}")
+    name = run_name(SCENARIO)
+    label = name.upper().replace('_', '-')
+    print(f"[{label} eval] obs_dim={obs_dim}, act_dim={act_dim}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     agent = D3QNAgent(
         input_dim=obs_dim,
         output_dim=act_dim,
-        lr=0.0003,
-        gamma=0.99,
-        batch_size=256,
-        buffer_size=120000,
-        eps_start=1.0,
-        eps_end=0.05,
-        eps_decay_steps=80000,
-        target_update_tau=0.005,
-        grad_clip=10.0,
-        hidden_dims=(1024, 1024, 512, 512, 256),
         device=device,
-        use_per=True,
-        per_alpha=0.6,
-        per_beta_start=0.4,
-        per_beta_end=1.0,
-        per_beta_steps=80000,
+        **agent_kwargs(SCENARIO),
     )
     bind_normalization(agent, SCENARIO)
-    ckpt_path = os.path.join(str(SCENARIO.checkpoint_dir("pd3qn")), "best_pd3qn.pth")
+    ckpt_path = os.path.join(str(SCENARIO.checkpoint_dir("pd3qn")), f"best_{name}.pth")
     if not os.path.exists(ckpt_path):
         raise FileNotFoundError(f"ckpt 不存在：{ckpt_path}")
-    print(f"[PD3QN-EVAL] load ckpt: {ckpt_path}")
+    print(f"[{label} eval] load ckpt: {ckpt_path}")
     agent.load(ckpt_path, require_learning_model=True)
     return (env_kwargs_base, agent)
 
 
 def main():
+    name = run_name(SCENARIO)
+    label = name.upper().replace('_', '-')
+    print(f'[{label} eval]')
     num_runs = len(SCENARIO.seeds)
     seeds = list(SCENARIO.seeds)
-    result_dir = os.path.join(ROOT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, "pd3qn_wfInfo_rn")
-    os.makedirs(result_dir, exist_ok=True)
+    result_dir = os.path.join(ROOT_DIR, "outputs", "run", SCENARIO.output_version, LEARNING_MODEL, f"{name}_wfInfo_rn")
     csv_path = os.path.join(
         result_dir,
-        f"run_pd3qn_task{SCENARIO.task}_res{SCENARIO.resource}_ddlAlphaMix_nr_{SCENARIO.deadline}.csv",
+        f"run_{name}_task{SCENARIO.task}_res{SCENARIO.resource}_ddlAlphaMix_nr_{SCENARIO.deadline}.csv",
     )
+    if name == RUN_NAME:
+        protect_evaluation_outputs(SCENARIO, ROOT_DIR)
+        csv_path = str(evaluation_csv(SCENARIO, ROOT_DIR))
+        result_dir = os.path.dirname(csv_path)
+    print(">>> build agent & env_kwargs ...")
+    env_kwargs_base, agent = build_agent_and_env_kwargs()
+    os.makedirs(result_dir, exist_ok=True)
     logger = CSVLogger(
         filepath=csv_path,
         fieldnames=[
@@ -299,8 +301,6 @@ def main():
             "eval_makespan",
         ],
     )
-    print(">>> build agent & env_kwargs ...")
-    env_kwargs_base, agent = build_agent_and_env_kwargs()
     ret_list, energy_list, makespan_list = ([], [], [])
     task_avg_late_list, task_avg_tardy_list, task_success_list = ([], [], [])
     wf_avg_late_list, wf_avg_tardy_list, wf_success_list = ([], [], [])
@@ -349,9 +349,9 @@ def main():
         wf_avg_tardy_list.append(_safe_float(m["wf_avg_tardiness"]))
         wf_success_list.append(_safe_float(m["wf_success_rate"]))
         print(
-            f"[PD3QN] return={_safe_float(eval_ret):.6f} steps={_safe_int(eval_steps)} | energy={_safe_float(m['total_energy']):.3f} J | task={_safe_int(m['num_tasks'])} tardy={_safe_int(m['num_tardy_tasks'])} | task_avg_lateness={_safe_float(m['task_avg_lateness']):.6f} task_avg_tardiness={_safe_float(m['task_avg_tardiness']):.6f} task_success_rate={_safe_float(m['task_success_rate']):.6f} | wf={_safe_int(m['num_workflows'])} tardy={_safe_int(m['num_tardy_workflows'])} | wf_avg_lateness={_safe_float(m['wf_avg_lateness']):.6f} wf_avg_tardiness={_safe_float(m['wf_avg_tardiness']):.6f} wf_success_rate={_safe_float(m['wf_success_rate']):.6f} | makespan={_safe_float(m['makespan']):.3f}"
+            f"[{label}] return={_safe_float(eval_ret):.6f} steps={_safe_int(eval_steps)} | energy={_safe_float(m['total_energy']):.3f} J | task={_safe_int(m['num_tasks'])} tardy={_safe_int(m['num_tardy_tasks'])} | task_avg_lateness={_safe_float(m['task_avg_lateness']):.6f} task_avg_tardiness={_safe_float(m['task_avg_tardiness']):.6f} task_success_rate={_safe_float(m['task_success_rate']):.6f} | wf={_safe_int(m['num_workflows'])} tardy={_safe_int(m['num_tardy_workflows'])} | wf_avg_lateness={_safe_float(m['wf_avg_lateness']):.6f} wf_avg_tardiness={_safe_float(m['wf_avg_tardiness']):.6f} wf_success_rate={_safe_float(m['wf_success_rate']):.6f} | makespan={_safe_float(m['makespan']):.3f}"
         )
-    print("\n================= PD3QN 汇总 =================")
+    print(f"\n================= {label} 汇总 =================")
     print(f"avg_return             = {float(np.nanmean(ret_list)):.6f}")
     print(f"avg_energy             = {float(np.nanmean(energy_list)):.3f} J")
     print(f"avg_task_avg_lateness  = {float(np.nanmean(task_avg_late_list)):.6f}")
@@ -362,7 +362,8 @@ def main():
     print(f"avg_wf_success_rate    = {float(np.nanmean(wf_success_list)):.6f}")
     print(f"avg_makespan           = {float(np.nanmean(makespan_list)):.3f}")
     print("===============================================")
-    print(f"CSV saved: {csv_path}")
+    logger.close()
+    print(f"[{label} eval completed] CSV saved: {csv_path}")
 
 
 if __name__ == "__main__":

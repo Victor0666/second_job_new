@@ -615,7 +615,7 @@ def evaluate_hrl_mix_one_seed(env_cls, env_kwargs, vm_agent, host_agent, manager
     return metrics
 
 
-def build_three_layer_agents_and_load(env_kwargs: dict):
+def build_three_layer_agents_and_load(env_kwargs: dict, device=None):
     ctor_block = {
         "energy_reward_scale",
         "task_baseline_norm",
@@ -646,7 +646,7 @@ def build_three_layer_agents_and_load(env_kwargs: dict):
     print(
         f"[HRL_MIX probe] host_obs_dim={host_state_dim}, host_act_dim={host_act_dim} | vm_obs_dim={vm_state_dim}, vm_act_dim={vm_act_dim} | mgr_obs_dim={mgr_state_dim}, mgr_act_dim={NUM_OPTIONS}"
     )
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = torch.device(device if device is not None else ("cuda" if torch.cuda.is_available() else "cpu"))
     vm_agent = D3QNAgent(
         input_dim=vm_state_dim,
         output_dim=vm_act_dim,

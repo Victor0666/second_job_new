@@ -1,5 +1,6 @@
 # MAHDRL 实验代码
 
+
 `algorithms/` 按算法分目录，每个算法集中保存统一训练/评测入口及专用智能体；环境集中在 `environments/`。场景由命令行参数选择。
 
 新增独立变式 `mahdrl_oe`（MAHDRL-OE），实施截止期/功耗/候选主机观测增强与按分配结算能耗奖励，保留原 MAHDRL。用 `run.cmd algorithms/mahdrl_oe/train.py` 或 `run.cmd algorithms/mahdrl_oe/evaluate.py` 启动，场景参数相同，模型与输出独立；详见 [MAHDRL-OE 说明](docs/MAHDRL_OE.md)。
@@ -86,7 +87,11 @@ S 任务仅使用约 30 节点的五类工作流；M 任务按 30/50 节点组�
 
 MARL 额外保留 `--deadline-cache`、`--ckpt-global`、`--ckpt-local`、`--out` 和 `--device`，可用 `--help` 查看。其余算法自动选择 CUDA 或 CPU。
 
-训练输出在 `outputs/ckpts` 和 `outputs/logs`，评测 CSV 在 `outputs/run`。训练会更新所选场景的模型和日志；需要保留旧实验时，先备份这些目录。评测不会自动搜索并替换为其他场景的模型；缺失模型时会明确报错。
+MARL 正式入口现为 `marl_q_v2`：独立 Local Actor/Critic、动作条件 Q、Global 参照 MAHDRL HA 补全观测；同一条经验先更新 Critic，再用更新后的 Q 更新 Actor，随后采样下一动作。原文未明确 TD 公式的部分使用合法动作的策略期望 Q。熵和梯度裁剪关闭，保留公共归一化与奖励。旧 A2C 和 v1 模型不能加载，需重训，训练/评测命令不变，输出进入独立版本目录。实现与验收见 [MARL Q 适配说明](docs/MARL_Q_implementation.md)。
+
+新 MARL 按独立对比算法标记为 **MARL-Q**，CSV 和测量 JSON 的 `algorithm` 均为 `marl_q_v2`。训练日志名为 `train_metrics_marl_q_v2.csv`；默认评测结果位于 `outputs/run/marl_q_v2/<协议与归一化版本>/from_<训练场景>_model<模型种子>/eval_<评测场景>/`，其中 CSV 为 `evaluation_marl_q_v2.csv`，逐种子明细在 `measurements/`。旧 MARL/A2C/v1 的目录不阻挡新实验；同一新版训练目录非空或同一评测目的地已有结果时明确报错，防止追加或覆盖。另一次评测可通过 `--out <新的CSV路径>` 同时隔离 CSV 和附属明细。`--dry-run` 会打印实际目的地。
+
+训练输出在 `outputs/ckpts` 和 `outputs/logs`，评测 CSV 在 `outputs/run`。MARL 的重复写入规则见上段；其他算法沿用各自的输出规则。评测不会自动搜索并替换为其他场景的模型；缺失模型时会明确报错。
 
 ## 截止期缓存、绘图与检查
 
@@ -272,3 +277,17 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 新增独立的 `mahdrl_oe_ge` 和 `mahdrl_oe_ge_pf`。前者结合 OE 观测/逐分配能耗奖励与 GE 探索；后者再加 PF，按筛选后的候选计算 OE 摘要、执行 GE，并一致限制 TD 后继动作。原 MAHDRL 及 OE/GE/PF/TS/UB 各单独变式保持原样；两组合的模型、日志和评测结果独立，拒绝错版本权重。实现、验证和 50/600 代训练评测命令见 [组合说明](docs/MAHDRL_OE_GE_combinations.md)。
 
 另新增独立的 `mahdrl_oe_pf`，保留 OE 观测/逐分配能耗奖励与 PF 筛选，使用原 epsilon-greedy，不加入 GE 引导探索。原版、各单独变式及已有两个组合保持不变；本版模型与输出独立。实现、检查和训练评估命令见 [OE＋PF 说明](docs/MAHDRL_OE_PF.md)。
+
+### PD3QN-DAG 独立对比算法
+
+新版作为独立对比算法命名为 **PD3QN-DAG**（DAG工作流适配），算法ID为 `pd3qn_dag`、模型版本为 `pd3qn_dag_v1`，入口为 `algorithms/pd3qn_dag/train.py` 和 `evaluate.py`。算法计算沿用此前v5：batch/回放容量/lr/gamma为论文128/10000/0.01/0.95，硬同步60、MSE、PER，无IS/裁剪；TD按式(29)由target取最大合法Q。共享隐层保留指定的1024、1024、512、512、256，输入含父数据和Host历史窗口，SS为112维。公共物理成本、奖励系数、数据划分及best选模不变。
+
+原 `algorithms/pd3qn/train.py`、`evaluate.py` 作为兼容入口保留。显式传入旧 `--normalization-mode f19_shared_v1`、`f18_shared_v1` 或 `legacy` 会选择历史学习实现及旧 best 模型，用于复查已有结果；它们不是新版的归一化消融开关。公共云 DAG、奖励和物理模型保留适配，不能称原始 IIoT 问题完全复现。原文歧义、未披露参数的固定取值、命令及验证见 [PD3QN 实现说明](docs/PD3QN_paper_implementation.md)。
+
+新模型和日志目录前缀为 `pd3qn_dag_`，文件为 `best_pd3qn_dag.pth`、`pd3qn_dag_final.pth`、`train_metrics_pd3qn_dag_cost.csv`；评测输出集中在 `outputs/run/pd3qn_dag/`，主CSV以 `eval_pd3qn_dag_` 开头，明细放在同场景/模型目录内。旧PD3QN和v5文件不动、不自动加载；新训练/评测同名输出已存在时，写入前报错，避免追加混合或覆盖。新旧checkpoint实现标记隔离，需在新目录重训。`pd3qn_v5`入口保留为新算法别名。命令及覆盖规则见[实现说明](docs/PD3QN_paper_implementation.md)。
+
+各算法实际奖励的公式、能耗结算时点/范围、MAHDRL 变式与 IRWS 融合差异见 [奖励设置核查](docs/Algorithm_reward_settings_2026-10-23.md)。
+
+### IRWS-R 独立对比算法
+
+此前修改的IRWS现在使用独立入口`algorithms/irws_r/train.py`、`evaluate.py`，显示名称为**IRWS-R**，算法ID为`irws_r`，模型版本为`irws_r_v1`。新模型使用`best_irws_r.pth`、`final_irws_r.pth`；训练、评测主文件均带`irws_r`前缀，目录按模型种子隔离。新训练及评测入口拒绝覆盖已有结果。旧IRWS目录及结果保留；本次独立命名不改变此前v2的算法计算。命令与文件示例见[IRWS-R输出说明](docs/IRWS_R_output_identity.md)。

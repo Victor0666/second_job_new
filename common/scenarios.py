@@ -28,6 +28,7 @@ DAX_GROUPS = (
     ),
 )
 MODEL_NAMES = {
+    "drl_gnn": "drl_gnn_source_be67762_task{task}_res{resource}_seed1_{deadline}",
     "mahdrl": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
     "mahdrl_oe": "mahdrl_oe_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
     "mahdrl_ts": "mahdrl_ts_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
@@ -220,6 +221,12 @@ class Scenario:
 
     def model_name(self, algorithm):
         task = self.task if self.mode == "train" else self.train_task
+        if algorithm == 'drl_gnn':
+            name = MODEL_NAMES[algorithm].format(task=task,
+                resource=(self.train_resource or self.resource) if self.mode == 'eval' else self.resource,
+                deadline=(self.train_deadline or self.deadline) if self.mode == 'eval' else self.deadline)
+            name = name.replace('_seed1_', '_model' + str(self.model_seed) + '_')
+            return name + '_source_raw_task4_vm3_bn_v1_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING
         name = MODEL_NAMES[algorithm].format(
             task=task, resource=(self.train_resource or self.resource) if self.mode == "eval" else self.resource,
             deadline=(self.train_deadline or self.deadline) if self.mode == "eval" else self.deadline
@@ -267,6 +274,9 @@ class Scenario:
         if algorithm in MODEL_NAMES:
             result["checkpoint_dir"] = str(self.checkpoint_dir(algorithm))
             result["model_training_task"] = self.task if self.mode == "train" else self.train_task
+        if algorithm == 'drl_gnn':
+            result['normalization'] = {'policy_input': 'source_raw_task4_vm3_bn_v1',
+                'additional_input_scaling': False, 'shared_calibration': self.normalization_kwargs()}
         return result
 
 
@@ -320,10 +330,13 @@ def parse_scenario(mode, algorithm=None):
     if algorithm == 'irws_paper':
         parser.add_argument('--resume-checkpoint')
         parser.add_argument('--device', default='cpu')
+    if algorithm == 'drl_gnn':
+        parser.add_argument('--device', choices=('cpu', 'cuda'), default=None)
     args = parser.parse_args()
     try:
         scenario = Scenario(
-            paper_options={k:getattr(args,k) for k in ('resume_checkpoint','device')} if algorithm == 'irws_paper' else None,
+            paper_options=({k:getattr(args,k) for k in ('resume_checkpoint','device')} if algorithm == 'irws_paper'
+                           else {'device': args.device} if algorithm == 'drl_gnn' else None),
             experiment_protocol=getattr(args, 'experiment_protocol', str(DEFAULT_PROTOCOL)),
             legacy_split=getattr(args, 'legacy_split', False),
             model_seed=getattr(args, 'model_seed', 1),

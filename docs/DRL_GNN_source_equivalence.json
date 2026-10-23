@@ -1,0 +1,14 @@
+{
+  "torch": "2.5.1+cu121",
+  "pyg_reference": "2.6.1",
+  "source_commit": "be67762c3dd22c05733ebb808083375de3bd7d62",
+  "seed": 19,
+  "parameter_state_keys": 116,
+  "max_initial_weight_error": 0.0,
+  "max_logit_error": 0.0,
+  "value_error": 0.0,
+  "max_parameter_gradient_error": 0.0,
+  "same_graph_no_update_logp_equal": true,
+  "masked_probability_zero": true,
+  "actor_critic_parameters_disjoint": true
+}

@@ -159,7 +159,7 @@ class TrainingRecorder:
                 if isinstance(opt,torch.optim.Optimizer):
                     key=role+'.'+name;self.optimizer_steps[key]=0;self.optimizer_samples[key]=0
                     _wrap(opt,'step',lambda f,key=key,role=role:self._count_step(f,key,role),self.restores)
-        assignment=next(name for name in ('paper_step','vm_assign_global','vm_assign','step') if hasattr(env,name))
+        assignment=next(name for name in ('paper_step','pair_step','vm_assign_global','vm_assign','step') if hasattr(env,name))
         _wrap(env,assignment,lambda f:self._assignment(f),self.restores)
         _wrap(env,'finish_phase_and_advance',lambda f:self._phase(f),self.restores)
         _wrap(env,'reset',lambda f:self._reset(f),self.restores)
@@ -311,13 +311,13 @@ class EvaluationRecorder:
         # A nested API call is already included in its outer measured interval.
         for name in ('get_manager_state','get_manager_action_mask','get_host_state_for_next_assignment',
             'get_vm_state_for_current_task','get_vm_state_for_next_assignment','get_action_mask','get_global_state','get_local_state',
-            'get_ready_task_candidates','get_vm_obs_and_mask','_build_obs','_build_global_obs',
+            'get_ready_task_candidates','get_vm_obs_and_mask','graph_state','_build_obs','_build_global_obs',
             '_build_local_obs','_build_vm_obs_for_task','_build_host_obs_for_task','_build_vm_obs_for_task_host'):
             _wrap(env,name,lambda f:self._timed(f,'state'),self.restores)
         for role,agent in agents.items():
             for name in ('select_action','prepare','act','select'):
                 _wrap(agent,name,lambda f,role=role:self._timed(f,role),self.restores)
-        assignment=next(name for name in ('paper_step','vm_assign_global','vm_assign','step') if hasattr(env,name))
+        assignment=next(name for name in ('paper_step','pair_step','vm_assign_global','vm_assign','step') if hasattr(env,name))
         _wrap(env,assignment,lambda f:self._allocation(f),self.restores)
         _wrap(env,'finish_phase_and_advance',lambda f:self._exclude_phase(f),self.restores)
         _sync(self.agents);self.boundary_clock=time.perf_counter()

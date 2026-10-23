@@ -1,0 +1,21 @@
+SS_T Resume scenario/seeds/cache mismatch
+9 historical caches: 450450 workflow template IDs match the current generator
+SS seed=2 Tight: all 9 algorithms match on 50 complete workflow instances
+SS seed=2 Medium: all 9 algorithms match on 50 complete workflow instances
+SS seed=2 Loose: all 9 algorithms match on 50 complete workflow instances
+SS seed=2: parent 2 finish=101.793786, child 3 start=101.793786, finish=181.329154; tasks=1391, episode finish=2058.334148
+SS seed=2 alpha=2: 30 task deadlines, maximum gap=0.000000000000s
+[2SD-GAT train] SS/Tight episodes=8 assignments=657 device=cpu
+[2SD-GAT 1/8] seed=0 energy=37404.794065 validation=23022.063407
+[2SD-GAT 2/8] seed=1 energy=40910.444949 validation=23022.063407
+[2SD-GAT 3/8] seed=3 energy=41330.796309 validation=23022.063407
+[2SD-GAT 4/8] seed=2 energy=56502.397433 validation=23022.063407
+[2SD-GAT 5/8] seed=7 energy=57624.104245 validation=23022.063407
+[2SD-GAT 6/8] seed=5 energy=48931.587454 validation=23022.063407
+[2SD-GAT 7/8] seed=6 energy=51738.791268 validation=23022.063407
+[2SD-GAT 8/8] seed=4 energy=38952.519610 validation=23022.063407
+[2SD-GAT train completed] best=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_runner_x89w35wz\models\best.pth final=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_runner_x89w35wz\models\final.pth logs=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_runner_x89w35wz\models\logs
+----------------------------------------------------------------------
+Ran 275 tests in 147.429s
+
+OK

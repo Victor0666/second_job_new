@@ -30,6 +30,7 @@ DAX_GROUPS = (
     ),
 )
 MODEL_NAMES = {
+    "two_stage_gat": "two_stage_gat_source_aae1397_task{task}_res{resource}_model1_{deadline}",
     "drl_gnn": "drl_gnn_source_be67762_task{task}_res{resource}_seed1_{deadline}",
     "mahdrl": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
     "mahdrl_oe": "mahdrl_oe_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
@@ -233,6 +234,12 @@ class Scenario:
             deadline = (self.train_deadline or self.deadline) if self.mode == 'eval' else self.deadline
             name = f'{PD3QN_DAG}_task{task}_res{resource}_model{self.model_seed}_{deadline}_{LEARNING_MODEL}_{PD3QN_UNITS}'
             return name + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING
+        if algorithm == 'two_stage_gat':
+            name = MODEL_NAMES[algorithm].format(task=task,
+                resource=(self.train_resource or self.resource) if self.mode == 'eval' else self.resource,
+                deadline=(self.train_deadline or self.deadline) if self.mode == 'eval' else self.deadline)
+            name = name.replace('_model1_', '_model' + str(self.model_seed) + '_')
+            return name + '_task6_vm4_signed_slack_shared_v1_' + self.normalization_mode + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING
         if algorithm == 'drl_gnn':
             name = MODEL_NAMES[algorithm].format(task=task,
                 resource=(self.train_resource or self.resource) if self.mode == 'eval' else self.resource,
@@ -374,13 +381,13 @@ def parse_scenario(mode, algorithm=None):
     if algorithm == 'irws_paper':
         parser.add_argument('--resume-checkpoint')
         parser.add_argument('--device', default='cpu')
-    if algorithm == 'drl_gnn':
+    if algorithm in ('drl_gnn', 'two_stage_gat'):
         parser.add_argument('--device', choices=('cpu', 'cuda'), default=None)
     args = parser.parse_args()
     try:
         scenario = Scenario(
             paper_options=({k:getattr(args,k) for k in ('resume_checkpoint','device')} if algorithm == 'irws_paper'
-                           else {'device': args.device} if algorithm == 'drl_gnn' else None),
+                           else {'device': args.device} if algorithm in ('drl_gnn', 'two_stage_gat') else None),
             experiment_protocol=getattr(args, 'experiment_protocol', str(DEFAULT_PROTOCOL)),
             legacy_split=getattr(args, 'legacy_split', False),
             model_seed=getattr(args, 'model_seed', 1),

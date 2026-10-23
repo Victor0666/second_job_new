@@ -1,5 +1,6 @@
 # MAHDRL 实验代码
 
+新增独立对比算法 `two_stage_gat`（2SD-GAT-Adapted）：保留作者两阶段 GAT–PPO 与忙碌 VM 队尾未来预留，接入共同能耗—截止期问题，使用原 6＋4 维观测的目标适配。原 MAHDRL 与已有算法保持独立。训练/评测入口为 `algorithms/two_stage_gat/train.py`、`evaluate.py`；参数、源码差异、未来排程及公平性边界见 [2SD-GAT 实现说明](docs/Two_stage_GAT_implementation.md)。
 
 `algorithms/` 按算法分目录，每个算法集中保存统一训练/评测入口及专用智能体；环境集中在 `environments/`。场景由命令行参数选择。
 

@@ -77,7 +77,7 @@ class ScenarioTests(unittest.TestCase):
         # Intercept the first environment constructor before agents, logs or models are created.
         for algorithm in MODEL_NAMES:
             entry = "ablation_nohost" if algorithm == "ablation_tl2" else algorithm
-            module = importlib.import_module(f"algorithms.{entry}.{'runner' if algorithm == 'drl_gnn' else 'train'}")
+            module = importlib.import_module(f"algorithms.{entry}.{'runner' if algorithm in ('drl_gnn', 'two_stage_gat') else 'train'}")
             for task, resource, deadline in itertools.product(
                 "SML", "SML", ("Tight", "Medium", "Loose")
             ):
@@ -87,11 +87,11 @@ class ScenarioTests(unittest.TestCase):
                 with self.subTest(
                     algorithm=algorithm, task=task, resource=resource, deadline=deadline
                 ):
-                    if algorithm == 'drl_gnn':
+                    if algorithm in ('drl_gnn', 'two_stage_gat'):
                         kwargs = module.env_kwargs(scenario, scenario.first_training_seed())
                         self.assert_configuration(kwargs, scenario)
                         self.assertEqual(kwargs['random_seed'], 0)
-                        self.assertEqual(kwargs['normalization_mode'], 'legacy')
+                        self.assertEqual(kwargs['normalization_mode'], 'legacy' if algorithm == 'drl_gnn' else scenario.normalization_mode)
                         continue
                     with (patch.object(module, "_load_cache_seeds", return_value=list(range(1001)))
                           if algorithm == "marl" else nullcontext()), patch.object(module, "SCENARIO", scenario), patch.object(
@@ -108,19 +108,19 @@ class ScenarioTests(unittest.TestCase):
     def test_all_evaluation_configurations(self):
         for algorithm in [*MODEL_NAMES, "ertf_fifs"]:
             entry = "ablation_nohost" if algorithm == "ablation_tl2" else algorithm
-            module = importlib.import_module(f"algorithms.{entry}.{'runner' if algorithm == 'drl_gnn' else 'evaluate'}")
+            module = importlib.import_module(f"algorithms.{entry}.{'runner' if algorithm in ('drl_gnn', 'two_stage_gat') else 'evaluate'}")
             for task, resource, deadline in itertools.product(
                 "SML", "SML", ("Tight", "Medium", "Loose")
             ):
                 scenario = Scenario(task=task, resource=resource, deadline=deadline)
                 with self.subTest(
                     algorithm=algorithm, task=task, resource=resource, deadline=deadline
-                ), (patch.object(module, "SCENARIO", scenario) if algorithm != 'drl_gnn' else nullcontext()), contextlib.redirect_stdout(
+                ), (patch.object(module, "SCENARIO", scenario) if algorithm not in ('drl_gnn', 'two_stage_gat') else nullcontext()), contextlib.redirect_stdout(
                     io.StringIO()
                 ):
-                    if algorithm == 'drl_gnn':
+                    if algorithm in ('drl_gnn', 'two_stage_gat'):
                         kwargs = module.env_kwargs(scenario, 2)
-                        self.assertEqual(kwargs['normalization_mode'], 'legacy')
+                        self.assertEqual(kwargs['normalization_mode'], 'legacy' if algorithm == 'drl_gnn' else scenario.normalization_mode)
                     elif algorithm in EVAL_BUILDERS:
                         kwargs = getattr(module, EVAL_BUILDERS[algorithm])(random_seed=2)
                     elif algorithm == "marl":

@@ -1,0 +1,77 @@
+{
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 4060 Ti",
+  "torch": "2.5.1+cu121",
+  "threads": 1,
+  "workflows": 5,
+  "instance_seed": 32,
+  "model_seed": 1,
+  "diagnostics": true,
+  "summary": {
+    "irws_r_v1": {
+      "mean_seconds": 15.602619000012055,
+      "runs": [
+        {
+          "train_seconds": 15.940880400012247,
+          "assignments": 138,
+          "updates": 138,
+          "optimizer_steps": {
+            "actor": 138,
+            "critic": 138,
+            "intrinsic": 138,
+            "task": 138
+          },
+          "graph_calls": 297,
+          "sample_presentations": 138
+        },
+        {
+          "train_seconds": 15.264357600011863,
+          "assignments": 138,
+          "updates": 138,
+          "optimizer_steps": {
+            "actor": 138,
+            "critic": 138,
+            "intrinsic": 138,
+            "task": 138
+          },
+          "graph_calls": 297,
+          "sample_presentations": 138
+        }
+      ]
+    },
+    "irws_r_v2_batch": {
+      "mean_seconds": 7.241296150023118,
+      "runs": [
+        {
+          "train_seconds": 7.294463900034316,
+          "assignments": 138,
+          "updates": 49,
+          "optimizer_steps": {
+            "actor": 49,
+            "critic": 49,
+            "intrinsic": 49,
+            "task": 49
+          },
+          "graph_calls": 178,
+          "sample_presentations": 138
+        },
+        {
+          "train_seconds": 7.188128400011919,
+          "assignments": 138,
+          "updates": 49,
+          "optimizer_steps": {
+            "actor": 49,
+            "critic": 49,
+            "intrinsic": 49,
+            "task": 49
+          },
+          "graph_calls": 178,
+          "sample_presentations": 138
+        }
+      ]
+    }
+  },
+  "local_speedup": 2.154672130066417,
+  "formal_training": false,
+  "limitations": "Two unprofiled runs per version, alternating order. Same physical instances, but policies and schedules differ. Temporary fixed normalization and no deadline cache; not a formal performance or convergence experiment."
+}

@@ -1,5 +1,7 @@
 # IRWS-R 独立对比算法身份与输出隔离
 
+2026-10-25更新：当前入口`algorithms/irws_r/`已升级为`irws_r_v2_batch`，新模型和结果进入该版本目录；旧逐样本实现保留在`algorithms/irws_r_v1/`，仍对应原`irws_r_v1`目录。v2拒绝加载v1 Checkpoint，需要重新训练。v2算法变化见[机制说明](IRWS_R_v2_implementation.md)。以下内容记录最初v1的命名与隔离方案，其中“本次仅改变身份”仅适用于当时的v1复制操作。
+
 日期：2026-10-24（Asia/Shanghai）。此前修改的IRWS现在作为独立命名的对比算法运行，避免旧IRWS结果与新结果混淆。
 
 | 项目 | 新标识 |

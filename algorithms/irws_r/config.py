@@ -3,7 +3,14 @@ from dataclasses import dataclass, asdict
 
 ALGORITHM = 'irws_r'
 DISPLAY_NAME = 'IRWS-R'
-MODEL_VERSION = 'irws_r_v1'
+MODEL_VERSION = 'irws_r_v2_batch'
+IMPLEMENTATION = dict(
+    graph_aggregation='predecessor_mean_feature_softmax_v2',
+    update_rule='interval_minibatch_mean_v2',
+    meta_estimator='observed_interval_mean_local_intrinsic_partials_v2',
+    boundary_rule='old_policy_expectation_then_post_update_selection_v2',
+    task_score='fixed_seeded_Q',
+)
 BEST_CHECKPOINT = 'best_irws_r.pth'
 FINAL_CHECKPOINT = 'final_irws_r.pth'
 REWARD_PROTOCOL = 'common_energy_tardiness_paper_fusion_v1'

@@ -1,1 +1,1 @@
-"""IRWS-R: an independently named comparison algorithm copied from restored v2."""
+"""IRWS-R v2: explicit graph reduction and interval minibatch meta-updates."""

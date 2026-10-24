@@ -101,6 +101,6 @@ def run():
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(__doc__);p.add_argument('--out',default='docs/IRWS_R_smoke.json');args=p.parse_args()
+    p=argparse.ArgumentParser(__doc__);p.add_argument('--out',default='docs/IRWS_R_v2_smoke.json');args=p.parse_args()
     result=run();Path(args.out).write_text(json.dumps(result,indent=2),encoding='utf-8')
     print('IRWS-R: four learned groups changed, Q stayed fixed; queue physics, checkpoint and test passed')

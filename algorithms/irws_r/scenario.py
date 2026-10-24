@@ -3,7 +3,7 @@ import argparse
 import json
 from common.scenarios import Scenario,VM_COUNTS,SMALL_PROBABILITY,DEFAULT_PROTOCOL
 from common.f18_state_normalization import CURRENT_VERSION,SHARED_VERSIONS,DEFAULT_CONFIG
-from .config import ALGORITHM,DISPLAY_NAME,MODEL_VERSION,REWARD_PROTOCOL
+from .config import ALGORITHM,DISPLAY_NAME,MODEL_VERSION,IMPLEMENTATION,REWARD_PROTOCOL
 
 
 def parse_scenario(mode,algorithm=None):
@@ -43,7 +43,7 @@ def parse_scenario(mode,algorithm=None):
     except (ValueError,argparse.ArgumentTypeError) as error:parser.error(str(error))
     if args.dry_run:
         info=scenario.describe(ALGORITHM)
-        info.update(algorithm=ALGORITHM,display_name=DISPLAY_NAME,model_version=MODEL_VERSION,reward_protocol=REWARD_PROTOCOL,
+        info.update(algorithm=ALGORITHM,display_name=DISPLAY_NAME,model_version=MODEL_VERSION,implementation=dict(IMPLEMENTATION),reward_protocol=REWARD_PROTOCOL,
                     queue=dict(capacity=args.queue_capacity,slot_seconds=args.slot_duration,discipline='FIFO'),
                     retained_deadline_context=False,fixed_Q_head=True,entropy=False)
         print(json.dumps(info,indent=2,ensure_ascii=False));raise SystemExit(0)

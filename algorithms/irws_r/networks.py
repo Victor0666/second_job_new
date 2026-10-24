@@ -6,7 +6,7 @@ from torch import nn
 
 def masked_distribution(logits,mask):
     mask=torch.as_tensor(mask,dtype=torch.bool,device=logits.device)
-    if logits.shape!=mask.shape or not mask.any() or not torch.isfinite(logits).all():
+    if logits.shape!=mask.shape or not mask.any(dim=-1).all() or not torch.isfinite(logits).all():
         raise ValueError('Invalid policy logits or empty legal action set')
     return torch.distributions.Categorical(logits=logits.masked_fill(~mask,-torch.inf))
 
@@ -25,11 +25,10 @@ class TopologicalLayer(nn.Module):
     def forward(self,previous,neighbors,order):
         output=[None]*len(neighbors)
         for v in order:
-            # Eq.(16) leaves the reduction implicit: featurewise neighbor attention,
-            # including the previous self-state as described in the adjoining text.
-            states=torch.stack([previous[v]]+[output[u] for u in neighbors[v]])
-            attention=torch.softmax(self.self_weight(previous[v])+self.neighbor_weight(states),dim=0)
-            aggregate=(attention*states).sum(0)
+            # Eq.(16) omits the axis/reduction. Minimal convention: mean the
+            # predecessor states, then apply Softmax across embedding features.
+            mean=torch.stack([output[u] for u in neighbors[v]]).mean(0) if neighbors[v] else torch.zeros_like(previous[v])
+            aggregate=torch.softmax(self.self_weight(previous[v])+self.neighbor_weight(mean),dim=-1)
             # Two-token Bi-GRU of (past self, aggregated neighbors), Eq.(17).
             zero=torch.zeros_like(previous[v])
             forward=self.forward_gru(aggregate,self.forward_gru(previous[v],zero))

@@ -14,7 +14,7 @@ from common.experiment_measurements import TrainingRecorder, EvaluationRecorder,
 from common.scenarios import ROOT
 from .scenario import parse_scenario
 from common.workflow_opt import ENERGY_ACCOUNTING
-from .config import ALGORITHM,DISPLAY_NAME,MODEL_VERSION,BEST_CHECKPOINT,FINAL_CHECKPOINT,REWARD_PROTOCOL,COMMON_REWARD,PaperConfig
+from .config import ALGORITHM,DISPLAY_NAME,MODEL_VERSION,IMPLEMENTATION,BEST_CHECKPOINT,FINAL_CHECKPOINT,REWARD_PROTOCOL,COMMON_REWARD,PaperConfig
 from .environment import PaperCloudEnv
 from .learner import PaperLearner
 
@@ -76,13 +76,19 @@ def run_episode(env,learner,seed,training=False,evaluation=None):
         # Algorithm 1 keeps policy/clock fixed for this interval's dispatch sequence.
         if not env.can_dispatch():env.finish_phase_and_advance()
         done=env.done_flag
-        successor=None if done else learner.prepare(env,deterministic=not training)
-        if training:
-            learner.remember(decision,action,logp,value,reward,done,info,successor)
-            if done or env.interval_index!=interval:
-                bootstrap=0. if done else learner.value(successor)
-                updates.append(learner.update(bootstrap))
-                if successor is not None:successor=learner.refresh(successor)
+        if training and not done and env.interval_index!=interval:
+            # Estimate the boundary without selecting a task. Algorithm 1's next
+            # interval ordering must use the newly updated embedding network.
+            boundary=learner.boundary_snapshot(env)
+            learner.remember(decision,action,logp,value,reward,False,info,None,boundary=boundary)
+            updates.append(learner.update(boundary.value))
+            successor=learner.prepare(env)
+            learner.resolve_boundary(successor)
+        else:
+            successor=None if done else learner.prepare(env,deterministic=not training)
+            if training:
+                learner.remember(decision,action,logp,value,reward,done,info,successor)
+                if done:updates.append(learner.update(0.))
         decision=successor
         if len(weights)>100000:raise RuntimeError('Episode exceeded the decision guard')
     if measurement is not None:measurement.finish()
@@ -92,7 +98,7 @@ def run_episode(env,learner,seed,training=False,evaluation=None):
     if not np.isfinite(list(metrics.values())).all():raise FloatingPointError('Nonfinite physical metrics')
     return dict(metrics=metrics,objective=dict(protocol=REWARD_PROTOCOL,settings=COMMON_REWARD,
         external_return=float(external_return),physical_cost=float(physical_cost)),updates=updates,
-        numerics=learner.numerics.snapshot(),assignments=len(weights),queue=dict(capacity=env.queue_capacity,
+        implementation=dict(IMPLEMENTATION),numerics=learner.numerics.snapshot(),assignments=len(weights),queue=dict(capacity=env.queue_capacity,
         slot_duration=env.slot_duration,interval_index=env.interval_index),fusion=dict(
         minimum=min(weights,default=0.),maximum=max(weights,default=0.),mean=float(np.mean(weights)) if weights else 0.,
         outside_unit_interval=sum(w<0 or w>1 for w in weights),zero_rank_boundaries=boundaries))
@@ -103,12 +109,13 @@ def git_commit():
 
 
 def save_checkpoint(path,learner,scenario,episode,best_energy,environment_config):
-    if learner.buffer:raise RuntimeError('Checkpoints are written only at completed episode/rollout boundaries')
+    if learner.buffer or learner._pending_boundary is not None:
+        raise RuntimeError('Checkpoints are written only at completed episode/rollout boundaries')
     modules={n:getattr(learner,n).state_dict() for n in ('task','actor','critic','intrinsic')}
     optimizers={n:getattr(learner,n+'_opt').state_dict() for n in ('task','actor','critic','intrinsic')}
     rng=dict(python=random.getstate(),numpy=np.random.get_state(),torch=torch.get_rng_state(),
              cuda=torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None)
-    obj=dict(algorithm=ALGORITHM,display_name=DISPLAY_NAME,model_version=MODEL_VERSION,model_seed=scenario.model_seed,reward_protocol=REWARD_PROTOCOL,reward_settings=COMMON_REWARD,modules=modules,optimizers=optimizers,paper_config=learner.cfg.as_dict(),
+    obj=dict(algorithm=ALGORITHM,display_name=DISPLAY_NAME,model_version=MODEL_VERSION,implementation=dict(IMPLEMENTATION),model_seed=scenario.model_seed,reward_protocol=REWARD_PROTOCOL,reward_settings=COMMON_REWARD,modules=modules,optimizers=optimizers,paper_config=learner.cfg.as_dict(),
         episode=episode,steps=learner.steps,updates=learner.updates,best_validation_energy=best_energy,
         normalization=scenario.normalization_metadata(),protocol=scenario.protocol().metadata(),
         environment=environment_config,scenario=scenario.describe(),rng=rng,git_commit=git_commit(),
@@ -122,6 +129,8 @@ def load_checkpoint(path,scenario,device='cpu',restore_training=False):
     obj=torch.load(path,map_location=device,weights_only=False)
     if obj.get('algorithm')!=ALGORITHM or obj.get('model_version')!=MODEL_VERSION:
         raise ValueError('IRWS-R checkpoint algorithm/version mismatch; train with algorithms/irws_r/train.py')
+    if obj.get('implementation')!=IMPLEMENTATION:
+        raise ValueError('IRWS-R checkpoint implementation settings mismatch')
     if obj.get('model_seed')!=scenario.model_seed:raise ValueError('IRWS-R checkpoint model seed mismatch')
     if obj.get('reward_protocol')!=REWARD_PROTOCOL or obj.get('reward_settings')!=COMMON_REWARD:
         raise ValueError('Checkpoint reward objective mismatch; retrain adapted IRWS')
@@ -249,7 +258,7 @@ def evaluate_main():
             completed+=1
             print(f'[{DISPLAY_NAME} eval {completed}/{len(scenario.seeds)}] task={scenario.task} resource={scenario.resource} deadline={scenario.deadline} seed={row["seed"]} energy={row["total_energy"]:.6f} saved',flush=True)
         rows,summary=evaluate(learner,scenario,scenario.seeds,on_result=save_seed)
-    summary_path.write_text(json.dumps(dict(algorithm=ALGORITHM,display_name=DISPLAY_NAME,model_version=MODEL_VERSION,model_seed=scenario.model_seed,summary=summary,normalization=scenario.normalization_metadata(),
+    summary_path.write_text(json.dumps(dict(algorithm=ALGORITHM,display_name=DISPLAY_NAME,model_version=MODEL_VERSION,implementation=dict(IMPLEMENTATION),model_seed=scenario.model_seed,summary=summary,normalization=scenario.normalization_metadata(),
         protocol=scenario.protocol().metadata(),reward_protocol=REWARD_PROTOCOL,
         reward_settings=COMMON_REWARD,source_checkpoint=str(directory/BEST_CHECKPOINT)),indent=2),encoding='utf-8')
     print(f'[{DISPLAY_NAME} eval completed] 评测完成：{len(rows)}/{len(scenario.seeds)} seeds | '

@@ -235,11 +235,12 @@ class Scenario:
             name = f'{PD3QN_DAG}_task{task}_res{resource}_model{self.model_seed}_{deadline}_{LEARNING_MODEL}_{PD3QN_UNITS}'
             return name + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING
         if algorithm == 'two_stage_gat':
+            from algorithms.two_stage_gat.config import SELECTION_TAG
             name = MODEL_NAMES[algorithm].format(task=task,
                 resource=(self.train_resource or self.resource) if self.mode == 'eval' else self.resource,
                 deadline=(self.train_deadline or self.deadline) if self.mode == 'eval' else self.deadline)
             name = name.replace('_model1_', '_model' + str(self.model_seed) + '_')
-            return name + '_task6_vm4_signed_slack_shared_v1_' + self.normalization_mode + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING
+            return name + '_task6_vm4_signed_slack_shared_v1_' + self.normalization_mode + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING + '_' + SELECTION_TAG
         if algorithm == 'drl_gnn':
             from algorithms.drl_gnn.config import INPUT_ENCODING
             name = MODEL_NAMES[algorithm].format(task=task,
@@ -299,6 +300,11 @@ class Scenario:
         if algorithm in MODEL_NAMES:
             result["checkpoint_dir"] = str(self.checkpoint_dir(algorithm))
             result["model_training_task"] = self.task if self.mode == "train" else self.train_task
+        if algorithm == 'two_stage_gat':
+            from algorithms.two_stage_gat.selection import selection_metadata, selection_protocol
+            result['checkpoint_selection'] = selection_metadata()
+            if self.protocol():
+                result['experiment_protocol'] = selection_protocol(self)
         if algorithm == 'drl_gnn':
             from algorithms.drl_gnn.config import INPUT_ENCODING
             result['normalization'] = {'policy_input': INPUT_ENCODING,

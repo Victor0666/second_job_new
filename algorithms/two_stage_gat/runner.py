@@ -21,6 +21,8 @@ from .config import (COMMON_REWARD, INPUT_ENCODING, MODEL_VERSION, REWARD_PROTOC
                      SCHEDULING_PROTOCOL, SOURCE_COMMIT, SOURCE_REPOSITORY, TwoStageGATConfig)
 from .environment import TwoStageGATEnv
 from .ppo import PPOAgent, Transition
+from .selection import (selection_key, selection_metadata, selection_protocol, selection_scenario,
+                        validation_selection)
 
 
 def seed_everything(seed):
@@ -75,14 +77,16 @@ def objective_metadata():
         reward_protocol=REWARD_PROTOCOL, reward_settings=COMMON_REWARD,
         scheduling_protocol=SCHEDULING_PROTOCOL, energy_accounting=ENERGY_ACCOUNTING,
         communication_model=COMMUNICATION_MODEL, pooling='real_arrived_tasks_and_real_VMs',
+        checkpoint_selection=selection_metadata(),
         evaluation='sequential task argmax then conditional VM argmax; paper/common protocol')
 
 
-def save_checkpoint(path, agent, scenario, completed, best_energy, environment_config, budget):
+def save_checkpoint(path, agent, scenario, completed, best_selection, candidate, environment_config, budget):
     obj = dict(**objective_metadata(), config=agent.cfg.as_dict(),
         network=agent.network.state_dict(), optimizer=agent.optimizer.state_dict(),
         completed_episodes=int(completed), steps=agent.steps, updates=agent.updates,
-        best_validation_energy=float(best_energy), protocol=scenario.protocol().metadata(),
+        best_validation_selection=dict(best_selection), validation_selection=dict(candidate),
+        protocol=selection_protocol(scenario),
         normalization=scenario.normalization_metadata(), scenario=scenario.describe('two_stage_gat'),
         environment=environment_config, budget=budget, versions=dict(torch=torch.__version__,
             pyg=torch_geometric.__version__, numpy=np.__version__), resume_supported=False)
@@ -94,7 +98,7 @@ def load_checkpoint(path, scenario, device='cpu'):
     for key, value in objective_metadata().items():
         if obj.get(key) != value:
             raise ValueError('Two-stage GAT checkpoint mismatch: ' + key)
-    if obj.get('protocol') != scenario.protocol().metadata():
+    if obj.get('protocol') != selection_protocol(scenario):
         raise ValueError('Checkpoint data partition mismatch')
     source = obj['scenario']
     expected = (scenario.train_task if scenario.mode == 'eval' else scenario.task,
@@ -133,6 +137,7 @@ def run_episode(env, agent, seed, evaluation=None):
 
 
 def evaluate(agent, scenario, seeds, split='test', kwargs=None, directory=None, checkpoint_directory=None):
+    scenario = selection_scenario(scenario)
     protocol = scenario.protocol()
     if protocol is None or split not in ('test', 'validation') or not seeds:
         raise ValueError('Evaluation requires the frozen protocol and a nonempty partition')
@@ -176,6 +181,7 @@ def planned_assignments(env, seeds):
 
 
 def train(scenario, config=None, kwargs=None, out=None):
+    scenario = selection_scenario(scenario)
     protocol = scenario.protocol()
     if protocol is None or not 0 < scenario.episodes <= protocol.episodes:
         raise ValueError('Training requires the fixed paired episode budget')
@@ -205,7 +211,7 @@ def train(scenario, config=None, kwargs=None, out=None):
     seed_everything(scenario.model_seed)
     agent = PPOAgent(cfg)
     metadata = dict(**objective_metadata(), config=cfg.as_dict(), budget=budget,
-        protocol=protocol.metadata(), normalization=scenario.normalization_metadata(),
+        protocol=selection_protocol(scenario), normalization=scenario.normalization_metadata(),
         numerical_precision='float32', parameters=sum(p.numel() for p in agent.network.parameters()),
         versions=dict(torch=torch.__version__, pyg=torch_geometric.__version__, numpy=np.__version__),
         validation_timing='episode completion at current policy; normal full-rollout/final-budget update occurs first when coincident',
@@ -213,7 +219,7 @@ def train(scenario, config=None, kwargs=None, out=None):
     (logs / 'measurement_metadata.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
     states = [None] * cfg.num_envs; slot_seeds = [None] * cfg.num_envs
     slot_returns = [0.] * cfg.num_envs; started_seeds = []
-    completed = 0; best = float('inf'); records = []
+    completed = 0; best = None; records = []
     optimizer_steps = 0; sample_presentations = 0
     cumulative = dict(train=0., validation=0., checkpoint=0.)
     previous_counts = dict(assignments=0, optimizer_steps=0, sample_presentations=0)
@@ -270,13 +276,15 @@ def train(scenario, config=None, kwargs=None, out=None):
                     split='validation', kwargs=kwargs)
                 sync(agent); validation_seconds = time.perf_counter() - validation_started
                 cumulative['validation'] += validation_seconds
-                energy = validation['total_energy']['mean']
+                candidate = validation_selection(validation_rows)
+                energy = candidate['mean_total_energy']
                 checkpoint_started = time.perf_counter()
-                if energy < best:
-                    best = energy
-                    save_checkpoint(directory / 'best.pth', agent, scenario, completed, best, kwargs, budget)
+                selected = best is None or selection_key(candidate) < selection_key(best)
+                if selected:
+                    best = dict(candidate, completed_episodes=completed)
+                    save_checkpoint(directory / 'best.pth', agent, scenario, completed, best, candidate, kwargs, budget)
                 if completed == len(seeds):
-                    save_checkpoint(directory / 'final.pth', agent, scenario, completed, best, kwargs, budget)
+                    save_checkpoint(directory / 'final.pth', agent, scenario, completed, best, candidate, kwargs, budget)
                 sync(agent); checkpoint_seconds = time.perf_counter() - checkpoint_started
                 cumulative['checkpoint'] += checkpoint_seconds
                 counts = dict(assignments=agent.steps, optimizer_steps=optimizer_steps,
@@ -284,6 +292,7 @@ def train(scenario, config=None, kwargs=None, out=None):
                 row = dict(version=MEASUREMENT_VERSION, algorithm='two_stage_gat', episode=completed - 1,
                     instance_seed=slot_seeds[slot], model_seed=scenario.model_seed, metrics=metrics,
                     validation=validation_rows, validation_summary=validation, instance=identity,
+                    validation_selection=candidate, best_validation_selection=dict(best), selected_as_best=selected,
                     external_return=slot_returns[slot], episode_assignments=env.assignment_count,
                     queued_assignments=env.queued_assignments, policy_updates_at_validation=agent.updates,
                     assignment_calls=counts['assignments'] - previous_counts['assignments'],
@@ -296,7 +305,10 @@ def train(scenario, config=None, kwargs=None, out=None):
                 append_json(logs / (artifact_name(scenario, 'train') + '.jsonl'), row)
                 previous_counts = counts
                 print(f'[2SD-GAT {completed}/{len(seeds)}] seed={slot_seeds[slot]} '
-                    f'energy={metrics["total_energy"]:.6f} validation={energy:.6f}', flush=True)
+                    f'energy={metrics["total_energy"]:.6f} validation={energy:.6f} '
+                    f'validation_SR={candidate["workflow_success_rate"]:.4f} '
+                    f'validation_ESP={candidate["validation_ESP"]:.4f} '
+                    f'feasible={candidate["feasible"]} selected={selected}', flush=True)
                 interval_clock = time.perf_counter(); reset_slot(slot)
             if completed == len(seeds):
                 break
@@ -304,7 +316,7 @@ def train(scenario, config=None, kwargs=None, out=None):
     if agent.steps != total_assignments or agent.updates != total_updates or sorted(started_seeds) != list(seeds):
         raise RuntimeError('Actual exposure did not match the frozen instance/assignment/update budget')
     summary = dict(**metadata, completed_episodes=completed, counts=counts, timing_seconds=cumulative,
-        best_validation_energy=best, seeds_started=started_seeds, final_rollout_retained=True)
+        best_validation_selection=best, seeds_started=started_seeds, final_rollout_retained=True)
     (logs / 'training_summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
     print(f'[2SD-GAT train completed] best={(directory / "best.pth").resolve()} '
           f'final={(directory / "final.pth").resolve()} logs={logs.resolve()}', flush=True)
@@ -316,10 +328,13 @@ def train_main():
 
 
 def evaluate_main():
-    scenario = parse_scenario('eval', 'two_stage_gat')
+    scenario = selection_scenario(parse_scenario('eval', 'two_stage_gat'))
     device = (scenario.paper_options or {}).get('device') or ('cuda' if torch.cuda.is_available() else 'cpu')
     checkpoint = output_dir(scenario, 'ckpts')
-    agent, _ = load_checkpoint(checkpoint / 'best.pth', scenario, device)
+    agent, obj = load_checkpoint(checkpoint / 'best.pth', scenario, device)
+    selected = obj['validation_selection']
+    print(f'[2SD-GAT selected checkpoint] validation_SR={selected["workflow_success_rate"]:.4f} '
+        f'validation_ESP={selected["validation_ESP"]:.4f} feasible={selected["feasible"]}', flush=True)
     directory = output_dir(scenario, 'run'); directory.mkdir(parents=True, exist_ok=True)
     rows, summary = evaluate(agent, scenario, scenario.seeds, directory=directory / 'measurements',
         checkpoint_directory=checkpoint)
@@ -328,6 +343,7 @@ def evaluate_main():
         writer = csv.DictWriter(stream, fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
     summary_path = directory / (artifact_name(scenario, 'summary') + '.json')
     summary_path.write_text(json.dumps(dict(**objective_metadata(), summary=summary,
-        protocol=scenario.protocol().metadata(), source_checkpoint=str(checkpoint / 'best.pth')),
+        protocol=selection_protocol(scenario), selected_checkpoint_validation=selected,
+        source_checkpoint=str(checkpoint / 'best.pth')),
         indent=2), encoding='utf-8')
     print(f'[2SD-GAT eval completed] csv={path.resolve()} summary={summary_path.resolve()}', flush=True)

@@ -3,7 +3,10 @@ from dataclasses import asdict, dataclass
 
 SOURCE_REPOSITORY = 'https://github.com/kdsuneraavinash/2sd-gat-cloud-scheduler'
 SOURCE_COMMIT = 'aae1397f11e8e75d5dcb70c9b38608dcf05ef773'
-MODEL_VERSION = 'two_stage_gat_source_aae1397_v1'
+MODEL_VERSION = 'two_stage_gat_source_aae1397_selection_v2'
+SELECTION_TAG = 'select_sr092_esp099_v2'
+WORKFLOW_SUCCESS_THRESHOLD = .92
+SATISFACTION_PROBABILITY_TARGET = .99
 INPUT_ENCODING = 'task6_vm4_signed_slack_shared_v1'
 REWARD_PROTOCOL = 'common_energy_tardiness_v2'
 SCHEDULING_PROTOCOL = 'arrived_parent_finished_vm_tail_reservation_v1'

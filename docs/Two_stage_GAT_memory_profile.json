@@ -1,0 +1,88 @@
+{
+  "gpu": "NVIDIA GeForce RTX 4060 Ti",
+  "torch": "2.5.1+cu121",
+  "gpu_total_mib": 8187.5,
+  "free_at_start_mib": 7075.0,
+  "allocator_fraction_cap": 0.8,
+  "production_minibatch": 128,
+  "method": "real late-episode graphs repeated across a minibatch; two Adam backward/update passes",
+  "limitations": "PyTorch allocated/reserved only; excludes CUDA context and other processes; capped probes may require extrapolation",
+  "scenarios": [
+    {
+      "task": "S",
+      "resource": "S",
+      "instance_seed": 551,
+      "task_nodes": 1431,
+      "edges": 3519,
+      "vms": 25,
+      "snapshot": "last physical assignment; all 50 workflows arrived; round-robin VM reservations",
+      "mode": "train",
+      "probes": [
+        {
+          "batch": 128,
+          "completed": true,
+          "peak_allocated_mib": 5717.78515625,
+          "peak_reserved_mib": 6446.0,
+          "seconds": 1.9708312000147998
+        }
+      ]
+    },
+    {
+      "task": "S",
+      "resource": "M",
+      "instance_seed": 551,
+      "task_nodes": 1431,
+      "edges": 3500,
+      "vms": 50,
+      "snapshot": "last physical assignment; all 50 workflows arrived; round-robin VM reservations",
+      "mode": "train",
+      "probes": [
+        {
+          "batch": 128,
+          "completed": true,
+          "peak_allocated_mib": 5709.65234375,
+          "peak_reserved_mib": 6508.0,
+          "seconds": 1.4494107000064105
+        }
+      ]
+    },
+    {
+      "task": "S",
+      "resource": "L",
+      "instance_seed": 551,
+      "task_nodes": 1431,
+      "edges": 3474,
+      "vms": 75,
+      "snapshot": "last physical assignment; all 50 workflows arrived; round-robin VM reservations",
+      "mode": "train",
+      "probes": [
+        {
+          "batch": 128,
+          "completed": true,
+          "peak_allocated_mib": 5696.8740234375,
+          "peak_reserved_mib": 6538.0,
+          "seconds": 1.649084800039418
+        }
+      ]
+    },
+    {
+      "task": "L",
+      "resource": "L",
+      "instance_seed": 723,
+      "task_nodes": 3921,
+      "edges": 10045,
+      "vms": 75,
+      "snapshot": "last physical assignment; all 50 workflows arrived; round-robin VM reservations",
+      "mode": "eval",
+      "probes": [
+        {
+          "batch": 1,
+          "completed": true,
+          "peak_allocated_mib": 58.0908203125,
+          "peak_reserved_mib": 206.0,
+          "seconds": 0.2557858999934979
+        }
+      ]
+    }
+  ]
+}

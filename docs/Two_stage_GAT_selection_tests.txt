@@ -1,0 +1,37 @@
+Verification provenance (2026-10-25)
+The 327-test run below used an isolated snapshot of b669882 plus the 2SD-GAT selection changes.
+After concurrent IRWS changes advanced HEAD to debe006, the current workspace passed:
+  .venv/Scripts/python.exe -X utf8 -B -m unittest common.test_two_stage_gat common.test_scenarios -q
+  Ran 21 tests in 21.363s: OK.
+Before publication on top of 0d9f163, the same focused suite passed again:
+  Ran 21 tests in 19.385s: OK.
+No formal 600-episode training was run.
+
+SS_T Resume scenario/seeds/cache mismatch
+9 historical caches: 450450 workflow template IDs match the current generator
+SS seed=2 Tight: all 9 algorithms match on 50 complete workflow instances
+SS seed=2 Medium: all 9 algorithms match on 50 complete workflow instances
+SS seed=2 Loose: all 9 algorithms match on 50 complete workflow instances
+SS seed=2: parent 2 finish=101.793786, child 3 start=101.793786, finish=181.329154; tasks=1391, episode finish=2058.334148
+SS seed=2 alpha=2: 30 task deadlines, maximum gap=0.000000000000s
+[2SD-GAT train] SS/Tight episodes=5 assignments=144 device=cpu
+[2SD-GAT 1/5] seed=1 energy=26559.899777 validation=100.000000 validation_SR=0.9000 validation_ESP=0.0000 feasible=False selected=True
+[2SD-GAT 2/5] seed=0 energy=27219.788612 validation=200.000000 validation_SR=0.9200 validation_ESP=1.0000 feasible=True selected=True
+[2SD-GAT 3/5] seed=2 energy=21433.504167 validation=50.000000 validation_SR=0.8800 validation_ESP=0.0000 feasible=False selected=False
+[2SD-GAT 4/5] seed=3 energy=22183.257567 validation=180.000000 validation_SR=0.9400 validation_ESP=1.0000 feasible=True selected=True
+[2SD-GAT 5/5] seed=4 energy=19006.090839 validation=250.000000 validation_SR=1.0000 validation_ESP=1.0000 feasible=True selected=False
+[2SD-GAT train completed] best=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_selection_idenhpwc\models\best.pth final=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_selection_idenhpwc\models\final.pth logs=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_selection_idenhpwc\models\logs
+[2SD-GAT train] SS/Tight episodes=8 assignments=657 device=cpu
+[2SD-GAT 1/8] seed=0 energy=37404.794065 validation=23022.063407 validation_SR=0.6667 validation_ESP=0.0000 feasible=False selected=True
+[2SD-GAT 2/8] seed=1 energy=40910.444949 validation=23022.063407 validation_SR=0.6667 validation_ESP=0.0000 feasible=False selected=False
+[2SD-GAT 3/8] seed=3 energy=41330.796309 validation=23022.063407 validation_SR=0.6667 validation_ESP=0.0000 feasible=False selected=False
+[2SD-GAT 4/8] seed=2 energy=56502.397433 validation=23022.063407 validation_SR=0.6667 validation_ESP=0.0000 feasible=False selected=False
+[2SD-GAT 5/8] seed=7 energy=57624.104245 validation=23022.063407 validation_SR=0.6667 validation_ESP=0.0000 feasible=False selected=False
+[2SD-GAT 6/8] seed=5 energy=48931.587454 validation=23022.063407 validation_SR=0.6667 validation_ESP=0.0000 feasible=False selected=False
+[2SD-GAT 7/8] seed=6 energy=51738.791268 validation=23022.063407 validation_SR=0.6667 validation_ESP=0.0000 feasible=False selected=False
+[2SD-GAT 8/8] seed=4 energy=38952.519610 validation=23022.063407 validation_SR=0.6667 validation_ESP=0.0000 feasible=False selected=False
+[2SD-GAT train completed] best=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_runner_opqdj9bl\models\best.pth final=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_runner_opqdj9bl\models\final.pth logs=C:\Users\lyz12\AppData\Local\Temp\two_stage_gat_runner_opqdj9bl\models\logs
+----------------------------------------------------------------------
+Ran 327 tests in 153.712s
+
+OK

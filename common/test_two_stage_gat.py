@@ -11,12 +11,14 @@ from unittest.mock import patch
 import numpy as np
 import torch
 
-from algorithms.two_stage_gat.config import TwoStageGATConfig, SOURCE_COMMIT
+from algorithms.two_stage_gat.config import TwoStageGATConfig, SOURCE_COMMIT, SELECTION_TAG
 from algorithms.two_stage_gat.environment import TwoStageGATEnv
 from algorithms.two_stage_gat.networks import GraphState, TwoStageActorCritic
 from algorithms.two_stage_gat.ppo import PPOAgent, Transition, compute_gae
 from algorithms.two_stage_gat.runner import (env_kwargs, evaluate, load_checkpoint,
     objective_metadata, run_episode, seed_everything, train, artifact_name)
+from algorithms.two_stage_gat.selection import (selection_key, selection_metadata,
+    selection_protocol, selection_scenario, validation_selection)
 from common.experiment_measurements import episode_metrics
 from common.f22_instances import instance_identity
 from common.scenarios import Scenario
@@ -34,6 +36,60 @@ def graph(count=4, vms=3):
 
 def vector(module):
     return torch.cat([p.detach().cpu().flatten() for p in module.parameters()])
+
+
+def validation_fixture(successes, energy=100., count=50):
+    return dict(seed=600, wf_success_count=successes, wf_count=count,
+                wf_success_rate=successes/count, total_energy=energy)
+
+
+class SelectionTests(unittest.TestCase):
+    def test_paper_workflow_threshold_and_probability_target_are_distinct(self):
+        self.assertFalse(validation_selection([validation_fixture(45)])['feasible'])
+        boundary = validation_selection([validation_fixture(46)])
+        self.assertTrue(boundary['feasible'])
+        self.assertEqual(boundary['workflow_success_rate'], .92)
+        self.assertEqual(boundary['validation_ESP'], 1.)
+        rows = [validation_fixture(50)] * 99 + [validation_fixture(45)]
+        self.assertTrue(validation_selection(rows)['feasible'])
+        rows = [validation_fixture(50)] * 98 + [validation_fixture(45)] * 2
+        result = validation_selection(rows)
+        self.assertGreater(result['workflow_success_rate'], .92)
+        self.assertEqual(result['validation_ESP'], .98)
+        self.assertFalse(result['feasible'])
+
+    def test_feasible_energy_order_and_infeasible_success_fallback(self):
+        def candidate(success, energy):
+            return validation_selection([validation_fixture(success, energy)])
+        self.assertLess(selection_key(candidate(46,200)), selection_key(candidate(45,1)))
+        self.assertLess(selection_key(candidate(46,200)), selection_key(candidate(50,250)))
+        self.assertLess(selection_key(candidate(49,200)), selection_key(candidate(46,200)))
+        self.assertLess(selection_key(candidate(45,200)), selection_key(candidate(44,1)))
+        self.assertLess(selection_key(candidate(45,100)), selection_key(candidate(45,200)))
+        self.assertEqual(selection_key(candidate(46,200)), selection_key(candidate(46,200)))
+
+    def test_invalid_or_inconsistent_validation_is_rejected(self):
+        for rows in ([], [validation_fixture(51)], [validation_fixture(-1)],
+                     [validation_fixture(46,float('nan'))], [validation_fixture(46,-1)],
+                     [dict(validation_fixture(46),wf_success_rate=1.)],
+                     [dict(validation_fixture(46),wf_count=0)]):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                validation_selection(rows)
+
+    def test_selector_is_algorithm_specific_and_paths_are_isolated(self):
+        scene = Scenario()
+        self.assertEqual(scene.protocol().selection, 'minimum_validation_total_energy')
+        protocol = selection_protocol(scene)
+        for key in ('train','validation','test','episodes'):
+            self.assertEqual(protocol[key], scene.protocol().metadata()[key])
+        self.assertEqual(protocol['selection'], SELECTION_TAG)
+        self.assertIn(SELECTION_TAG, scene.model_name('two_stage_gat'))
+        self.assertNotIn(SELECTION_TAG, scene.model_name('mahdrl'))
+        self.assertEqual(scene.describe('two_stage_gat')['checkpoint_selection'], selection_metadata())
+        adapted = selection_scenario(scene)
+        self.assertEqual(adapted.reproducibility_metadata()['data_split']['selection'], SELECTION_TAG)
+        self.assertEqual(scene.reproducibility_metadata()['data_split']['selection'],
+                         'minimum_validation_total_energy')
 
 
 class ReservationTests(unittest.TestCase):
@@ -260,6 +316,14 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(rows[-1]['policy_updates_at_validation'],agent.updates)
             loaded,obj = load_checkpoint(directory/'final.pth',scene)
             self.assertEqual(obj['source_commit'],SOURCE_COMMIT)
+            self.assertEqual(obj['checkpoint_selection'], selection_metadata())
+            self.assertEqual(obj['protocol']['selection'], SELECTION_TAG)
+            self.assertEqual(summary['best_validation_selection'],
+                min((dict(r['validation_selection'], completed_episodes=r['episode']+1)
+                     for r in rows), key=selection_key))
+            best_agent, best_obj = load_checkpoint(directory/'best.pth',scene)
+            self.assertEqual(best_obj['validation_selection'],
+                             rows[best_obj['completed_episodes']-1]['validation_selection'])
             before = deepcopy(agent.network.state_dict()); steps=agent.steps; updates=agent.updates
             rng = (random.getstate(),np.random.get_state(),torch.get_rng_state().clone())
             a,_=evaluate(agent,scene,[700],kwargs=kwargs,directory=Path(tmp)/'measurements',checkpoint_directory=directory)
@@ -270,12 +334,39 @@ class RunnerTests(unittest.TestCase):
             torch.testing.assert_close(torch.get_rng_state(),rng[2],rtol=0,atol=0)
             for key,value in before.items(): torch.testing.assert_close(agent.network.state_dict()[key],value,rtol=0,atol=0)
             self.assertTrue((Path(tmp)/'measurements/episodes/seed700.json').is_file())
+            measurement=json.loads((Path(tmp)/'measurements/episodes/seed700.json').read_text())
+            self.assertEqual(measurement['provenance']['data_split']['selection'],SELECTION_TAG)
             with self.assertRaises(ValueError): evaluate(agent,scene,[0],kwargs=kwargs)
             with self.assertRaises(ValueError): load_checkpoint(directory/'final.pth',replace(scene,model_seed=2))
             corrupt=deepcopy(obj);corrupt['scheduling_protocol']='idle_only'
             torch.save(corrupt,directory/'wrong.pth')
             with self.assertRaises(ValueError): load_checkpoint(directory/'wrong.pth',scene)
+            old=deepcopy(obj);old['model_version']='two_stage_gat_source_aae1397_v1'
+            old.pop('checkpoint_selection')
+            torch.save(old,directory/'old_energy_only.pth')
+            with self.assertRaises(ValueError): load_checkpoint(directory/'old_energy_only.pth',scene)
             with self.assertRaises(FileExistsError): train(scene,cfg,kwargs,directory)
+
+    def test_checkpoint_updates_follow_feasibility_not_only_energy(self):
+        candidates = [validation_fixture(s,e) for s,e in
+                      ((45,100.),(46,200.),(44,50.),(47,180.),(50,250.))]
+        evaluations = [([row], {'total_energy':{'mean':row['total_energy']}})
+                       for row in candidates]
+        with TemporaryDirectory(prefix='two_stage_gat_selection_') as temporary:
+            scene=Scenario(mode='train',episodes=5)
+            kwargs=env_kwargs(scene,0);kwargs['workflows_per_episode']=1
+            with patch('algorithms.two_stage_gat.runner.evaluate',side_effect=evaluations):
+                _, directory=train(scene,TwoStageGATConfig(device='cpu'),kwargs,Path(temporary)/'models')
+            _, best=load_checkpoint(directory/'best.pth',scene)
+            _, final=load_checkpoint(directory/'final.pth',scene)
+            self.assertEqual(best['completed_episodes'],4)
+            self.assertEqual(best['validation_selection']['mean_total_energy'],180.)
+            self.assertEqual(best['validation_selection']['workflow_success_rate'],.94)
+            self.assertTrue(best['validation_selection']['feasible'])
+            self.assertEqual(final['validation_selection']['mean_total_energy'],250.)
+            self.assertEqual(final['best_validation_selection'],best['best_validation_selection'])
+            metadata=json.loads((directory/'data_split.json').read_text())
+            self.assertEqual(metadata['data_split']['selection'],SELECTION_TAG)
 
     def test_paired_instance_matches_public_environment_despite_different_queues(self):
         scene=Scenario();kwargs=env_kwargs(scene,700);kwargs['workflows_per_episode']=2

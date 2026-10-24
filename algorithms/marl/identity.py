@@ -1,7 +1,7 @@
 """Stable experiment identity and isolated outputs for the adapted MARL baseline."""
 from pathlib import Path
 
-MODEL_VERSION = 'marl_q_v2'
+MODEL_VERSION = 'marl_q_v3'
 DISPLAY_NAME = 'MARL-Q'
 
 

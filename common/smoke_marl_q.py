@@ -45,6 +45,8 @@ def run_smoke(hidden_dims=(16,8)):
         pending = set()
         original_record, original_update = QDecisionTrace.record, QAgent.update
         original_select = QAgent.select_action
+        original_target = QAgent.sampled_q
+        target_calls = dict(Global=0, Local=0, queried_locals=0)
         def record(trace, *args, **kwargs):
             original_record(trace, *args, **kwargs)
             pending.add(trace.agent)
@@ -57,12 +59,25 @@ def run_smoke(hidden_dims=(16,8)):
             assert agent not in pending, 'Next action sampled before pending Critic/Actor updates'
             return original_select(agent, *args, **kwargs)
 
+        def target(agent, obs, mask, peer_action_sampler=None):
+            target_calls['Global' if agent.peer_act_dim else 'Local'] += 1
+            if peer_action_sampler is None:
+                return original_target(agent, obs, mask)
+            queried = []
+            def peer(host_index):
+                queried.append(host_index)
+                return peer_action_sampler(host_index)
+            value = original_target(agent, obs, mask, peer)
+            assert len(queried) == 1, 'Global target queried multiple Locals'
+            target_calls['queried_locals'] += len(queried)
+            return value
+
         with redirect_stdout(io.StringIO()):
             precompute(Scenario(mode='precompute', seed_spec='0,600,700', cache_output=str(scene.cache_path)))
             with patch.object(train,'SCENARIO',scene), patch.object(train,'QConfig',side_effect=cfg), \
                     patch.object(train,'CloudWorkflowEnv_MARL',side_effect=environment), \
                     patch.object(QDecisionTrace,'record',record), patch.object(QAgent,'update',update), \
-                    patch.object(QAgent,'select_action',select):
+                    patch.object(QAgent,'select_action',select), patch.object(QAgent,'sampled_q',target):
                 train.train()
                 saved = {path:hashlib.sha256(path.read_bytes()).hexdigest()
                          for directory in (scene.checkpoint_dir('marl'),scene.log_dir('marl'))
@@ -91,6 +106,9 @@ def run_smoke(hidden_dims=(16,8)):
             for role, diagnostics in final['learners'].items():
                 assert measurement['optimizer_steps'][role+'.actor_optim'] == diagnostics['transitions']
                 assert measurement['optimizer_steps'][role+'.critic_optim'] == diagnostics['transitions']
+            assert target_calls['Global'] == final['learners']['Global']['nonterminal']
+            assert target_calls['Local'] == sum(v['nonterminal'] for k,v in final['learners'].items() if k.startswith('Local_'))
+            assert target_calls['queried_locals'] == target_calls['Global']
 
             eval_scene = replace(scene, mode='eval', seed_spec='700')
             recorder = evaluate.EvaluationRecorder
@@ -99,7 +117,8 @@ def run_smoke(hidden_dims=(16,8)):
                 return recorder(*args, **kwargs)
             with patch.object(evaluate,'SCENARIO',eval_scene), patch.object(evaluate,'QConfig',side_effect=cfg), \
                     patch.object(evaluate,'CloudWorkflowEnv_MARL',side_effect=environment), \
-                    patch.object(evaluate,'EvaluationRecorder',side_effect=evaluation_recorder):
+                    patch.object(evaluate,'EvaluationRecorder',side_effect=evaluation_recorder), \
+                    patch.object(QAgent,'sample_target_action',side_effect=AssertionError('Evaluation sampled TD action')):
                 kwargs = evaluate.build_env_kwargs(str(scene.cache_path))
                 kwargs.update(eval_scene.normalization_kwargs())
                 g, locals, dims = evaluate.build_agents_and_probe_dims(kwargs,700,'cpu',
@@ -116,7 +135,8 @@ def run_smoke(hidden_dims=(16,8)):
             out = root/f'evaluation_{MODEL_VERSION}.csv'
             cli_scene = replace(eval_scene, marl_options={'out':str(out),'device':'cpu'})
             with patch.object(evaluate,'SCENARIO',cli_scene), patch.object(evaluate,'QConfig',side_effect=cfg), \
-                    patch.object(evaluate,'CloudWorkflowEnv_MARL',side_effect=environment):
+                    patch.object(evaluate,'CloudWorkflowEnv_MARL',side_effect=environment), \
+                    patch.object(QAgent,'sample_target_action',side_effect=AssertionError('Evaluation sampled TD action')):
                 evaluate.main()
                 with out.open(newline='') as stream:
                     rows = list(csv.DictReader(stream))
@@ -134,6 +154,7 @@ def run_smoke(hidden_dims=(16,8)):
                     raise AssertionError('Repeated evaluation did not refuse existing output')
                 assert all(path.read_bytes() == contents for path,contents in before.items())
         return dict(model_version=MODEL_VERSION, hidden_dims=hidden_dims, dims=dims, learners=final['learners'],
+                    target_estimator='single_sample_q', target_q_calls=target_calls,
                     numerics=final['numerics'],
                     reward_balances=dict(global_balance=final['global_reward_balance'],local_balance=final['local_reward_balance']),
                     assignment_count=measurement['assignment_calls'], policy_calls=measurement['policy_calls'],

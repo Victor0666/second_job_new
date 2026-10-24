@@ -1,7 +1,7 @@
 """Paper-style action-conditioned critics with independent Local policies.
 
-The paper leaves the TD target unspecified. We use the next policy's expected Q,
-then update Critic before Actor, without sampling a stale successor action.
+The paper leaves the TD target unspecified. We sample one successor action pair
+for Q estimation, update Critic before Actor, then draw a fresh behavior action.
 """
 from dataclasses import asdict, dataclass
 
@@ -71,37 +71,18 @@ class QAgent:
         return int(dist.logits.argmax(-1).item() if deterministic else dist.sample().item())
 
     @torch.no_grad()
-    def action_probabilities(self, obs, mask):
-        return self._distribution(obs, mask).probs.squeeze(0).cpu().numpy().copy()
+    def sample_target_action(self, obs, mask):
+        """A TD-only draw, separate from select_action and environment execution."""
+        return int(self._distribution(obs, mask).sample().item())
 
     @torch.no_grad()
-    def expected_q(self, obs, mask, peer_probabilities=None):
-        """Policy evaluation over legal actions, without drawing a behavior action."""
-        probs = self._distribution(obs, mask).probs.squeeze(0)
-        legal = torch.nonzero(torch.as_tensor(mask, device=self.device) > .5).flatten()
-        if self.peer_act_dim:
-            if peer_probabilities is None or set(peer_probabilities) != set(legal.tolist()):
-                raise ValueError('Global successor needs a Local policy for every legal Host')
-            actions, peers, weights = [], [], []
-            for action in legal.tolist():
-                peer = torch.as_tensor(peer_probabilities[action], dtype=torch.float32, device=self.device)
-                if (peer.shape != (self.peer_act_dim,) or not torch.isfinite(peer).all()
-                        or (peer < 0).any() or not torch.isclose(peer.sum(), peer.new_tensor(1.), atol=1e-6)):
-                    raise ValueError('Invalid Local successor action probabilities')
-                indices = torch.nonzero(peer > 0).flatten()
-                actions.append(torch.full_like(indices, action))
-                peers.append(indices)
-                weights.append(probs[action] * peer[indices])
-            actions, peers, weights = torch.cat(actions), torch.cat(peers), torch.cat(weights)
-        else:
-            if peer_probabilities is not None:
-                raise ValueError('Local successor must not receive another agent policy')
-            actions, weights = legal, probs[legal]
-        parts = [self._obs(obs).expand(len(actions), -1), F.one_hot(actions, self.act_dim).float()]
-        if self.peer_act_dim:
-            parts.append(F.one_hot(peers, self.peer_act_dim).float())
-        q = self.critic(torch.cat(parts, dim=-1)).squeeze(-1)
-        return float(torch.dot(weights, q).item())
+    def sampled_q(self, obs, mask, peer_action_sampler=None):
+        """One masked policy sample; Global queries only the sampled Host's Local."""
+        if bool(self.peer_act_dim) != (peer_action_sampler is not None):
+            raise ValueError('Only Global successor Q requires a Local action sampler')
+        action = self.sample_target_action(obs, mask)
+        peer = peer_action_sampler(action) if self.peer_act_dim else None
+        return float(self._q(Decision(obs, mask, action, peer)).item())
 
     def _q(self, decision):
         parts = [self._obs(decision.obs)]
@@ -190,9 +171,8 @@ class QAgent:
 
 def _load(path, device, normalization):
     ckpt = torch.load(path, map_location=device, weights_only=True)
-    # The earlier long v2 name has the same learning rules and checkpoint schema.
-    if not isinstance(ckpt, dict) or ckpt.get('model_version') not in (MODEL_VERSION, 'marl_independent_q_v2') or ckpt.get('learning_model') != LEARNING_MODEL:
-        raise ValueError('Not an independent MARL Q checkpoint; retrain the new model')
+    if not isinstance(ckpt, dict) or ckpt.get('model_version') != MODEL_VERSION or ckpt.get('learning_model') != LEARNING_MODEL:
+        raise ValueError(f'Expected {MODEL_VERSION} (single-sample Q) checkpoint; retrain the new model')
     check_checkpoint(ckpt.get('normalization'), normalization)
     return ckpt
 
@@ -252,10 +232,10 @@ class QDecisionTrace:
         self.agent, self.pending = agent, None
         self.recorded_reward = self.emitted_reward = 0.0
 
-    def advance(self, obs, mask, peer_probabilities=None):
+    def advance(self, obs, mask, peer_action_sampler=None):
         if self.pending is not None:
             decision, reward = self.pending
-            next_value = self.agent.expected_q(obs, mask, peer_probabilities)
+            next_value = self.agent.sampled_q(obs, mask, peer_action_sampler)
             self.agent.update(decision, reward, next_value)
             self.emitted_reward += reward
             self.pending = None

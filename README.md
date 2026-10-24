@@ -88,9 +88,9 @@ S 任务仅使用约 30 节点的五类工作流；M 任务按 30/50 节点组�
 
 MARL 额外保留 `--deadline-cache`、`--ckpt-global`、`--ckpt-local`、`--out` 和 `--device`，可用 `--help` 查看。其余算法自动选择 CUDA 或 CPU。
 
-MARL 正式入口现为 `marl_q_v2`：独立 Local Actor/Critic、动作条件 Q、Global 参照 MAHDRL HA 补全观测；同一条经验先更新 Critic，再用更新后的 Q 更新 Actor，随后采样下一动作。原文未明确 TD 公式的部分使用合法动作的策略期望 Q。熵和梯度裁剪关闭，保留公共归一化与奖励。旧 A2C 和 v1 模型不能加载，需重训，训练/评测命令不变，输出进入独立版本目录。实现与验收见 [MARL Q 适配说明](docs/MARL_Q_implementation.md)。
+MARL 正式入口现为 `marl_q_v3`：独立 Local Actor/Critic、动作条件 Q、Global 参照 MAHDRL HA 补全观测；同一条经验先更新 Critic，再用更新后的 Q 更新 Actor，随后采样实际动作。原文未明确 TD 公式的部分使用一步单样本后继 Q：Global 只查询抽中的一个 Local，Local 只抽自己的合法 VM；估值抽样与执行动作分开。熵和梯度裁剪关闭，保留公共归一化与奖励。旧 A2C、v1、期望 Q 的 v2 模型不能加载，需重训，训练/评测命令不变，输出进入独立版本目录。实现与验收见 [MARL Q 适配说明](docs/MARL_Q_implementation.md)。
 
-新 MARL 按独立对比算法标记为 **MARL-Q**，CSV 和测量 JSON 的 `algorithm` 均为 `marl_q_v2`。训练日志名为 `train_metrics_marl_q_v2.csv`；默认评测结果位于 `outputs/run/marl_q_v2/<协议与归一化版本>/from_<训练场景>_model<模型种子>/eval_<评测场景>/`，其中 CSV 为 `evaluation_marl_q_v2.csv`，逐种子明细在 `measurements/`。旧 MARL/A2C/v1 的目录不阻挡新实验；同一新版训练目录非空或同一评测目的地已有结果时明确报错，防止追加或覆盖。另一次评测可通过 `--out <新的CSV路径>` 同时隔离 CSV 和附属明细。`--dry-run` 会打印实际目的地。
+新 MARL 按独立对比算法标记为 **MARL-Q**，CSV 和测量 JSON 的 `algorithm` 均为 `marl_q_v3`。训练日志名为 `train_metrics_marl_q_v3.csv`；默认评测结果位于 `outputs/run/marl_q_v3/<协议与归一化版本>/from_<训练场景>_model<模型种子>/eval_<评测场景>/`，其中 CSV 为 `evaluation_marl_q_v3.csv`，逐种子明细在 `measurements/`。旧 MARL/A2C/v1/v2 的目录不阻挡新实验；同一新版训练目录非空或同一评测目的地已有结果时明确报错，防止追加或覆盖。另一次评测可通过 `--out <新的CSV路径>` 同时隔离 CSV 和附属明细。`--dry-run` 会打印实际目的地。
 
 训练输出在 `outputs/ckpts` 和 `outputs/logs`，评测 CSV 在 `outputs/run`。MARL 的重复写入规则见上段；其他算法沿用各自的输出规则。评测不会自动搜索并替换为其他场景的模型；缺失模型时会明确报错。
 

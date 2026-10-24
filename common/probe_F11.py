@@ -74,12 +74,11 @@ def probe():
     local2,mask2,_=env.get_local_state(env.host_ids[next_host]);act2=int(np.flatnonzero(mask2>.5)[0])
     cfg=QConfig(hidden_dims=HIDDEN)
     agent=QAgent(len(obs['global_obs']),len(obs['global_mask']),cfg,peer_act_dim=len(mask))
-    # A fixed uniform masked Local policy is sufficient for this finite-update probe.
-    peer_probabilities={}
-    for h in np.flatnonzero(obs2['global_mask']>.5):
-        _,peer_mask,_=env.get_local_state(env.host_ids[int(h)])
-        peer_probabilities[int(h)]=(peer_mask>.5)/np.count_nonzero(peer_mask>.5)
-    tail=agent.expected_q(obs2['global_obs'],obs2['global_mask'],peer_probabilities)
+    # A uniform masked Local draw is sufficient for this finite-update probe.
+    def sample_peer(host_index):
+        _,peer_mask,_=env.get_local_state(env.host_ids[host_index])
+        return int(np.random.choice(np.flatnonzero(peer_mask>.5)))
+    tail=agent.sampled_q(obs2['global_obs'],obs2['global_mask'],sample_peer)
     losses=agent.update(current_global,rg,tail)
     record('MARL_Global',agent,losses['critic_loss']);del agent;gc.collect()
     # Local's successor is its own next decision, never the next other Host.
@@ -92,7 +91,7 @@ def probe():
     tail=None
     if not done:
         local2,mask2,_=env.get_local_state(env.host_ids[host])
-        tail=agent.expected_q(local2,mask2)
+        tail=agent.sampled_q(local2,mask2)
     losses=agent.update(current_local,rl,tail)
     record('MARL_Local',agent,losses['critic_loss']);del agent;gc.collect()
 

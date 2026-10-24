@@ -224,6 +224,11 @@ def train():
     learners = learner_map(global_agent, local_agent)
     for agent in local_agent.agents:
         bind_normalization(agent, SCENARIO)
+
+    def sample_local_target(host_index):
+        lobs, lmask, _ = env.get_local_state(env.host_ids[host_index])
+        return local_agent.agents[host_index].sample_target_action(lobs, lmask)
+
     save_dir = str(SCENARIO.checkpoint_dir("marl"))
     log_path = os.path.join(
         ROOT_DIR, "outputs", "logs", SCENARIO.model_name("marl"), f"train_metrics_{MODEL_VERSION}.csv"
@@ -299,12 +304,7 @@ def train():
             gobs = np.array(obs["global_obs"], copy=True)
             gmask = np.array(obs["global_mask"], copy=True)
             valid_decision(gobs, gmask)
-            if global_trace.pending is not None:
-                peer_probabilities = {}
-                for h in np.flatnonzero(gmask > .5):
-                    peer_obs, peer_mask, _ = env.get_local_state(env.host_ids[int(h)])
-                    peer_probabilities[int(h)] = local_agent.agents[int(h)].action_probabilities(peer_obs, peer_mask)
-                global_trace.advance(gobs, gmask, peer_probabilities)
+            global_trace.advance(gobs, gmask, sample_local_target)
             a_host = global_agent.select_action(gobs, gmask, deterministic=False)
             host_id = env.host_ids[int(a_host)]
             host_index = int(a_host)

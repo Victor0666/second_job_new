@@ -17,7 +17,8 @@ from common.read_xml_opt_Tsize import load_workflow_from_dax
 from common.scenarios import ROOT, parse_scenario
 from common.workflow_opt import ENERGY_ACCOUNTING, COMMUNICATION_MODEL
 from .config import (COMMON_REWARD, DRLGNNConfig, INPUT_ENCODING, MODEL_VERSION,
-                     REWARD_PROTOCOL, SOURCE_COMMIT, SOURCE_REPOSITORY)
+                     REWARD_PROTOCOL, SOURCE_COMMIT, SOURCE_REPOSITORY,
+                     TASK_FEATURES, VM_FEATURES)
 from .environment import DRLGNNEnv
 from .ppo import PPOAgent, Transition
 
@@ -64,6 +65,7 @@ def append_json(path, value):
 def objective_metadata():
     return dict(source_repository=SOURCE_REPOSITORY, source_commit=SOURCE_COMMIT,
         model_version=MODEL_VERSION, policy_input=INPUT_ENCODING,
+        observation_fields=dict(task=list(TASK_FEATURES), vm=list(VM_FEATURES)),
         reward_protocol=REWARD_PROTOCOL, reward_settings=COMMON_REWARD,
         energy_accounting=ENERGY_ACCOUNTING, communication_model=COMMUNICATION_MODEL,
         evaluation='argmax with author single-graph train-mode BN on an isolated copy')
@@ -189,7 +191,7 @@ def train(scenario, config=None, kwargs=None, out=None):
     directory.mkdir(parents=True, exist_ok=True); logs.mkdir(parents=True, exist_ok=True)
     kwargs = dict(kwargs or env_kwargs(scenario, protocol.train[0]))
     if kwargs.get('normalization_mode') != 'legacy':
-        raise ValueError('The source GIN uses raw task4/VM3 inputs, not F19 feature scaling')
+        raise ValueError('The public-state GIN uses raw task8/VM9 inputs, not F19 feature scaling')
     if any(kwargs.get(key) != value for key, value in COMMON_REWARD.items()):
         raise ValueError('DRL-GNN must use the public global energy-tardiness coefficients')
     seeds = tuple(protocol.train[:scenario.episodes])

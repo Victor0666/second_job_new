@@ -241,11 +241,12 @@ class Scenario:
             name = name.replace('_model1_', '_model' + str(self.model_seed) + '_')
             return name + '_task6_vm4_signed_slack_shared_v1_' + self.normalization_mode + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING
         if algorithm == 'drl_gnn':
+            from algorithms.drl_gnn.config import INPUT_ENCODING
             name = MODEL_NAMES[algorithm].format(task=task,
                 resource=(self.train_resource or self.resource) if self.mode == 'eval' else self.resource,
                 deadline=(self.train_deadline or self.deadline) if self.mode == 'eval' else self.deadline)
             name = name.replace('_seed1_', '_model' + str(self.model_seed) + '_')
-            return name + '_source_raw_task4_vm3_bn_v1_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING
+            return name + '_' + INPUT_ENCODING + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING
         name = MODEL_NAMES[algorithm].format(
             task=task, resource=(self.train_resource or self.resource) if self.mode == "eval" else self.resource,
             deadline=(self.train_deadline or self.deadline) if self.mode == "eval" else self.deadline
@@ -299,7 +300,8 @@ class Scenario:
             result["checkpoint_dir"] = str(self.checkpoint_dir(algorithm))
             result["model_training_task"] = self.task if self.mode == "train" else self.train_task
         if algorithm == 'drl_gnn':
-            result['normalization'] = {'policy_input': 'source_raw_task4_vm3_bn_v1',
+            from algorithms.drl_gnn.config import INPUT_ENCODING
+            result['normalization'] = {'policy_input': INPUT_ENCODING,
                 'additional_input_scaling': False, 'shared_calibration': self.normalization_kwargs()}
         if algorithm == 'pd3qn':
             from algorithms.pd3qn.config import agent_kwargs, run_name

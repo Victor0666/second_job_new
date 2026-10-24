@@ -1,4 +1,4 @@
-"""Original DRL-GNN observations over the shared online cloud simulator."""
+"""DRL-GNN observations with public deadline, data and resource state."""
 from operator import index
 
 import networkx as nx
@@ -6,6 +6,7 @@ import numpy as np
 
 from common.workflow_opt import exec_time_components
 from environments.irws import IRWSEnvRouteA
+from .config import TASK_FEATURES, VM_FEATURES
 from .networks import GraphState
 
 
@@ -51,12 +52,17 @@ class DRLGNNEnv(IRWSEnvRouteA):
         estimated, global_ids = self._estimated_completions()
         count = len(self.task_meta)
         end = count + 1
-        task_features = np.zeros((count + 2, 4), dtype=np.float32)
-        task_features[0] = (1., 0., 0., float(self.first_arrival_time or 0.))
+        now = float(self.current_time)
+        workflows = {wf.workflow_id: wf for wf in self.workflows}
+        task_features = np.zeros((count + 2, len(TASK_FEATURES)), dtype=np.float32)
+        task_features[0, :4] = (1., 0., 0., float(self.first_arrival_time or 0.))
         for gid, status in enumerate(self.task_state):
+            wf = workflows[self.task_meta[gid].wf_id]
             task_features[gid + 1] = (
                 float(status in ("Running", "Finished")), float(status == "Ready"),
                 float(self.task_mi[gid]), estimated[gid],
+                float(self.task_baseline_finish[gid]) - now, float(wf.deadline) - now,
+                float(self.task_in_bits[gid]), float(self.task_out_bits[gid]),
             )
         dependencies = set()
         exit_estimates = []
@@ -73,14 +79,25 @@ class DRLGNNEnv(IRWSEnvRouteA):
         dependencies.update((previous + 1, gid + 1) for previous, gid in self._vm_order_edges)
         end_completion = (float(np.max(self.vm_available_at)) if self.done_flag
                           else max(exit_estimates, default=float(self.current_time)))
-        task_features[end] = (float(self.done_flag), 0., 0., end_completion)
+        task_features[end, :4] = (float(self.done_flag), 0., 0., end_completion)
 
-        vm_features = np.empty((self.num_vms, 3), dtype=np.float32)
+        active_pc = dict.fromkeys(self.hosts, 0.)
+        for vm_id, vm in self.vms.items():
+            if self.vm_available_at[vm_id] > now + 1e-12:
+                active_pc[vm.host_id] += float(vm.pc)
+        host_loads = {h: active_pc[h] / max(host.total_pc, 1e-12)
+                      for h, host in self.hosts.items()}
+        vm_features = np.empty((self.num_vms, len(VM_FEATURES)), dtype=np.float32)
         for vm_id in range(self.num_vms):
             vm = self.vms[vm_id]
             host = self.hosts[vm.host_id]
             energy_rate = (float(host.power(1.)) - float(host.power(0.))) / host.total_pc
-            vm_features[vm_id] = (float(self.vm_available_at[vm_id]), 1. / vm.pc, energy_rate)
+            load = host_loads[vm.host_id]
+            vm_features[vm_id] = (
+                float(self.vm_available_at[vm_id]), 1. / vm.pc, energy_rate,
+                float(vm.bw), max(0., float(self.vm_available_at[vm_id]) - now), load,
+                float(host.power(load)), float(host.power(0.)), float(vm.host_id),
+            )
         compatibility = np.ones((count + 2, self.num_vms), dtype=bool)
         action_mask = np.zeros_like(compatibility)
         if not self.done_flag:

@@ -1,12 +1,19 @@
-"""Fixed author-code architecture and default PPO parameters for DRL-GNN."""
+"""Author-code GIN/PPO settings with public scheduling-state inputs."""
 from dataclasses import asdict, dataclass
 
 
 SOURCE_REPOSITORY = "https://github.com/kdsuneraavinash/workflow-cloudsim-drlgnn"
 SOURCE_COMMIT = "be67762c3dd22c05733ebb808083375de3bd7d62"
-MODEL_VERSION = "drl_gnn_source_be67762_v1"
+MODEL_VERSION = "drl_gnn_source_be67762_public_state_v2"
 REWARD_PROTOCOL = "common_energy_tardiness_v2"
-INPUT_ENCODING = "source_raw_task4_vm3_bn_v1"
+INPUT_ENCODING = "public_raw_task8_vm9_bn_v2"
+# Append public state to the native task4/VM3 prefix; keep raw units and graph BN.
+TASK_FEATURES = ("assigned", "ready", "workload_mi", "estimated_completion_s",
+                 "task_deadline_remaining_s", "workflow_deadline_remaining_s",
+                 "input_bits", "output_bits")
+VM_FEATURES = ("availability_time_s", "inverse_cpu_speed", "active_energy_rate",
+               "bandwidth_mbps", "remaining_busy_s", "host_load",
+               "host_current_power_w", "host_idle_power_w", "host_id")
 COMMON_REWARD = dict(alpha_delay_vm=.75, energy_reward_scale=.001, task_baseline_norm=300.)
 
 

@@ -1,0 +1,54 @@
+# 【DRL-GNN（公共状态输入适配版）：drl_gnn】
+# --------------------------------------------------------------
+# Linux / Bash；在项目根目录、已激活的 Python 环境中执行。
+# 输入版本：public_raw_task8_vm9_bn_v2（Task8 / VM9）；需要重新训练，旧 Task4 / VM3 权重不兼容。
+# CUDA_VISIBLE_DEVICES=0；每个命令是一项独立后台任务，按需单独执行。
+# --normalization-mode f19_shared_v1 保留公共参考元数据；策略仍使用 raw 特征和单图 BN。
+# PPO、奖励和最低验证能耗选模不变；本次未修改已有的大图 minibatch 显存处理。
+# 训练：task=S，资源 S/M/L × 截止期 Tight/Medium/Loose，共 9 个源模型。
+# 600 Episodes；训练实例 0-599，验证实例 600，模型初始化种子 1。
+
+# DRL-GNN（Task8 / VM9） | SS | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SS_Tight_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SS_Tight_task8_vm9_v2_ep600_seed1.pid
+
+# DRL-GNN（Task8 / VM9） | SS | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SS_Medium_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SS_Medium_task8_vm9_v2_ep600_seed1.pid
+
+# DRL-GNN（Task8 / VM9） | SS | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SS_Loose_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SS_Loose_task8_vm9_v2_ep600_seed1.pid
+
+# DRL-GNN（Task8 / VM9） | SM | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SM_Tight_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SM_Tight_task8_vm9_v2_ep600_seed1.pid
+
+# DRL-GNN（Task8 / VM9） | SM | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SM_Medium_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SM_Medium_task8_vm9_v2_ep600_seed1.pid
+
+# DRL-GNN（Task8 / VM9） | SM | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SM_Loose_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SM_Loose_task8_vm9_v2_ep600_seed1.pid
+
+# DRL-GNN（Task8 / VM9） | SL | Tight
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SL_Tight_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SL_Tight_task8_vm9_v2_ep600_seed1.pid
+
+# DRL-GNN（Task8 / VM9） | SL | Medium
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SL_Medium_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SL_Medium_task8_vm9_v2_ep600_seed1.pid
+
+# DRL-GNN（Task8 / VM9） | SL | Loose
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/drl_gnn/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda' > outputs/server_console_logs/drl_gnn_SL_Loose_task8_vm9_v2_ep600_seed1.log 2>&1 &
+echo $! > outputs/server_console_logs/drl_gnn_SL_Loose_task8_vm9_v2_ep600_seed1.pid

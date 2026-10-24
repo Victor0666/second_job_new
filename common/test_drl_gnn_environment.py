@@ -1,16 +1,30 @@
 """Physical equivalence and online graph checks for the DRL-GNN adapter."""
+from copy import deepcopy
+from dataclasses import replace
+import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 import numpy as np
+import torch
 
+from algorithms.drl_gnn.config import (COMMON_REWARD, DRLGNNConfig, INPUT_ENCODING,
+                                       TASK_FEATURES, VM_FEATURES)
 from algorithms.drl_gnn.environment import DRLGNNEnv
+from algorithms.drl_gnn.ppo import PPOAgent, Transition
+from algorithms.drl_gnn.runner import evaluate, load_checkpoint, save_checkpoint, train
+from common.scenarios import Scenario
 from common.workflow_opt import exec_time_components
 from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents
 
 
 class DRLGNNEnvironmentTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        torch.set_num_threads(1)
+
     def setUp(self):
         self.directory = TemporaryDirectory(prefix="drl_gnn_environment_")
         self.addCleanup(self.directory.cleanup)
@@ -90,16 +104,69 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         previous_vm = int(legal[0]) % env.num_vms
         self.assertIn((previous_vm + 1, 3), set(map(tuple, final.dependencies)))
 
+    def test_public_task_deadlines_and_payload_are_signed_current_snapshots(self):
+        env = DRLGNNEnv(**self.kwargs())
+        env.reset(seed=2)
+        now = float(env.current_time)
+        env.task_baseline_finish[0] = now - 7.
+        env.workflows[0].deadline = now + 13.
+        state = env.graph_state()
+        self.assertEqual(state.task_features.shape, (5, len(TASK_FEATURES)))
+        np.testing.assert_allclose(state.task_features[1:-1, 4],
+                                   np.asarray(env.task_baseline_finish) - now)
+        np.testing.assert_array_equal(state.task_features[1:-1, 5], [13.] * 3)
+        np.testing.assert_allclose(state.task_features[1:-1, 6], env.task_in_bits)
+        np.testing.assert_allclose(state.task_features[1:-1, 7], env.task_out_bits)
+        np.testing.assert_array_equal(state.task_features[[0, -1], 4:], 0.)
+        env.task_baseline_finish[0] = now + 5.
+        changed = env.graph_state()
+        self.assertEqual(float(state.task_features[1, 4]), -7.)
+        self.assertEqual(float(changed.task_features[1, 4]), 5.)
+        np.testing.assert_array_equal(state.task_features[:, :4], changed.task_features[:, :4])
+        np.testing.assert_array_equal(state.vm_features, changed.vm_features)
+        env.workflows[0].deadline = now - 3.
+        np.testing.assert_array_equal(env.graph_state().task_features[1:-1, 5], [-3.] * 3)
+
+    def test_public_vm_bandwidth_busy_time_and_shared_host_state(self):
+        env = DRLGNNEnv(**self.kwargs(num_hosts=2, vms_per_host=(2, 1),
+                                     bw_tiers=(1000., 2000.)))
+        env.reset(seed=2)
+        now = float(env.current_time)
+        env.vm_available_at[:] = [now + 11., now - 1., now]
+        state = env.graph_state()
+        self.assertEqual(state.vm_features.shape, (3, len(VM_FEATURES)))
+        np.testing.assert_array_equal(state.vm_features[:, 3], [1000., 2000., 1000.])
+        np.testing.assert_array_equal(state.vm_features[:, 4], [11., 0., 0.])
+        load = env.vms[0].pc / env.hosts[0].total_pc
+        np.testing.assert_allclose(state.vm_features[:, 5], [load, load, 0.])
+        np.testing.assert_allclose(state.vm_features[:, 6],
+            [env.hosts[0].power(load)] * 2 + [env.hosts[1].power(0.)])
+        np.testing.assert_allclose(state.vm_features[:, 7],
+            [env.hosts[0].power(0.)] * 2 + [env.hosts[1].power(0.)])
+        np.testing.assert_array_equal(state.vm_features[:, 8], [0., 0., 1.])
+        self.assertFalse(state.action_mask[:, 0].any())
+        self.assertTrue(state.action_mask[1, 1:].all())
+        # Moving a VM to busy updates every VM's view of the same host only.
+        env.vm_available_at[1] = now + 9.
+        changed = env.graph_state()
+        np.testing.assert_array_equal(changed.vm_features[:2, 5], [1., 1.])
+        np.testing.assert_array_equal(state.vm_features[2], changed.vm_features[2])
+        self.assertEqual(float(state.vm_features[1, 4]), 0.)
+
     def test_later_workflow_arrival_updates_shared_dummy_without_early_end(self):
         env = DRLGNNEnv(**self.kwargs(workflows_per_episode=2, arrival_lambda=1e-6))
         env.reset(seed=2)
         first = env.graph_state()
         self.assertEqual(len(env.workflows), 1)
-        self.assertEqual(first.task_features.shape, (5, 4))
+        self.assertEqual(first.task_features.shape, (5, len(TASK_FEATURES)))
         saw_second = False
         while not env.done_flag:
             state = env.graph_state()
             self.assertEqual(float(state.task_features[-1, 0]), 0.)
+            for gid, meta in enumerate(env.task_meta):
+                expected = env.workflows[meta.wf_id].deadline - env.current_time
+                self.assertAlmostEqual(float(state.task_features[gid + 1, 5]),
+                                       float(np.float32(expected)))
             actions = np.flatnonzero(state.action_mask.reshape(-1))
             self.assertGreater(len(actions), 0)
             _, _, _ = env.pair_step(int(actions[0]))
@@ -108,8 +175,8 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertEqual(env.completed_workflows, 2)
         self.assertEqual(env.assignment_count, 6)
         final = env.graph_state()
-        self.assertEqual(final.task_features.shape, (8, 4))
-        self.assertEqual(first.task_features.shape, (5, 4))
+        self.assertEqual(final.task_features.shape, (8, len(TASK_FEATURES)))
+        self.assertEqual(first.task_features.shape, (5, len(TASK_FEATURES)))
         self.assertEqual(final.task_gids.count(-1), 1)
         self.assertEqual(final.task_gids.count(-2), 1)
 
@@ -144,6 +211,77 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertEqual(env.completed_workflows, reference.completed_workflows)
         self.assertAlmostEqual(env.total_energy, reference.total_energy, places=7)
         self.assertAlmostEqual(total_reward, -.25 * .001 * env.total_energy + .75 * total_delay_reward, places=9)
+
+    def test_expanded_inputs_train_and_checkpoint_roundtrip_without_old_version_mix(self):
+        torch.manual_seed(73)
+        kwargs = self.kwargs(num_hosts=2, vms_per_host=(2, 1),
+                             bw_tiers=(1000., 2000.))
+        env = DRLGNNEnv(**kwargs)
+        agent = PPOAgent(DRLGNNConfig())
+        records = []
+        first_state = None
+        for seed in (2, 3):
+            env.reset(seed=seed)
+            while not env.done_flag:
+                state = env.graph_state()
+                if first_state is None:
+                    first_state = state
+                action, logp, value = agent.act(state)
+                self.assertTrue(state.action_mask.reshape(-1)[action])
+                reward, done, _ = env.pair_step(action)
+                next_value = 0. if done else agent.value(env.graph_state())
+                records.append(Transition(state, action, logp, value, reward, done, next_value))
+        before = {name: p.detach().clone() for name, p in agent.network.named_parameters()}
+        result = agent.update(records)
+        self.assertEqual(result['transitions'], 6)
+        self.assertEqual(result['epochs'], agent.cfg.update_epochs)
+        self.assertTrue(np.isfinite([result[k] for k in ('loss', 'entropy', 'grad_norm')]).all())
+        for role in ('actor', 'critic'):
+            for kind, native in (('task', 4), ('vm', 3)):
+                name = f'{role}.network.{kind}_encoder.0.weight'
+                after = dict(agent.network.named_parameters())[name].detach()
+                self.assertGreater(float((after[:, native:] - before[name][:, native:]).abs().max()), 0., name)
+        # Old shapes fail before they can reach an encoder with different semantics.
+        old = replace(first_state, task_features=first_state.task_features[:, :4],
+                      vm_features=first_state.vm_features[:, :3])
+        with self.assertRaisesRegex(ValueError, 'public-state policy'):
+            agent.network(old)
+        scene = Scenario(mode='train', episodes=1)
+        self.assertIn(INPUT_ENCODING, scene.model_name('drl_gnn'))
+        self.assertNotIn('source_raw_task4_vm3_bn_v1', scene.model_name('drl_gnn'))
+        self.assertEqual(scene.describe('drl_gnn')['normalization']['policy_input'], INPUT_ENCODING)
+        path = Path(self.directory.name) / 'public_state.pth'
+        save_checkpoint(path, agent, scene, 1, 1., kwargs, {'episodes': 1})
+        loaded, obj = load_checkpoint(path, scene)
+        self.assertEqual(obj['observation_fields'], dict(task=list(TASK_FEATURES), vm=list(VM_FEATURES)))
+        for key, value in agent.network.state_dict().items():
+            torch.testing.assert_close(loaded.network.state_dict()[key], value, rtol=0, atol=0)
+        a, _ = evaluate(agent, scene, [700], kwargs=kwargs)
+        b, _ = evaluate(loaded, scene, [700], kwargs=kwargs)
+        self.assertEqual(a, b)
+        legacy = deepcopy(obj)
+        legacy['model_version'] = 'drl_gnn_source_be67762_v1'
+        legacy['policy_input'] = 'source_raw_task4_vm3_bn_v1'
+        torch.save(legacy, path)
+        with self.assertRaisesRegex(ValueError, 'checkpoint mismatch'):
+            load_checkpoint(path, scene)
+
+    def test_runner_small_graph_train_validation_and_tail_rollout(self):
+        scene = Scenario(mode='train', episodes=1)
+        kwargs = self.kwargs(**COMMON_REWARD)
+        # The tiny synthetic DAX has no FCFS cache; only mock its known task budget.
+        with patch('algorithms.drl_gnn.runner.planned_assignments', return_value=3):
+            agent, directory = train(scene, DRLGNNConfig(), kwargs,
+                                     Path(self.directory.name) / 'models')
+        self.assertEqual((agent.steps, agent.updates), (3, 1))
+        self.assertTrue((directory / 'best.pth').is_file())
+        loaded, obj = load_checkpoint(directory / 'final.pth', scene)
+        self.assertEqual((loaded.steps, loaded.updates), (3, 1))
+        self.assertEqual(obj['protocol']['selection'], 'minimum_validation_total_energy')
+        summary = json.loads((directory / 'logs/training_summary.json').read_text())
+        self.assertEqual(summary['policy_input'], INPUT_ENCODING)
+        self.assertEqual(summary['completed_episodes'], 1)
+        self.assertTrue(summary['final_rollout_retained'])
 
 
 if __name__ == "__main__":

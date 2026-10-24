@@ -1,7 +1,7 @@
 """Author-code GIN policy, implemented with torch without a PyG dependency.
 
-Matches be67762c3dd22c05733ebb808083375de3bd7d62 and PyG 2.6.1 defaults.
-The common simulator supplies raw four-task/three-VM features and legal masks.
+Retains be67762c3dd22c05733ebb808083375de3bd7d62 / PyG 2.6.1 mechanisms.
+The input layers accept public-state task8/VM9 features instead of task4/VM3.
 """
 from dataclasses import dataclass
 import math
@@ -11,7 +11,7 @@ import torch
 from torch import nn
 from torch.distributions import Categorical
 
-from .config import DRLGNNConfig
+from .config import DRLGNNConfig, TASK_FEATURES, VM_FEATURES
 
 
 @dataclass(frozen=True)
@@ -86,8 +86,8 @@ def _encoder(input_dim, hidden_dim, embedding_dim):
 class BaseGINNetwork(nn.Module):
     def __init__(self, config):
         super().__init__()
-        self.task_encoder = _encoder(4, config.hidden_dim, config.embedding_dim)
-        self.vm_encoder = _encoder(3, config.hidden_dim, config.embedding_dim)
+        self.task_encoder = _encoder(len(TASK_FEATURES), config.hidden_dim, config.embedding_dim)
+        self.vm_encoder = _encoder(len(VM_FEATURES), config.hidden_dim, config.embedding_dim)
         self.graph_network = _GIN(config.hidden_dim, config.embedding_dim)
 
     def forward(self, task_features, vm_features, edge_index):
@@ -150,8 +150,9 @@ class GraphActorCritic(nn.Module):
         dependencies = torch.as_tensor(state.dependencies, dtype=torch.long, device=device)
         if dependencies.numel() == 0:
             dependencies = dependencies.reshape(0, 2)
-        if tasks.ndim != 2 or tasks.shape[1] != 4 or vms.ndim != 2 or vms.shape[1] != 3:
-            raise ValueError("The source policy needs task features [T,4] and VM features [V,3]")
+        if (tasks.ndim != 2 or tasks.shape[1] != len(TASK_FEATURES)
+                or vms.ndim != 2 or vms.shape[1] != len(VM_FEATURES)):
+            raise ValueError("The public-state policy needs task features [T,8] and VM features [V,9]")
         if len(tasks) < 2 or len(vms) < 2 or len(state.task_gids) != len(tasks):
             raise ValueError("Single-graph source BatchNorm needs at least two task and VM rows")
         if compatibility.shape != (len(tasks), len(vms)) or action_mask.shape != compatibility.shape:

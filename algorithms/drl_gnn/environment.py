@@ -1,4 +1,5 @@
 """DRL-GNN observations with public deadline, data and resource state."""
+import math
 from operator import index
 
 import networkx as nx
@@ -11,13 +12,45 @@ from .networks import GraphState
 
 
 class DRLGNNEnv(IRWSEnvRouteA):
-    """Expose one atomic task--VM action without adding a private cost model."""
+    """Author readiness: scheduled parents and reservations at any VM's tail."""
 
     def reset(self, **kwargs):
         self._previous_task_by_vm = [None] * self.num_vms
         self._vm_order_edges = []
+        self.task_dispatch_time = []
         self.assignment_count = 0
+        self.queued_assignments = 0
         return super().reset(**kwargs)
+
+    def _add_workflows_up_to_current_time(self):
+        super()._add_workflows_up_to_current_time()
+        self.task_dispatch_time.extend([None] * (len(self.task_meta) - len(self.task_dispatch_time)))
+
+    def _process_completions_at_time(self, t):
+        for gid, status in enumerate(self.task_state):
+            if status == "Queued" and self.task_start_time[gid] <= t + 1e-12:
+                self.task_state[gid] = "Running"
+        super()._process_completions_at_time(t)
+
+    def _advance_until_decision(self):
+        self._process_completions_at_time(self.current_time)
+        while True:
+            if self._check_done():
+                self._finalize_energy_if_done()
+                self.done_flag = True
+                return
+            if self.ready_task_ids:
+                return  # A ready task can reserve a busy VM; do not wait for idle.
+            events = [self.task_end_time[g] for g, s in enumerate(self.task_state) if s == "Running"]
+            events.extend(self.task_start_time[g] for g, s in enumerate(self.task_state) if s == "Queued")
+            if self.next_arrival_idx < len(self.arrival_times):
+                events.append(float(self.arrival_times[self.next_arrival_idx]))
+            future = [float(t) for t in events if t > self.current_time + 1e-12]
+            if not future or not math.isfinite(min(future)):
+                raise RuntimeError("Unfinished DRL-GNN reservation episode has no future event")
+            self.current_time = min(future)
+            self._add_workflows_up_to_current_time()
+            self._process_completions_at_time(self.current_time)
 
     def _estimated_completions(self):
         """Estimate unassigned tasks on all VMs, including their current waits."""
@@ -27,7 +60,7 @@ class DRLGNNEnv(IRWSEnvRouteA):
         for wf in self.workflows:
             for local_id in nx.topological_sort(wf.graph):
                 gid = global_ids[wf.workflow_id, local_id]
-                if self.task_state[gid] in ("Running", "Finished"):
+                if self.task_state[gid] in ("Queued", "Running", "Finished"):
                     estimated[gid] = float(self.task_end_time[gid])
                     continue
                 parent_finish = max((estimated[global_ids[wf.workflow_id, p]]
@@ -59,7 +92,7 @@ class DRLGNNEnv(IRWSEnvRouteA):
         for gid, status in enumerate(self.task_state):
             wf = workflows[self.task_meta[gid].wf_id]
             task_features[gid + 1] = (
-                float(status in ("Running", "Finished")), float(status == "Ready"),
+                float(status in ("Queued", "Running", "Finished")), float(status == "Ready"),
                 float(self.task_mi[gid]), estimated[gid],
                 float(self.task_baseline_finish[gid]) - now, float(wf.deadline) - now,
                 float(self.task_in_bits[gid]), float(self.task_out_bits[gid]),
@@ -82,8 +115,9 @@ class DRLGNNEnv(IRWSEnvRouteA):
         task_features[end, :4] = (float(self.done_flag), 0., 0., end_completion)
 
         active_pc = dict.fromkeys(self.hosts, 0.)
-        for vm_id, vm in self.vms.items():
-            if self.vm_available_at[vm_id] > now + 1e-12:
+        for gid, status in enumerate(self.task_state):
+            if status == "Running":
+                vm = self.vms[self.task_placement[gid][0]]
                 active_pc[vm.host_id] += float(vm.pc)
         host_loads = {h: active_pc[h] / max(host.total_pc, 1e-12)
                       for h, host in self.hosts.items()}
@@ -101,10 +135,9 @@ class DRLGNNEnv(IRWSEnvRouteA):
         compatibility = np.ones((count + 2, self.num_vms), dtype=bool)
         action_mask = np.zeros_like(compatibility)
         if not self.done_flag:
-            idle = self.vm_available_at <= self.current_time + 1e-12
             for gid in self.ready_task_ids:
                 if self.task_state[gid] == "Ready":
-                    action_mask[gid + 1] = idle
+                    action_mask[gid + 1] = compatibility[gid + 1]
         if not np.isfinite(task_features).all() or not np.isfinite(vm_features).all():
             raise ValueError("Nonfinite DRL-GNN observation")
         return GraphState(
@@ -128,14 +161,34 @@ class DRLGNNEnv(IRWSEnvRouteA):
         gid = task_index - 1
         if not 0 <= gid < len(self.task_state) or self.task_state[gid] != "Ready" or gid not in self.ready_task_ids:
             raise ValueError("Joint action must select a real Ready task")
-        if self.vm_available_at[vm_id] > self.current_time + 1e-12:
-            raise ValueError("Joint action must select an idle VM")
+        base = gid - self.task_meta[gid].local_id
+        if any(base + p not in self.task_placement for p in self.task_parents[gid]):
+            raise ValueError("Joint action requires all parents to be scheduled")
+        dispatched = float(self.current_time)
+        before = float(self.total_energy)
         previous = self._previous_task_by_vm[vm_id]
-        self.select_task(gid)
-        _, reward, terminated, truncated, info = super().step(vm_id)
+        self.ready_task_ids.remove(gid)
+        _, info = self._assign_task_to_vm(gid, vm_id)
+        self.task_dispatch_time[gid] = dispatched
+        queued = self.task_start_time[gid] > dispatched + 1e-12
+        if queued:
+            self.task_state[gid] = "Queued"
+            self.queued_assignments += 1
         if previous is not None:
             self._vm_order_edges.append((previous, gid))
         self._previous_task_by_vm[vm_id] = gid
         self.assignment_count += 1
-        info.update(task_gid=gid, vm_id=vm_id, action_count=self.assignment_count)
-        return float(reward), bool(terminated or truncated), info
+        for child in self.task_children[gid]:
+            child_gid = base + child
+            if (self.task_state[child_gid] == "unReady"
+                    and all(base + p in self.task_placement for p in self.task_parents[child_gid])):
+                self.task_state[child_gid] = "Ready"
+                self.task_ready_time[child_gid] = dispatched
+                self.ready_task_ids.append(child_gid)
+        self._advance_until_decision()
+        increment = float(self.total_energy - before)
+        reward = -(1. - self.alpha_delay_vm) * self.energy_reward_scale * increment + self.alpha_delay_vm * info["r_delay"]
+        info.update(task_gid=gid, vm_id=vm_id, action_count=self.assignment_count,
+            dispatch_time=dispatched, queued=queued, delta_energy_total=increment,
+            r_energy_total=-self.energy_reward_scale * increment, reward_mode="host_task_window_v1")
+        return float(reward), bool(self.done_flag), info

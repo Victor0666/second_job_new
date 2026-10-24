@@ -1,0 +1,55 @@
+{
+  "model_version": "drl_gnn_source_be67762_parent_scheduled_v3",
+  "scheduling_protocol": "arrived_parent_scheduled_vm_tail_v1",
+  "policy": "scripted round-robin VM tails; physical checks only, no model training",
+  "cases": [
+    {
+      "task": "S",
+      "resource": "S",
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "queued_assignments": 1349,
+      "assignments_before_parent_finish": 1044,
+      "energy_reintegration_error": 0.0,
+      "reward_conservation_error": 9.094947017729282e-13,
+      "all_physically_finished": true,
+      "vm_intervals_nonoverlapping": true
+    },
+    {
+      "task": "S",
+      "resource": "M",
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "queued_assignments": 1339,
+      "assignments_before_parent_finish": 1044,
+      "energy_reintegration_error": 0.0,
+      "reward_conservation_error": 1.3642420526593924e-12,
+      "all_physically_finished": true,
+      "vm_intervals_nonoverlapping": true
+    },
+    {
+      "task": "S",
+      "resource": "L",
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "queued_assignments": 1323,
+      "assignments_before_parent_finish": 1044,
+      "energy_reintegration_error": 0.0,
+      "reward_conservation_error": 3.410605131648481e-13,
+      "all_physically_finished": true,
+      "vm_intervals_nonoverlapping": true
+    }
+  ],
+  "verification": {
+    "publication_base_commit": "52c628e81acb2ff523c40c6ecfabf61d10ed2907",
+    "publication_snapshot_tests": 38,
+    "publication_snapshot_seconds": 28.472,
+    "includes_uncommitted_memory_changes": false,
+    "environment_sha256": "3774037d4eed194f2c2bb2d14c0abba88fc609b46091e1dda29b36e54cf535fd",
+    "train_and_cross_size_evaluation_dry_run": true,
+    "formal_600_episode_training": false
+  }
+}

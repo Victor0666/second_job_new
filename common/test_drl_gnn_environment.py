@@ -11,13 +11,12 @@ import numpy as np
 import torch
 
 from algorithms.drl_gnn.config import (COMMON_REWARD, DRLGNNConfig, INPUT_ENCODING,
-                                       TASK_FEATURES, VM_FEATURES)
+                                       TASK_FEATURES, VM_FEATURES, SCHEDULING_PROTOCOL)
 from algorithms.drl_gnn.environment import DRLGNNEnv
 from algorithms.drl_gnn.ppo import PPOAgent, Transition
 from algorithms.drl_gnn.runner import evaluate, load_checkpoint, save_checkpoint, train
 from common.scenarios import Scenario
-from common.workflow_opt import exec_time_components
-from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents
+from common.workflow_opt import exec_time_components, energy_from_records
 
 
 class DRLGNNEnvironmentTests(unittest.TestCase):
@@ -55,7 +54,8 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertEqual(state.task_features.dtype, np.float32)
         self.assertEqual(state.vm_features.dtype, np.float32)
         self.assertTrue(state.compatibility_mask.all())
-        self.assertFalse(state.action_mask.any())
+        self.assertTrue(state.action_mask[1:3].all())
+        self.assertFalse(state.action_mask[[0, 3, 4]].any())
         np.testing.assert_array_equal(state.task_features[:, :2],
                                       [[1, 0], [0, 1], [0, 1], [0, 0], [0, 0]])
         self.assertEqual(float(state.task_features[1, 2]), float(np.float32(env.task_mi[0])))
@@ -88,12 +88,22 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertEqual(float(state.task_features[1, 0]), 0.)  # Historical snapshot is unchanged.
         physical = (list(env.task_state), env.total_energy, len(env.records), env.current_time)
         with self.assertRaises(ValueError):
-            env.pair_step(4)  # Task 1, busy VM 0.
+            env.pair_step(6)  # Child still has an unscheduled parent.
         self.assertEqual((list(env.task_state), env.total_energy, len(env.records), env.current_time), physical)
         self.assertIsNone(env.current_task_gid)
-        env.pair_step(5)  # Task 1, VM 1.
+        dispatched = env.current_time
+        _, _, queued_info = env.pair_step(4)  # Task 1, busy VM 0 is legal.
+        self.assertTrue(queued_info['queued'])
+        self.assertEqual(env.current_time, dispatched)
+        self.assertEqual(env.task_state[:2], ['Running', 'Queued'])
+        self.assertEqual(env.task_state[2], 'Ready')
+        self.assertGreater(env.task_end_time[0], env.current_time)
+        self.assertAlmostEqual(env.task_start_time[1], env.task_end_time[0])
         next_state = env.graph_state()
         self.assertEqual(float(next_state.task_features[1, 3]), float(np.float32(env.task_end_time[0])))
+        np.testing.assert_array_equal(next_state.task_features[2, :2], [1., 0.])
+        self.assertEqual(float(next_state.task_features[2, 3]), float(np.float32(env.task_end_time[1])))
+        self.assertTrue(next_state.action_mask[3].all())
         legal = np.flatnonzero(next_state.action_mask.reshape(-1))
         self.assertGreater(len(legal), 0)
         _, done, _ = env.pair_step(int(legal[0]))
@@ -101,8 +111,11 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         final = env.graph_state()
         self.assertEqual(float(final.task_features[-1, 0]), 1.)
         self.assertFalse(final.action_mask.any())
-        previous_vm = int(legal[0]) % env.num_vms
-        self.assertIn((previous_vm + 1, 3), set(map(tuple, final.dependencies)))
+        self.assertIn((1, 2), set(map(tuple, final.dependencies)))
+        self.assertEqual(env.task_dispatch_time, [dispatched] * 3)
+        self.assertTrue(all(status == 'Finished' for status in env.task_state))
+        with self.assertRaises(RuntimeError):
+            env.pair_step(int(legal[0]))
 
     def test_public_task_deadlines_and_payload_are_signed_current_snapshots(self):
         env = DRLGNNEnv(**self.kwargs())
@@ -132,11 +145,11 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
                                      bw_tiers=(1000., 2000.)))
         env.reset(seed=2)
         now = float(env.current_time)
-        env.vm_available_at[:] = [now + 11., now - 1., now]
+        env.pair_step(3)  # Task 0 actually runs on VM 0.
         state = env.graph_state()
         self.assertEqual(state.vm_features.shape, (3, len(VM_FEATURES)))
         np.testing.assert_array_equal(state.vm_features[:, 3], [1000., 2000., 1000.])
-        np.testing.assert_array_equal(state.vm_features[:, 4], [11., 0., 0.])
+        np.testing.assert_allclose(state.vm_features[:, 4], [env.task_end_time[0] - now, 0., 0.])
         load = env.vms[0].pc / env.hosts[0].total_pc
         np.testing.assert_allclose(state.vm_features[:, 5], [load, load, 0.])
         np.testing.assert_allclose(state.vm_features[:, 6],
@@ -144,10 +157,10 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         np.testing.assert_allclose(state.vm_features[:, 7],
             [env.hosts[0].power(0.)] * 2 + [env.hosts[1].power(0.)])
         np.testing.assert_array_equal(state.vm_features[:, 8], [0., 0., 1.])
-        self.assertFalse(state.action_mask[:, 0].any())
-        self.assertTrue(state.action_mask[1, 1:].all())
+        self.assertTrue(state.action_mask[2].all())
+        self.assertFalse(state.action_mask[1].any())
         # Moving a VM to busy updates every VM's view of the same host only.
-        env.vm_available_at[1] = now + 9.
+        env.pair_step(7)  # Task 1 actually runs on VM 1.
         changed = env.graph_state()
         np.testing.assert_array_equal(changed.vm_features[:2, 5], [1., 1.])
         np.testing.assert_array_equal(state.vm_features[2], changed.vm_features[2])
@@ -180,36 +193,82 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertEqual(final.task_gids.count(-1), 1)
         self.assertEqual(final.task_gids.count(-2), 1)
 
-    def test_real_dax_fixed_assignments_match_mahdrl_physics(self):
+    def test_future_arrival_precedes_queued_start_and_idle_reserved_vm_has_no_load(self):
+        env = DRLGNNEnv(**self.kwargs(workflows_per_episode=2, arrival_lambda=1e-6))
+        env.reset(seed=2)
+        now = float(env.current_time)
+        env.pair_step(2)  # First parent on VM 0.
+        arrival = now + (env.task_end_time[0] - now) / 2
+        env.arrival_times[1] = arrival
+        env.pair_step(4)  # Other parent queued behind it on VM 0.
+        snapshot = env.graph_state()
+        child_start = env.task_end_time[1]
+        reward, done, info = env.pair_step(7)  # Child reserved on currently idle VM 1.
+        self.assertFalse(done)
+        self.assertTrue(info['queued'])
+        self.assertAlmostEqual(info['start'], child_start)
+        self.assertAlmostEqual(env.current_time, arrival)
+        self.assertEqual(len(env.workflows), 2)
+        self.assertEqual(env.completed_workflows, 0)
+        self.assertEqual(env.task_state[:3], ['Running', 'Queued', 'Queued'])
+        self.assertLess(env.task_dispatch_time[2], env.task_end_time[0])
+        state = env.graph_state()
+        load = env.vms[0].pc / env.hosts[0].total_pc
+        np.testing.assert_allclose(state.vm_features[:, 5], [load, load])
+        np.testing.assert_allclose(state.vm_features[:, 6], [env.hosts[0].power(load)] * 2)
+        self.assertGreater(state.vm_features[1, 4], 0.)  # Reservation tail, not active load.
+        self.assertEqual(snapshot.task_features.shape[0], 5)
+        self.assertEqual(state.task_features.shape[0], 8)
+        np.testing.assert_array_equal(snapshot.task_features[3, :2], [0., 1.])
+        np.testing.assert_array_equal(state.task_features[3, :2], [1., 0.])
+        self.assertGreaterEqual(env.task_start_time[2], max(env.task_end_time[:2]))
+        while not env.done_flag:
+            action = int(np.flatnonzero(env.graph_state().action_mask.reshape(-1))[0])
+            env.pair_step(action)
+        self.assertEqual(env.completed_workflows, 2)
+        self.assertEqual(env.assignment_count, 6)
+        self.assertTrue(all(s == 'Finished' for s in env.task_state))
+
+    def test_real_dax_reservations_follow_public_physics_and_conserve_rewards(self):
         dax = Path(__file__).resolve().parents[1] / "data/dax/Montage_25.xml"
         kwargs = self.kwargs(dax_paths=[str(dax)], workflows_per_episode=2,
                              num_hosts=2, vms_per_host=(2, 1),
                              pc_tiers=(2., 4.), bw_tiers=(1000., 2000.))
         env = DRLGNNEnv(**kwargs)
-        reference = CloudWorkflowEnv_VMAgents(**kwargs)
         env.reset(seed=2)
-        reference.reset(seed=2)
         total_reward = 0.
         total_delay_reward = 0.
+        queued = 0
+        scheduled_before_parent_finished = 0
         while not env.done_flag:
             state = env.graph_state()
             action = int(np.flatnonzero(state.action_mask.reshape(-1))[0])
             task_index, vm_id = divmod(action, env.num_vms)
             gid = state.task_gids[task_index]
-            self.assertIn(gid, reference.ready_task_ids)
-            self.assertLessEqual(reference.vm_available_at[vm_id], reference.current_time + 1e-12)
-            reference._assign_task_to_specific_vm(gid, vm_id)
-            reference._advance_until_decision_energy_only()
+            base = gid - env.task_meta[gid].local_id
+            parent_ends = [env.task_end_time[base + p] for p in env.task_parents[gid]]
+            self.assertTrue(all(base + p in env.task_placement for p in env.task_parents[gid]))
+            start = max(env.current_time, env.vm_available_at[vm_id], max(parent_ends, default=env.current_time))
+            vm = env.vms[vm_id]
+            duration = exec_time_components(env._task_obj_from_gid(gid), vm.pc, vm.bw,
+                parents_loc=env._build_parents_loc(gid), child_vm_id=vm_id, child_host_id=vm.host_id,
+                zero_if_same_vm=True, zero_if_same_host=False)[-1]
+            scheduled_before_parent_finished += bool(parent_ends and max(parent_ends) > env.current_time + 1e-12)
             reward, _, info = env.pair_step(action)
+            self.assertAlmostEqual(info['start'], start, places=9)
+            self.assertAlmostEqual(info['end'], start + duration, places=9)
+            queued += info['queued']
             total_reward += reward
             total_delay_reward += info["r_delay"]
-            self.assertAlmostEqual(env.current_time, reference.current_time, places=8)
-            np.testing.assert_allclose(env.vm_available_at, reference.vm_available_at, rtol=0, atol=1e-8)
-            np.testing.assert_allclose(env.task_end_time, reference.task_end_time, rtol=0, atol=1e-8)
-            np.testing.assert_allclose(env.task_baseline_finish, reference.task_baseline_finish, rtol=0, atol=1e-6)
-        self.assertTrue(reference.done_flag)
-        self.assertEqual(env.completed_workflows, reference.completed_workflows)
-        self.assertAlmostEqual(env.total_energy, reference.total_energy, places=7)
+        self.assertGreater(queued, 0)
+        self.assertGreater(scheduled_before_parent_finished, 0)
+        self.assertEqual(env.completed_workflows, 2)
+        for vm_id in range(env.num_vms):
+            gids = [g for g, (v, _) in env.task_placement.items() if v == vm_id]
+            intervals = sorted((env.task_start_time[g], env.task_end_time[g]) for g in gids)
+            self.assertTrue(all(left[1] <= right[0] + 1e-9 for left, right in zip(intervals, intervals[1:])))
+        self.assertAlmostEqual(env.total_energy, energy_from_records(env.records, env.hosts,
+            start_time=env.first_arrival_time, end_time=env.current_time), places=7)
         self.assertAlmostEqual(total_reward, -.25 * .001 * env.total_energy + .75 * total_delay_reward, places=9)
 
     def test_expanded_inputs_train_and_checkpoint_roundtrip_without_old_version_mix(self):
@@ -250,9 +309,12 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertIn(INPUT_ENCODING, scene.model_name('drl_gnn'))
         self.assertNotIn('source_raw_task4_vm3_bn_v1', scene.model_name('drl_gnn'))
         self.assertEqual(scene.describe('drl_gnn')['normalization']['policy_input'], INPUT_ENCODING)
+        self.assertIn(SCHEDULING_PROTOCOL, scene.model_name('drl_gnn'))
+        self.assertNotIn(SCHEDULING_PROTOCOL, scene.model_name('mahdrl_oe_ge_pf'))
         path = Path(self.directory.name) / 'public_state.pth'
         save_checkpoint(path, agent, scene, 1, 1., kwargs, {'episodes': 1})
         loaded, obj = load_checkpoint(path, scene)
+        self.assertEqual(obj['scheduling_protocol'], SCHEDULING_PROTOCOL)
         self.assertEqual(obj['observation_fields'], dict(task=list(TASK_FEATURES), vm=list(VM_FEATURES)))
         for key, value in agent.network.state_dict().items():
             torch.testing.assert_close(loaded.network.state_dict()[key], value, rtol=0, atol=0)
@@ -263,6 +325,12 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         legacy['model_version'] = 'drl_gnn_source_be67762_v1'
         legacy['policy_input'] = 'source_raw_task4_vm3_bn_v1'
         torch.save(legacy, path)
+        with self.assertRaisesRegex(ValueError, 'checkpoint mismatch'):
+            load_checkpoint(path, scene)
+        old_idle = deepcopy(obj)
+        old_idle['model_version'] = 'drl_gnn_source_be67762_public_state_v2'
+        old_idle.pop('scheduling_protocol')
+        torch.save(old_idle, path)
         with self.assertRaisesRegex(ValueError, 'checkpoint mismatch'):
             load_checkpoint(path, scene)
 
@@ -282,6 +350,7 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertEqual(summary['policy_input'], INPUT_ENCODING)
         self.assertEqual(summary['completed_episodes'], 1)
         self.assertTrue(summary['final_rollout_retained'])
+
 
 
 if __name__ == "__main__":

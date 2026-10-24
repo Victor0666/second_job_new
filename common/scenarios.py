@@ -242,12 +242,12 @@ class Scenario:
             name = name.replace('_model1_', '_model' + str(self.model_seed) + '_')
             return name + '_task6_vm4_signed_slack_shared_v1_' + self.normalization_mode + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING + '_' + SELECTION_TAG
         if algorithm == 'drl_gnn':
-            from algorithms.drl_gnn.config import INPUT_ENCODING
+            from algorithms.drl_gnn.config import INPUT_ENCODING, SCHEDULING_PROTOCOL
             name = MODEL_NAMES[algorithm].format(task=task,
                 resource=(self.train_resource or self.resource) if self.mode == 'eval' else self.resource,
                 deadline=(self.train_deadline or self.deadline) if self.mode == 'eval' else self.deadline)
             name = name.replace('_seed1_', '_model' + str(self.model_seed) + '_')
-            return name + '_' + INPUT_ENCODING + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING
+            return name + '_' + INPUT_ENCODING + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING + '_' + SCHEDULING_PROTOCOL
         name = MODEL_NAMES[algorithm].format(
             task=task, resource=(self.train_resource or self.resource) if self.mode == "eval" else self.resource,
             deadline=(self.train_deadline or self.deadline) if self.mode == "eval" else self.deadline
@@ -306,7 +306,8 @@ class Scenario:
             if self.protocol():
                 result['experiment_protocol'] = selection_protocol(self)
         if algorithm == 'drl_gnn':
-            from algorithms.drl_gnn.config import INPUT_ENCODING
+            from algorithms.drl_gnn.config import INPUT_ENCODING, SCHEDULING_PROTOCOL
+            result['scheduling_protocol'] = SCHEDULING_PROTOCOL
             result['normalization'] = {'policy_input': INPUT_ENCODING,
                 'additional_input_scaling': False, 'shared_calibration': self.normalization_kwargs()}
         if algorithm == 'pd3qn':

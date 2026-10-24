@@ -18,7 +18,7 @@ from common.scenarios import ROOT, parse_scenario
 from common.workflow_opt import ENERGY_ACCOUNTING, COMMUNICATION_MODEL
 from .config import (COMMON_REWARD, DRLGNNConfig, INPUT_ENCODING, MODEL_VERSION,
                      REWARD_PROTOCOL, SOURCE_COMMIT, SOURCE_REPOSITORY,
-                     TASK_FEATURES, VM_FEATURES)
+                     TASK_FEATURES, VM_FEATURES, SCHEDULING_PROTOCOL)
 from .environment import DRLGNNEnv
 from .ppo import PPOAgent, Transition
 
@@ -67,6 +67,7 @@ def objective_metadata():
         model_version=MODEL_VERSION, policy_input=INPUT_ENCODING,
         observation_fields=dict(task=list(TASK_FEATURES), vm=list(VM_FEATURES)),
         reward_protocol=REWARD_PROTOCOL, reward_settings=COMMON_REWARD,
+        scheduling_protocol=SCHEDULING_PROTOCOL,
         energy_accounting=ENERGY_ACCOUNTING, communication_model=COMMUNICATION_MODEL,
         evaluation='argmax with author single-graph train-mode BN on an isolated copy')
 

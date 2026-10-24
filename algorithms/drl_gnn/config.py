@@ -4,7 +4,8 @@ from dataclasses import asdict, dataclass
 
 SOURCE_REPOSITORY = "https://github.com/kdsuneraavinash/workflow-cloudsim-drlgnn"
 SOURCE_COMMIT = "be67762c3dd22c05733ebb808083375de3bd7d62"
-MODEL_VERSION = "drl_gnn_source_be67762_public_state_v2"
+MODEL_VERSION = "drl_gnn_source_be67762_parent_scheduled_v3"
+SCHEDULING_PROTOCOL = "arrived_parent_scheduled_vm_tail_v1"
 REWARD_PROTOCOL = "common_energy_tardiness_v2"
 INPUT_ENCODING = "public_raw_task8_vm9_bn_v2"
 # Append public state to the native task4/VM3 prefix; keep raw units and graph BN.

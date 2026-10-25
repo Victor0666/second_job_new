@@ -1,11 +1,12 @@
 # 【DRL-GNN（公共状态输入适配版）：drl_gnn】
 # --------------------------------------------------------------
 # Linux / Bash；在项目根目录、已激活的 Python 环境中执行。
-# 输入版本：public_raw_task8_vm9_bn_v2（Task8 / VM9）；需要重新训练，旧 Task4 / VM3 权重不兼容。
+# 输入版本：public_f19_task8_vm9_bn_v3（Task8 / VM9）；需要重新训练，旧 raw Task8 / VM9 及 Task4 / VM3 权重均不兼容。
 # 调度v3：父任务已排程即释放子任务，允许全部兼容VM的队尾未来预留；旧 Ready×idle Task8/VM9 模型也需重训。
 # CUDA_VISIBLE_DEVICES=0；每个命令是一项独立后台任务，按需单独执行。
-# --normalization-mode f19_shared_v1 保留公共参考元数据；策略仍使用 raw 特征和单图 BN。
-# PPO、奖励和最低验证能耗选模不变；本次未修改已有的大图 minibatch 显存处理。
+# --normalization-mode f19_shared_v1 实际缩放图输入；跨规模评测固定来源训练场景尺度，保留单图 BN。
+# PPO、奖励和最低验证能耗选模不变；自动逐图梯度累计，minibatch 仍为 128。
+# 单进程 PyTorch 分配器上限：min(总显存的85%, 28 GiB)；不包含外部 CUDA 开销或其他进程。
 # 训练：task=S，资源 S/M/L × 截止期 Tight/Medium/Loose，共 9 个源模型。
 # 600 Episodes；训练实例 0-599，验证实例 600，模型初始化种子 1。
 

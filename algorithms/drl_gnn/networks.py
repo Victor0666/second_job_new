@@ -12,6 +12,7 @@ from torch import nn
 from torch.distributions import Categorical
 
 from .config import DRLGNNConfig, TASK_FEATURES, VM_FEATURES
+from .runtime import configure_cuda_memory
 
 
 @dataclass(frozen=True)
@@ -137,6 +138,7 @@ class GraphActorCritic(nn.Module):
     def __init__(self, config=None):
         super().__init__()
         self.config = config or DRLGNNConfig()
+        self.cuda_memory_policy = configure_cuda_memory(self.config.device)
         self.actor = GINActor(self.config)
         self.critic = GINCritic(self.config)
         self.to(self.config.device)
@@ -158,7 +160,7 @@ class GraphActorCritic(nn.Module):
         if compatibility.shape != (len(tasks), len(vms)) or action_mask.shape != compatibility.shape:
             raise ValueError("Task-VM masks must have shape [T,V]")
         if (action_mask & ~compatibility).any() or not torch.isfinite(tasks).all() or not torch.isfinite(vms).all():
-            raise ValueError("Illegal action mask or nonfinite raw graph features")
+            raise ValueError("Illegal action mask or nonfinite graph features")
         if dependencies.ndim != 2 or dependencies.shape[1] != 2:
             raise ValueError("Dependencies must be task-local pairs [D,2]")
         if dependencies.numel() and (dependencies.min() < 0 or dependencies.max() >= len(tasks)):

@@ -9,7 +9,7 @@
 作者公开仓库：<https://github.com/kdsuneraavinash/workflow-cloudsim-drlgnn>。
 固定提交：`be67762c3dd22c05733ebb808083375de3bd7d62`。
 
-- 保留原生 task4 / VM3 前缀，追加公共状态为 task8 / VM9；保留 raw 输入和单图 BatchNorm。
+- 保留原生 task4 / VM3 字段前缀，追加公共状态为 task8 / VM9；物理量使用固定 F19 训练参考尺度，保留单图 BatchNorm。
 - hidden64 / embedding16 / 3 层 GIN，单向依赖及兼容边、VM 顺序边、共享虚拟首尾节点。
 - 独立 Actor/Critic、全边打分后截取兼容边、联合任务—VM 分布。
 - PPO、GAE、价值裁剪、minibatch 优势归一化、单 Adam 和原超参数。
@@ -29,7 +29,7 @@
 - 队尾预留不是当前正在运行。主机当前负载/功率仅统计当前 Running 任务；VM 的可用时刻及剩余排队时间仍取队尾，因此允许出现“VM 未来已预留、当前尚空闲”的状态。
 - 图仍只包含已到达工作流。当前已到达任务均排程后，按后续到达、预留开始、任务结束事件推进；不会跳过中途到达。最终排程完成后继续结清物理完成及指标，不能提前结束整个在线回合。
 - 公共执行时间、通信、Host 任务窗口能耗、逐分配奖励及其系数、Task8/VM9 字段、GIN/PPO、训练数据与最低验证能耗选模均不变。MAHDRL、2SD-GAT 及其他算法不随本次修改改变。
-- 调度标识为 `arrived_parent_scheduled_vm_tail_v1`，模型版本为 `drl_gnn_source_be67762_parent_scheduled_v3`。模型/日志目录追加调度标识，检查点单独校验此项；旧 task8/VM9 的 Ready×idle v2 权重也拒绝加载，需要重新训练。命令行参数不变。
+- 调度标识为 `arrived_parent_scheduled_vm_tail_v1`，当前模型版本为 `drl_gnn_source_be67762_f19_inputs_v4`（调度规则沿用 v3）。模型/日志目录追加调度标识，检查点单独校验此项；旧 task8/VM9 的 Ready×idle v2 权重也拒绝加载，需要重新训练。命令行参数不变。
 - 与 MAHDRL 的调度候选语义现有明确差异，应作为保留原方法机制披露；不再宣称两个环境逐步可选动作及决策时刻完全相同。
 
 按本次要求补充公共截止期、数据量及资源状态，字段见下表。预计完成时间仍使用公共执行函数；它不再声明为严格下界。未加入 GE 引导探索、PF 性能筛选、OE 五项摘要、内在奖励或新的图网络机制。
@@ -40,15 +40,54 @@
 | VM9 | VM 可用绝对时刻 s、CPU 能力倒数、原生活动能耗系数、带宽 Mb/s、剩余忙碌时间 s、所属主机当前负载、所属主机当前功率 W、所属主机空闲功率 W、所属主机编号 |
 
 - 截止时间剩余量分别为 `task_baseline_finish - current_time` 和 `wf.deadline - current_time`，保留逾期负值，不减预计执行时长。所有真实任务使用其所属已到达工作流的状态；两个虚拟首尾节点的新增字段均为零。
-- 数据量直接读取公共 `task_in_bits` / `task_out_bits`，与 MAHDRL 基础观测使用相同逻辑数据口径；不将其替换成某个候选 VM 上扣除本地通信后的传输量。
+- 数据量读取公共 `task_in_bits` / `task_out_bits` 后分别除以固定训练参考尺度，与 MAHDRL 基础观测使用相同逻辑数据口径；不将其替换成某个候选 VM 上扣除本地通信后的传输量。
 - VM 剩余排队/占用时间为 `max(0, vm_available_at - current_time)`，字段名仍为 `remaining_busy_s`。主机负载为当前 Running 任务占用的 VM CPU 能力之和除以主机总 CPU 能力，不以未来队尾推断当前负载；当前和空闲功率直接使用公共 `host.power(load)` / `host.power(0)`。
 - 所属主机编号使用公共 `vm.host_id` 原始整数，作为明确标识直接加入 VM 特征；同一主机的 VM 共享编号、负载和功率。此编号不是大小有物理含义的资源量，不新增可学习主机嵌入或主机节点。固定 9 维 VM 输入可处理不同主机数量。
-- 新增物理量沿用 raw 输入，不引入额外 F19 缩放或校准。任务输入层改为 `8→64`，VM 输入层改为 `9→64`；Actor/Critic 两套网络合计增加 1280 个权重，其余层宽、GIN/PPO、奖励、训练超参数与选模规则保持不变。
-- 输入字段版本仍为 `public_raw_task8_vm9_bn_v2`；模型/调度版本为上述 v3，检查点和日志路径同时包含输入及调度标识，加载时核对两者与完整字段顺序。旧 task4/VM3、旧 Ready×idle task8/VM9 权重均不能作为当前模型使用，需要重新训练；入口参数不变。
+- 全部物理量在首层 Linear 前按固定 F19 训练参考缩放，不进行当前回合或评测场景校准，不裁剪输入。任务输入层改为 `8→64`，VM 输入层改为 `9→64`；Actor/Critic 两套网络合计增加 1280 个权重，其余层宽、GIN/PPO、奖励、训练超参数与选模规则保持不变。
+- 输入字段版本为 `public_f19_task8_vm9_bn_v3`；模型版本为 v4，调度协议不变，检查点和日志路径同时包含输入及调度标识，加载时核对两者与完整字段顺序。旧 task4/VM3、旧 Ready×idle task8/VM9 和相同维度的 raw 输入权重均不能作为当前模型使用，需要重新训练；入口参数不变。
 
 这属于已声明的公共观测扩展适配，不再是原生 task4/VM3 数值复现，也不声明与 MAHDRL_OE_GE_PF 的所有人工构造特征完全一致。
 
 训练入口遵循 F22：实例种子 0–599、600 Episodes；验证种子 600，每完成 Episode 验证一次，按能耗选模；测试种子 700–729。四个采样环境共用这 600 个训练实例，并非各自训练 600 回合。验证、测试使用隔离副本及 argmax，保留作者单图 BN 语义。
+
+## 固定输入尺度修复：v4（2026-10-25）
+
+本次只落实数值修复方案的前四步。父任务已分配即可选择子任务、允许忙 VM 队尾排队的原算法规则保持不变。没有增加 GE/PF、启发式筛选或强制使用快速 VM。
+
+先在 float64 中构造物理字段并按下表缩放，再转换 float32 供原有网络使用；网络学习精度仍为 float32。字段名称表示原始物理含义，维数及顺序不变。
+
+| 输入 | 送入第一层 Linear 的值 |
+| --- | --- |
+| Task8 | assigned、ready、MI/workload_mi_ref、预计完成绝对时刻/T_ref、带符号任务截止剩余时间/T_ref、带符号工作流截止剩余时间/T_ref、input_bits/input_bits_ref、output_bits/output_bits_ref |
+| VM9 | 可用绝对时刻/T_ref、vm_pc_ref/CPU、活动能耗系数/(100W/host_pc_ref)、带宽/vm_bw_ref、剩余忙碌时间/T_ref、当前主机负载、当前功率/100W、空闲功率/100W、原始主机编号 |
+
+训练、验证和评测均使用来源训练场景的既有 F19 配置。例如 SS/Tight 训练的模型在 MS/LS 评测时仍使用 SS_T 尺度；禁止从测试实例重新拟合、改用目标场景尺度或逐回合更新尺度。来源校准的训练划分、配置哈希、完整参考值及输入公式写入日志/检查点，并在加载时核验。没有修改共享校准文件。
+
+新编码 `public_f19_task8_vm9_bn_v3` 自动产生新模型/日志/评测目录，模型版本 `drl_gnn_source_be67762_f19_inputs_v4`。旧 raw Task8/VM9 虽然形状相同，仍明确拒绝加载，不能用旧权重直接评测新版输入。
+
+保持 hidden64 / embedding16 / GIN3、Actor/Critic、BN、PPO 全部超参数、rollout512/minibatch128/4epochs、公共奖励及系数、模型初始化种子、训练实例预算、训练采样、评测 argmax 和最低验证能耗选模不变。重新训练使用原初始化种子和训练预算；本次未启动正式 600 回合训练。此修复属于公共问题的数值输入适配，不声称原文规定了这些 F19 尺度，也不保证成功率必然改善。
+
+验证：DRL-GNN 环境/显存、场景及测量共 30 项测试通过（含 CPU/CUDA 小图训练、验证与检查点往返）。覆盖大数据量下 assigned/ready/截止期对首层及编码输出的敏感性、负值与不裁剪、来源尺度绑定、旧同维 raw 权重拒绝、固定分配的奖励和物理时刻不变。训练及跨资源/截止期评测入口 dry-run 通过。真实训练实例 seed0 的 50 工作流，在 25/50/75 VM 各完成 1371 次固定动作分配；父任务及 VM 队尾约束、非重叠、最终完成均通过，能耗重积分误差为 0，奖励守恒误差小于 1.4e-12。9 个来源训练场景的既有校准绑定校验通过，记录见 `DRL_GNN_f19_input_smoke_2026-10-25.json`。上述固定动作不用于选模或性能结论。
+
+## 单图梯度累计与显存预算
+
+全部 DRL-GNN 场景自动使用 `single_graph_gradient_accumulation_v1`：在完整 minibatch 上先归一化优势，一次清空梯度，逐图前向并对 `loss / 当前 minibatch 实际大小` 立即反向，最后只做一次梯度裁剪和一次 Adam 更新。不跨 minibatch 累计，不按单图归一化优势；BatchNorm 仍逐图执行。默认 rollout=512、minibatch=128、4 个 minibatch、4 epochs 及全部学习超参数保持不变，尾批/单样本/可选 KL 停止规则沿用原口径。
+
+这是平均损失梯度的数学等价改写，不保证浮点逐位一致；累加顺序和近零 BatchNorm 梯度可能使多次 Adam 更新后的参数有微小差异。显存改写本身不改变输入和权重形状；当前输入 v4 同样拒绝旧 raw/Ready×idle 检查点，必须从相同模型种子重新训练。
+
+创建 CUDA 网络前自动设置 PyTorch 分配器上限为 `min(显卡总显存 × 0.85, 28 GiB)`，适用于所有训练/验证/评测规模及显式 `device` 覆盖；32 GiB 显卡约为 27.2 GiB。评测检查点先反序列化到 CPU，避免整份检查点额外驻留 GPU。训练和评测摘要记录 `execution`、`cuda_memory_usage`（进程启动以来的分配器峰值）。命令无需增加参数。
+
+该上限仅约束本进程 PyTorch 分配器，不是整卡或整个进程的驱动级硬配额，不包含外部 CUDA 分配，多个进程也不共享此额度。超过预算将报 OOM，不会自动缩小 minibatch、改变精度或改用 CPU；其他程序同时使用 GPU 时仍需自行控制总占用。
+
+本机 RTX 4060 Ti 8GB / PyTorch 2.5.1+cu121 的九种合成图压力测试：每种规模完整执行一个 128 样本 minibatch 更新（压力测试仅 1 epoch、1 minibatch；正式默认值保持不变）。表内为峰值缓存显存 MiB，排除 CUDA 上下文；不同截止期不改变这些网络张量形状。
+
+| 任务规模 / 节点数（含虚拟节点） | 资源 S：25 VM | 资源 M：50 VM | 资源 L：75 VM |
+| --- | ---: | ---: | ---: |
+| S / 1502 | 222 | 352 | 506 |
+| M / 2902 | 362 | 648 | 938 |
+| L / 5002 | 604 | 1068 | 1534 |
+
+最大规模峰值已分配约 1230 MiB，峰值缓存约 1534 MiB。原始记录见 `DRL_GNN_memory_profile_2026-10-25.json`。这是代表任务数量和资源规模的合成图检查，不是 RTX 5090 实测或正式 600 回合真实轨迹峰值保证。
 
 ## 已检查
 
@@ -57,11 +96,13 @@
 - 调度 v3 独立提交快照验证：DRL-GNN环境、场景、2SD-GAT和MAHDRL组合共38项测试通过（28.472秒），训练与跨规模评测 dry-run 通过；该快照不依赖工作区中尚未提交的显存调整。真实公共50工作流实例分别使用25/50/75 VM，各完成1371次分配，累计4113次；全部满足依赖和VM非重叠，能耗重积分误差为0，奖励守恒误差小于1.4e-12。记录见 `DRL_GNN_scheduling_v3_smoke.json`。未执行正式600回合训练。
 - 历史 task4/VM3 版与作者源码、隔离 PyG 2.6.1 的 CPU 数值对照已完成：116 项 state_dict 键一致，相同 seed 初始权重、logits、value 和参数梯度误差均为 0。该证据只适用于历史原生输入网络，不能用于声称本次扩展输入后的数值仍与作者一致。
 - 新增观测检查覆盖逾期负值、输入输出数据、忙碌时间、同主机负载/功率、归属编号、后续到达工作流及历史快照；小图测试覆盖新增输入权重的 PPO 更新、训练尾批、验证、保存加载一致及旧版本拒绝。
+- 对照旧版整批反传检查相同参数下的梯度、损失、BN 状态、清梯度/裁剪/Adam 次数；覆盖完整 512 样本 rollout、尾批、单样本、不裁剪 value/不归一化优势、KL 停止。默认配置真实执行 4 epochs、16 次 Adam 更新并检查数值接近。
+- 自动统计存活反向保存张量：128 图 minibatch 的单图累计峰值相对旧版下降超过 50 倍；指标记录不持有反向图。
 - 提交前检查 Python 语法及 train/evaluate `--dry-run`。
 
 ## 尚未完成及已知限制
 
-1. **显存处理尚未修改。**当前 PPO 仍同时保留一个 minibatch 中多个完整图的反向计算图，正式规模可能超显存。拟改为等价逐图梯度累计，保持 minibatch、损失、一次梯度裁剪和一次 Adam 更新；需补梯度等价测试。
+1. 已实施单图梯度累计及单进程 CUDA 分配预算，但未在 RTX 5090 上实测完整训练，也不保证多进程及外部 CUDA 分配的总显存不超过 32GB。
 2. 已覆盖小图训练、验证、保存加载和尾批处理；未完成正式规模验收，没有运行正式 600 回合训练或正式 30 种子测试。
 3. 当前每步额外计算下一状态 Critic 值，存在重复前向开销；训练硬件元数据记录也待补齐。
 4. 当前检查点用于评估，不支持从 rollout 中途恢复训练；文件明确记录 `resume_supported=False`。
@@ -72,7 +113,7 @@
 ## 检查命令
 
 ```powershell
-.\.venv\Scripts\python.exe -X utf8 -B -m unittest common.test_drl_gnn_environment common.test_scenarios common.test_experiment_measurements -q
+.\.venv\Scripts\python.exe -X utf8 -B -m unittest common.test_drl_gnn_environment common.test_drl_gnn_memory common.test_scenarios common.test_experiment_measurements -q
 .\run.cmd algorithms/drl_gnn/train.py --dry-run
 .\run.cmd algorithms/drl_gnn/evaluate.py --dry-run
 ```

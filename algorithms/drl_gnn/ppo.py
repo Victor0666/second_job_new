@@ -1,5 +1,5 @@
 """Source-configured PPO for the adapted DRL-GNN joint policy."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Sequence
 
 import numpy as np
@@ -48,7 +48,7 @@ class PPOAgent:
     def __init__(self, config=None, device=None):
         self.cfg = config or DRLGNNConfig()
         self.device = torch.device(device if device is not None else self.cfg.device)
-        self.network = GraphActorCritic(self.cfg).to(self.device)
+        self.network = GraphActorCritic(replace(self.cfg, device=str(self.device)))
         self.optimizer = torch.optim.Adam(
             self.network.parameters(), lr=self.cfg.learning_rate, eps=self.cfg.adam_eps,
         )
@@ -88,59 +88,59 @@ class PPOAgent:
         for _ in range(self.cfg.update_epochs):
             np.random.shuffle(indices)
             for minibatch in np.array_split(indices, min(self.cfg.num_minibatches, len(records))):
-                new_logp, entropy, new_values = [], [], []
-                for index in minibatch:
+                selection = torch.as_tensor(minibatch, dtype=torch.long, device=self.device)
+                mb_advantages = batch_advantages[selection]
+                if self.cfg.norm_adv:
+                    # Normalize the whole minibatch, never individual graphs.
+                    std = mb_advantages.std() if len(minibatch) > 1 else mb_advantages.new_zeros(())
+                    mb_advantages = (mb_advantages - mb_advantages.mean()) / (std + 1e-8)
+                mb_measurements = torch.zeros(7, device=self.device)
+                self.optimizer.zero_grad()
+                for position, index in enumerate(minibatch):
                     record = records[int(index)]
                     mask = np.asarray(record.state.action_mask).reshape(-1)
                     if not 0 <= record.action < len(mask) or not mask[record.action]:
                         raise ValueError("PPO rollout contains an invalid joint action")
                     distribution, value = self.network.distribution_and_value(record.state)
                     action = torch.tensor(record.action, dtype=torch.long, device=self.device)
-                    new_logp.append(distribution.log_prob(action))
-                    entropy.append(distribution.entropy())
-                    new_values.append(value)
-                new_logp = torch.stack(new_logp).reshape(-1)
-                new_values = torch.stack(new_values).reshape(-1)
-                entropy_loss = torch.stack(entropy).mean()
-                selection = torch.as_tensor(minibatch, dtype=torch.long, device=self.device)
-                logratio = new_logp - old_logp[selection]
-                ratio = logratio.exp()
-                with torch.no_grad():
-                    old_approx_kl = (-logratio).mean()
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipfrac = ((ratio - 1).abs() > self.cfg.clip_coef).float().mean()
-                mb_advantages = batch_advantages[selection]
-                if self.cfg.norm_adv:
-                    # The final partial rollout can contain a singleton minibatch.
-                    std = mb_advantages.std() if len(minibatch) > 1 else mb_advantages.new_zeros(())
-                    mb_advantages = (mb_advantages - mb_advantages.mean()) / (std + 1e-8)
-                policy_loss = torch.maximum(
-                    -mb_advantages * ratio,
-                    -mb_advantages * ratio.clamp(1 - self.cfg.clip_coef, 1 + self.cfg.clip_coef),
-                ).mean()
-                if self.cfg.clip_vloss:
-                    unclipped = (new_values - batch_returns[selection]).square()
-                    clipped_values = old_values[selection] + (
-                        new_values - old_values[selection]
-                    ).clamp(-self.cfg.clip_coef, self.cfg.clip_coef)
-                    clipped = (clipped_values - batch_returns[selection]).square()
-                    value_loss = 0.5 * torch.maximum(unclipped, clipped).mean()
-                else:
-                    value_loss = 0.5 * (new_values - batch_returns[selection]).square().mean()
-                loss = policy_loss - self.cfg.ent_coef * entropy_loss + self.cfg.vf_coef * value_loss
-                if not torch.isfinite(loss):
-                    raise ValueError("Nonfinite PPO loss")
-                self.optimizer.zero_grad()
-                loss.backward()
+                    new_logp = distribution.log_prob(action)
+                    entropy_loss = distribution.entropy()
+                    logratio = new_logp - old_logp[index]
+                    ratio = logratio.exp()
+                    advantage = mb_advantages[position]
+                    policy_loss = torch.maximum(
+                        -advantage * ratio,
+                        -advantage * ratio.clamp(1 - self.cfg.clip_coef, 1 + self.cfg.clip_coef),
+                    )
+                    if self.cfg.clip_vloss:
+                        unclipped = (value - batch_returns[index]).square()
+                        clipped_value = old_values[index] + (
+                            value - old_values[index]
+                        ).clamp(-self.cfg.clip_coef, self.cfg.clip_coef)
+                        clipped = (clipped_value - batch_returns[index]).square()
+                        value_loss = 0.5 * torch.maximum(unclipped, clipped)
+                    else:
+                        value_loss = 0.5 * (value - batch_returns[index]).square()
+                    loss = policy_loss - self.cfg.ent_coef * entropy_loss + self.cfg.vf_coef * value_loss
+                    if not torch.isfinite(loss):
+                        raise ValueError("Nonfinite PPO loss")
+                    # Release each graph's saved activations before forwarding the next.
+                    # Divide by the actual size, including singleton/tail minibatches.
+                    (loss / len(minibatch)).backward()
+                    with torch.no_grad():
+                        mb_measurements += torch.stack((
+                            loss, policy_loss, value_loss, entropy_loss,
+                            (ratio - 1) - logratio, -logratio,
+                            ((ratio - 1).abs() > self.cfg.clip_coef).float(),
+                        ))
+                    del distribution, value, new_logp, loss
+                mb_measurements /= len(minibatch)
+                approx_kl = mb_measurements[4]
                 gradient_norm = nn.utils.clip_grad_norm_(
                     self.network.parameters(), self.cfg.max_grad_norm, error_if_nonfinite=True,
                 )
                 self.optimizer.step()
-                measurements.append([
-                    float(loss.detach()), float(policy_loss.detach()), float(value_loss.detach()),
-                    float(entropy_loss.detach()), float(approx_kl), float(old_approx_kl),
-                    float(clipfrac), float(gradient_norm),
-                ])
+                measurements.append(mb_measurements.cpu().tolist() + [float(gradient_norm)])
             epochs += 1
             if self.cfg.target_kl is not None and float(approx_kl) > self.cfg.target_kl:
                 break

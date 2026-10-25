@@ -91,7 +91,7 @@ class ScenarioTests(unittest.TestCase):
                         kwargs = module.env_kwargs(scenario, scenario.first_training_seed())
                         self.assert_configuration(kwargs, scenario)
                         self.assertEqual(kwargs['random_seed'], 0)
-                        self.assertEqual(kwargs['normalization_mode'], 'legacy' if algorithm == 'drl_gnn' else scenario.normalization_mode)
+                        self.assertEqual(kwargs['normalization_mode'], scenario.normalization_mode)
                         continue
                     with (patch.object(module, "_load_cache_seeds", return_value=list(range(1001)))
                           if algorithm == "marl" else nullcontext()), patch.object(module, "SCENARIO", scenario), patch.object(
@@ -120,7 +120,7 @@ class ScenarioTests(unittest.TestCase):
                 ):
                     if algorithm in ('drl_gnn', 'two_stage_gat'):
                         kwargs = module.env_kwargs(scenario, 2)
-                        self.assertEqual(kwargs['normalization_mode'], 'legacy' if algorithm == 'drl_gnn' else scenario.normalization_mode)
+                        self.assertEqual(kwargs['normalization_mode'], scenario.normalization_mode)
                     elif algorithm in EVAL_BUILDERS:
                         kwargs = getattr(module, EVAL_BUILDERS[algorithm])(random_seed=2)
                     elif algorithm == "marl":

@@ -6,13 +6,19 @@ import networkx as nx
 import numpy as np
 
 from common.workflow_opt import exec_time_components
+from common.f18_state_normalization import CURRENT_VERSION
 from environments.irws import IRWSEnvRouteA
-from .config import TASK_FEATURES, VM_FEATURES
+from .config import TASK_FEATURES, VM_FEATURES, POWER_REFERENCE_W
 from .networks import GraphState
 
 
 class DRLGNNEnv(IRWSEnvRouteA):
     """Author readiness: scheduled parents and reservations at any VM's tail."""
+
+    def __init__(self, *args, **kwargs):
+        if kwargs.get('normalization_mode') != CURRENT_VERSION:
+            raise ValueError('DRL-GNN requires fixed f19_shared_v1 training references')
+        super().__init__(*args, **kwargs)
 
     def reset(self, **kwargs):
         self._previous_task_by_vm = [None] * self.num_vms
@@ -87,7 +93,7 @@ class DRLGNNEnv(IRWSEnvRouteA):
         end = count + 1
         now = float(self.current_time)
         workflows = {wf.workflow_id: wf for wf in self.workflows}
-        task_features = np.zeros((count + 2, len(TASK_FEATURES)), dtype=np.float32)
+        task_features = np.zeros((count + 2, len(TASK_FEATURES)), dtype=np.float64)
         task_features[0, :4] = (1., 0., 0., float(self.first_arrival_time or 0.))
         for gid, status in enumerate(self.task_state):
             wf = workflows[self.task_meta[gid].wf_id]
@@ -121,7 +127,7 @@ class DRLGNNEnv(IRWSEnvRouteA):
                 active_pc[vm.host_id] += float(vm.pc)
         host_loads = {h: active_pc[h] / max(host.total_pc, 1e-12)
                       for h, host in self.hosts.items()}
-        vm_features = np.empty((self.num_vms, len(VM_FEATURES)), dtype=np.float32)
+        vm_features = np.empty((self.num_vms, len(VM_FEATURES)), dtype=np.float64)
         for vm_id in range(self.num_vms):
             vm = self.vms[vm_id]
             host = self.hosts[vm.host_id]
@@ -132,6 +138,15 @@ class DRLGNNEnv(IRWSEnvRouteA):
                 float(vm.bw), max(0., float(self.vm_available_at[vm_id]) - now), load,
                 float(host.power(load)), float(host.power(0.)), float(vm.host_id),
             )
+        # Scale before float32 conversion/Linear so bits cannot erase flags or deadlines.
+        scales = self.state_normalizer.scales
+        task_features /= np.asarray((1., 1., scales['workload_mi_ref'], scales['T_ref'],
+            scales['T_ref'], scales['T_ref'], scales['input_bits_ref'], scales['output_bits_ref']))
+        vm_features /= np.asarray((scales['T_ref'], 1. / scales['vm_pc_ref'],
+            POWER_REFERENCE_W / scales['host_pc_ref'], scales['vm_bw_ref'], scales['T_ref'],
+            1., POWER_REFERENCE_W, POWER_REFERENCE_W, 1.))
+        task_features = task_features.astype(np.float32)
+        vm_features = vm_features.astype(np.float32)
         compatibility = np.ones((count + 2, self.num_vms), dtype=bool)
         action_mask = np.zeros_like(compatibility)
         if not self.done_flag:

@@ -1,0 +1,118 @@
+{
+  "model_version": "drl_gnn_source_be67762_f19_inputs_v4",
+  "input_encoding": "public_f19_task8_vm9_bn_v3",
+  "scheduling_protocol": "arrived_parent_scheduled_vm_tail_v1",
+  "hyperparameters_reward_schedule_ast_unchanged": true,
+  "calibrated_training_scenes_checked": 9,
+  "fixed_action_training_instance_checks": [
+    {
+      "scene": "SS_T",
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "vms": 25,
+      "queued": 1349,
+      "energy_integration_error": 0.0,
+      "reward_conservation_error": 9.094947017729282e-13,
+      "probes": [
+        {
+          "assignment": 0,
+          "first_linear_response": {
+            "assigned": 0.34811246395111084,
+            "ready": 0.3463698625564575,
+            "task_deadline": 0.35046327114105225
+          }
+        },
+        {
+          "assignment": 300,
+          "first_linear_response": {
+            "assigned": 0.34811264276504517,
+            "ready": 0.34636974334716797,
+            "task_deadline": 0.3504631519317627
+          }
+        },
+        {
+          "assignment": 900,
+          "first_linear_response": {
+            "assigned": 0.3481125235557556,
+            "ready": 0.3463698625564575,
+            "task_deadline": 0.35046327114105225
+          }
+        }
+      ]
+    },
+    {
+      "scene": "SM_T",
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "vms": 50,
+      "queued": 1339,
+      "energy_integration_error": 0.0,
+      "reward_conservation_error": 1.3642420526593924e-12,
+      "probes": [
+        {
+          "assignment": 0,
+          "first_linear_response": {
+            "assigned": 0.3481125235557556,
+            "ready": 0.34636974334716797,
+            "task_deadline": 0.35046327114105225
+          }
+        },
+        {
+          "assignment": 300,
+          "first_linear_response": {
+            "assigned": 0.34811264276504517,
+            "ready": 0.34636974334716797,
+            "task_deadline": 0.35046327114105225
+          }
+        },
+        {
+          "assignment": 900,
+          "first_linear_response": {
+            "assigned": 0.3481125235557556,
+            "ready": 0.3463698625564575,
+            "task_deadline": 0.35046327114105225
+          }
+        }
+      ]
+    },
+    {
+      "scene": "SL_T",
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "vms": 75,
+      "queued": 1323,
+      "energy_integration_error": 0.0,
+      "reward_conservation_error": 3.410605131648481e-13,
+      "probes": [
+        {
+          "assignment": 0,
+          "first_linear_response": {
+            "assigned": 0.34811246395111084,
+            "ready": 0.34636974334716797,
+            "task_deadline": 0.3504631519317627
+          }
+        },
+        {
+          "assignment": 300,
+          "first_linear_response": {
+            "assigned": 0.3481125235557556,
+            "ready": 0.3463698625564575,
+            "task_deadline": 0.35046327114105225
+          }
+        },
+        {
+          "assignment": 900,
+          "first_linear_response": {
+            "assigned": 0.34811264276504517,
+            "ready": 0.3463698625564575,
+            "task_deadline": 0.3504631519317627
+          }
+        }
+      ]
+    }
+  ],
+  "formal_training_completed": false
+}

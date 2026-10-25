@@ -12,15 +12,17 @@ import torch
 
 from common.experiment_measurements import EvaluationRecorder, episode_metrics, VERSION as MEASUREMENT_VERSION
 from common.f11 import protect_training_outputs
+from common.f18_state_normalization import CURRENT_VERSION, load_normalizer
 from common.f22_instances import instance_identity, write_run_metadata
 from common.read_xml_opt_Tsize import load_workflow_from_dax
 from common.scenarios import ROOT, parse_scenario
 from common.workflow_opt import ENERGY_ACCOUNTING, COMMUNICATION_MODEL
 from .config import (COMMON_REWARD, DRLGNNConfig, INPUT_ENCODING, MODEL_VERSION,
                      REWARD_PROTOCOL, SOURCE_COMMIT, SOURCE_REPOSITORY,
-                     TASK_FEATURES, VM_FEATURES, SCHEDULING_PROTOCOL)
+                     TASK_FEATURES, VM_FEATURES, SCHEDULING_PROTOCOL, POWER_REFERENCE_W)
 from .environment import DRLGNNEnv
 from .ppo import PPOAgent, Transition
+from .runtime import PPO_UPDATE_EXECUTION, cuda_memory_usage
 
 
 def seed_everything(seed):
@@ -38,14 +40,31 @@ def sync(agent):
 
 
 def env_kwargs(scenario, seed):
+    if scenario.normalization_mode != CURRENT_VERSION:
+        raise ValueError('DRL-GNN requires fixed f19_shared_v1 training references')
     return dict(dax_paths=scenario.dax_paths(), horizon=1e9, arrival_lambda=.03,
         random_seed=int(seed), workflows_per_episode=50, num_hosts=scenario.num_hosts,
         vms_per_host=scenario.vms_per_host, pc_tiers=(1., 2., 4., 6., 8.),
         bw_tiers=(1000., 2000., 4000., 6000., 8000.), max_ready_tasks='auto', normalize=False,
         deadline_mode='cache_fcfs', deadline_cache_path=str(scenario.cache_path),
         deadline_cache_strict=True, deadline_alpha_choices=(2., 3.),
-        deadline_alpha_probs=scenario.deadline_probs, normalization_mode='legacy',
+        deadline_alpha_probs=scenario.deadline_probs, **scenario.normalization_kwargs(),
         energy_check_on_done=True, **COMMON_REWARD)
+
+
+def checked_reference(scenario, kwargs=None):
+    """Bind every environment to the frozen source-training calibration, including evaluation."""
+    expected = scenario.normalization_kwargs()
+    if expected['normalization_mode'] != CURRENT_VERSION:
+        raise ValueError('DRL-GNN requires fixed f19_shared_v1 training references')
+    reference = scenario.normalization_metadata()
+    actual = expected if kwargs is None else kwargs
+    normalizer = load_normalizer(actual.get('normalization_mode'),
+        actual.get('normalization_config'), actual.get('source_train_scene'))
+    if normalizer is None or any(normalizer.metadata.get(k) != reference.get(k) for k in (
+            'normalization_version', 'normalization_config_hash', 'source_train_scene')):
+        raise ValueError('DRL-GNN environment must use the source-training F19 reference')
+    return dict(reference, observation_scales=dict(normalizer.scales), power_reference_w=POWER_REFERENCE_W)
 
 
 def output_dir(scenario, kind):
@@ -66,6 +85,12 @@ def objective_metadata():
     return dict(source_repository=SOURCE_REPOSITORY, source_commit=SOURCE_COMMIT,
         model_version=MODEL_VERSION, policy_input=INPUT_ENCODING,
         observation_fields=dict(task=list(TASK_FEATURES), vm=list(VM_FEATURES)),
+        observation_scaling=dict(
+            task=['identity', 'identity', '/workload_mi_ref', '/T_ref', '/T_ref', '/T_ref',
+                  '/input_bits_ref', '/output_bits_ref'],
+            vm=['/T_ref', '*vm_pc_ref', '/(100W/host_pc_ref)', '/vm_bw_ref', '/T_ref',
+                'identity', '/100W', '/100W', 'identity'],
+            clipping=False, completion_time='absolute', deadline_remaining='signed'),
         reward_protocol=REWARD_PROTOCOL, reward_settings=COMMON_REWARD,
         scheduling_protocol=SCHEDULING_PROTOCOL,
         energy_accounting=ENERGY_ACCOUNTING, communication_model=COMMUNICATION_MODEL,
@@ -74,10 +99,11 @@ def objective_metadata():
 
 def save_checkpoint(path, agent, scenario, completed, best_energy, environment_config, budget):
     obj = dict(**objective_metadata(), config=agent.cfg.as_dict(),
+        execution=dict(ppo_update=PPO_UPDATE_EXECUTION, cuda_memory=agent.network.cuda_memory_policy),
         network=agent.network.state_dict(), optimizer=agent.optimizer.state_dict(),
         completed_episodes=int(completed), steps=agent.steps, updates=agent.updates,
         best_validation_energy=float(best_energy), protocol=scenario.protocol().metadata(),
-        shared_reference_normalization=scenario.normalization_metadata(),
+        shared_reference_normalization=checked_reference(scenario, environment_config),
         scenario=scenario.describe('drl_gnn'), environment=environment_config, budget=budget,
         rng=dict(python=random.getstate(), numpy=np.random.get_state(), torch=torch.get_rng_state(),
             cuda=torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None),
@@ -87,7 +113,8 @@ def save_checkpoint(path, agent, scenario, completed, best_energy, environment_c
 
 
 def load_checkpoint(path, scenario, device='cpu'):
-    obj = torch.load(path, map_location=device, weights_only=False)
+    # Deserialize weights, optimizer and RNG on CPU before the budgeted CUDA model.
+    obj = torch.load(path, map_location='cpu', weights_only=False)
     for key, value in objective_metadata().items():
         if obj.get(key) != value:
             raise ValueError('DRL-GNN checkpoint mismatch: ' + key)
@@ -101,8 +128,9 @@ def load_checkpoint(path, scenario, device='cpu'):
         raise ValueError('DRL-GNN checkpoint source training scenario mismatch')
     if source['model_seed'] != scenario.model_seed:
         raise ValueError('DRL-GNN checkpoint model seed mismatch')
-    reference = scenario.normalization_metadata()
-    for key in ('normalization_config_hash', 'source_train_scene', 'experiment_protocol_hash'):
+    reference = checked_reference(scenario)
+    for key in ('normalization_version', 'normalization_config_hash', 'source_train_scene',
+                'experiment_protocol_hash', 'observation_scales', 'power_reference_w'):
         if obj.get('shared_reference_normalization', {}).get(key) != reference.get(key):
             raise ValueError('DRL-GNN public experiment reference mismatch: ' + key)
     config = dict(obj['config']); config['device'] = str(device)
@@ -146,12 +174,14 @@ def evaluate(agent, scenario, seeds, split='test', kwargs=None, directory=None, 
     if split not in ('test', 'validation') or not seeds or not set(seeds) <= set(allowed):
         raise ValueError('Evaluation attempted to cross the frozen partition')
     # Preserve author per-graph BN without letting validation/test mutate the trained policy.
+    kwargs = dict(kwargs or env_kwargs(scenario, seeds[0]))
+    checked_reference(scenario, kwargs)
     frozen = deepcopy(agent)
     snapshot = deepcopy(frozen.network.state_dict())
     rows = []
     for seed in seeds:
         frozen.network.load_state_dict(snapshot)
-        env = DRLGNNEnv(**dict(kwargs or env_kwargs(scenario, seed), random_seed=int(seed)))
+        env = DRLGNNEnv(**dict(kwargs, random_seed=int(seed)))
         evaluation = (scenario, directory, checkpoint_directory or output_dir(scenario, 'ckpts')) if directory else None
         result = run_episode(env, frozen, seed, evaluation)
         rows.append(dict(seed=int(seed), **result['metrics']))
@@ -181,7 +211,7 @@ def train(scenario, config=None, kwargs=None, out=None):
     protocol = scenario.protocol()
     if protocol is None or not 0 < scenario.episodes <= protocol.episodes:
         raise ValueError('DRL-GNN training requires the fixed common episode budget')
-    scenario.normalization_metadata()  # Validate the shared experiment reference, not GIN input scaling.
+    checked_reference(scenario)
     cfg = config or DRLGNNConfig(device=(scenario.paper_options or {}).get('device') or (
         'cuda' if torch.cuda.is_available() else 'cpu'), seed=scenario.model_seed)
     if cfg.seed != scenario.model_seed:
@@ -191,8 +221,7 @@ def train(scenario, config=None, kwargs=None, out=None):
     protect_training_outputs(directory, logs)
     directory.mkdir(parents=True, exist_ok=True); logs.mkdir(parents=True, exist_ok=True)
     kwargs = dict(kwargs or env_kwargs(scenario, protocol.train[0]))
-    if kwargs.get('normalization_mode') != 'legacy':
-        raise ValueError('The public-state GIN uses raw task8/VM9 inputs, not F19 feature scaling')
+    reference = checked_reference(scenario, kwargs)
     if any(kwargs.get(key) != value for key, value in COMMON_REWARD.items()):
         raise ValueError('DRL-GNN must use the public global energy-tardiness coefficients')
     seeds = tuple(protocol.train[:scenario.episodes])
@@ -207,6 +236,8 @@ def train(scenario, config=None, kwargs=None, out=None):
     for path in (directory, logs):
         write_run_metadata(path, scenario)
     metadata = dict(**objective_metadata(), config=cfg.as_dict(), budget=budget,
+        shared_reference_normalization=reference,
+        execution=dict(ppo_update=PPO_UPDATE_EXECUTION, cuda_memory=agent.network.cuda_memory_policy),
         protocol=protocol.metadata(), parameters=sum(p.numel() for p in agent.network.parameters()),
         numerical_precision='float32', timing_scope='global nonoverlapping intervals between completed episodes; 4 environments share one policy')
     (logs / 'measurement_metadata.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
@@ -305,6 +336,7 @@ def train(scenario, config=None, kwargs=None, out=None):
     if agent.steps != total_assignments or agent.updates != total_updates:
         raise RuntimeError('Actual training exposure did not match the fixed assignment budget')
     summary = dict(**metadata, completed_episodes=completed, counts=counts,
+        cuda_memory_usage=cuda_memory_usage(agent.device),
         timing_seconds=cumulative, best_validation_energy=best,
         seeds_started=list(seeds), final_rollout_retained=True)
     (logs / 'training_summary.json').write_text(json.dumps(summary, indent=2), encoding='utf-8')
@@ -327,6 +359,9 @@ def evaluate_main():
     with path.open('w', encoding='utf-8', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
     (directory / 'summary.json').write_text(json.dumps(dict(**objective_metadata(), summary=summary,
+        shared_reference_normalization=checked_reference(scenario),
+        execution=dict(ppo_update=PPO_UPDATE_EXECUTION, cuda_memory=agent.network.cuda_memory_policy),
+        cuda_memory_usage=cuda_memory_usage(agent.device),
         protocol=scenario.protocol().metadata(), source_checkpoint=str(checkpoint / 'best.pth')),
         indent=2), encoding='utf-8')
     print(f'DRL-GNN evaluation saved: {path}', flush=True)

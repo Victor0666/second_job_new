@@ -14,7 +14,9 @@ from algorithms.drl_gnn.config import (COMMON_REWARD, DRLGNNConfig, INPUT_ENCODI
                                        TASK_FEATURES, VM_FEATURES, SCHEDULING_PROTOCOL)
 from algorithms.drl_gnn.environment import DRLGNNEnv
 from algorithms.drl_gnn.ppo import PPOAgent, Transition
-from algorithms.drl_gnn.runner import evaluate, load_checkpoint, save_checkpoint, train
+from algorithms.drl_gnn.runner import (evaluate, load_checkpoint, save_checkpoint, train,
+                                       checked_reference, env_kwargs)
+from algorithms.drl_gnn.runtime import PPO_UPDATE_EXECUTION
 from common.scenarios import Scenario
 from common.workflow_opt import exec_time_components, energy_from_records
 
@@ -39,13 +41,13 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         result = dict(
             dax_paths=[str(self.dax)], horizon=1e9, workflows_per_episode=1, arrival_lambda=.03,
             num_hosts=1, vms_per_host=(2,), pc_tiers=(1., 8.), bw_tiers=(1000., 1000.),
-            deadline_mode="none", normalization_mode="legacy", max_ready_tasks="auto",
+            deadline_mode="none", **Scenario(mode='train').normalization_kwargs(), max_ready_tasks="auto",
             random_seed=2,
         )
         result.update(changes)
         return result
 
-    def test_raw_features_full_compatibility_and_all_vm_estimates(self):
+    def test_scaled_features_full_compatibility_and_all_vm_estimates(self):
         env = DRLGNNEnv(**self.kwargs())
         env.reset(seed=2)
         env.vm_available_at[:] = env.current_time + np.array([1000., 100.])
@@ -58,17 +60,105 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertFalse(state.action_mask[[0, 3, 4]].any())
         np.testing.assert_array_equal(state.task_features[:, :2],
                                       [[1, 0], [0, 1], [0, 1], [0, 0], [0, 0]])
-        self.assertEqual(float(state.task_features[1, 2]), float(np.float32(env.task_mi[0])))
+        scales = env.state_normalizer.scales
+        self.assertEqual(float(state.task_features[1, 2]), float(np.float32(env.task_mi[0] / scales['workload_mi_ref'])))
         candidates = [max(env.current_time, env.vm_available_at[j]) + exec_time_components(
             env.workflows[0].tasks[0], env.vms[j].pc, env.vms[j].bw,
             parents_loc={}, child_vm_id=j, child_host_id=env.vms[j].host_id,
         )[-1] for j in range(env.num_vms)]
-        self.assertAlmostEqual(float(state.task_features[1, 3]), min(candidates), places=3)
-        np.testing.assert_allclose(state.vm_features[:, 1], [1., 1. / 8.])
+        self.assertAlmostEqual(float(state.task_features[1, 3]), min(candidates) / scales['T_ref'], places=6)
+        np.testing.assert_allclose(state.vm_features[:, 1], scales['vm_pc_ref'] * np.array([1., 1. / 8.]))
         host = env.hosts[0]
         np.testing.assert_allclose(state.vm_features[:, 2],
-                                   (host.power(1.) - host.power(0.)) / host.total_pc)
+                                   (host.power(1.) - host.power(0.)) / host.total_pc / (100. / scales['host_pc_ref']))
         self.assertEqual(set(map(tuple, state.dependencies)), {(0, 1), (0, 2), (1, 3), (2, 3), (3, 4)})
+
+    def test_fixed_scales_preserve_absolute_times_signed_deadlines_and_no_clipping(self):
+        env = DRLGNNEnv(**self.kwargs())
+        env.reset(seed=2)
+        s = env.state_normalizer.scales
+        now = env.current_time
+        env.task_mi[0] = 2. * s['workload_mi_ref']
+        env.task_in_bits[0] = 4. * s['input_bits_ref']
+        env.task_out_bits[0] = 3. * s['output_bits_ref']
+        env.task_baseline_finish[0] = now - 2. * s['T_ref']
+        env.workflows[0].deadline = now - 3. * s['T_ref']
+        env.vm_available_at[:] = now + np.array([2., 4.]) * s['T_ref']
+        state = env.graph_state()
+        np.testing.assert_allclose(state.task_features[1, [2, 4, 5, 6, 7]], [2., -2., -3., 4., 3.])
+        np.testing.assert_allclose(state.vm_features[:, 0], env.vm_available_at / s['T_ref'])
+        np.testing.assert_allclose(state.vm_features[:, 4], [2., 4.])
+        np.testing.assert_allclose(state.vm_features[:, 1], [s['vm_pc_ref'] / env.vms[j].pc for j in range(env.num_vms)])
+        self.assertAlmostEqual(float(state.task_features[0, 3]), now / s['T_ref'])
+        estimates, _ = env._estimated_completions()
+        np.testing.assert_allclose(state.task_features[1:-1, 3], estimates / s['T_ref'])
+        self.assertAlmostEqual(float(state.task_features[-1, 3]), max(estimates) / s['T_ref'], places=6)
+
+    def test_flags_and_deadlines_survive_first_linear_with_large_payloads(self):
+        torch.manual_seed(73)
+        env = DRLGNNEnv(**self.kwargs())
+        env.reset(seed=2)
+        env.task_in_bits[:] = [1e10] * len(env.task_meta)
+        env.task_out_bits[:] = [2e10] * len(env.task_meta)
+        original = env.graph_state()
+        agent = PPOAgent(DRLGNNConfig())
+        # Probe both encoders at identical weights; no policy training or BN mutation.
+        for role in ('actor', 'critic'):
+            encoder = deepcopy(getattr(agent.network, role).network.task_encoder).eval()
+            x = torch.tensor(original.task_features)
+            baseline = encoder(x)
+            for column, increment in ((0, 1.), (1, 1.), (4, 1000. / env.state_normalizer.scales['T_ref'])):
+                changed = x.clone()
+                changed[1, column] += increment
+                with self.subTest(role=role, column=column):
+                    self.assertGreater(float((encoder[0](changed) - encoder[0](x)).abs().max()), 1e-3)
+                    self.assertGreater(float((encoder(changed) - baseline).abs().max()), 1e-5)
+
+    def test_cross_scale_evaluation_uses_source_training_reference(self):
+        training = Scenario(mode='train', task='S', resource='S', deadline='Tight')
+        evaluation = Scenario(mode='eval', task='L', resource='L', deadline='Loose',
+                              train_task='S', train_resource='S', train_deadline='Tight')
+        expected = checked_reference(training)
+        actual = checked_reference(evaluation)
+        for key in ('normalization_version', 'source_train_scene', 'normalization_config_hash',
+                    'observation_scales', 'power_reference_w', 'experiment_protocol_hash'):
+            self.assertEqual(actual[key], expected[key], key)
+        self.assertEqual(training.checkpoint_dir('drl_gnn'), evaluation.checkpoint_dir('drl_gnn'))
+        kwargs = env_kwargs(evaluation, 700)
+        self.assertEqual(kwargs['source_train_scene'], 'SS_T')
+        checked_reference(evaluation, kwargs)
+        kwargs['source_train_scene'] = 'SM_T'
+        with self.assertRaisesRegex(ValueError, 'source-training F19'):
+            checked_reference(evaluation, kwargs)
+        with self.assertRaisesRegex(ValueError, 'fixed f19_shared_v1'):
+            DRLGNNEnv(**self.kwargs(normalization_mode='legacy'))
+        with self.assertRaisesRegex(ValueError, 'fixed f19_shared_v1'):
+            env_kwargs(replace(training, normalization_mode='legacy'), 0)
+
+    def test_scaling_only_leaves_fixed_assignment_physics_and_rewards_identical(self):
+        kwargs = self.kwargs(workflows_per_episode=2, **COMMON_REWARD)
+        original = json.loads(Path(kwargs['normalization_config']).read_text(encoding='utf-8'))
+        altered = deepcopy(original)
+        for key in altered['scenes']['SS_T']:
+            altered['scenes']['SS_T'][key] *= 7.
+        config = Path(self.directory.name) / 'other_scales.json'
+        config.write_text(json.dumps(altered), encoding='utf-8')
+        left = DRLGNNEnv(**kwargs)
+        right = DRLGNNEnv(**dict(kwargs, normalization_config=str(config)))
+        left.reset(seed=2); right.reset(seed=2)
+        while not left.done_flag:
+            a, b = left.graph_state(), right.graph_state()
+            np.testing.assert_array_equal(a.action_mask, b.action_mask)
+            np.testing.assert_array_equal(a.dependencies, b.dependencies)
+            action = int(np.flatnonzero(a.action_mask.reshape(-1))[0])
+            lr, ld, li = left.pair_step(action)
+            rr, rd, ri = right.pair_step(action)
+            self.assertEqual((lr, ld, li), (rr, rd, ri))
+            self.assertEqual(left.current_time, right.current_time)
+            self.assertEqual(left.task_start_time, right.task_start_time)
+            self.assertEqual(left.task_end_time, right.task_end_time)
+            self.assertEqual(left.total_energy, right.total_energy)
+        self.assertTrue(right.done_flag)
 
     def test_pair_validation_is_atomic_and_reward_is_public(self):
         env = DRLGNNEnv(**self.kwargs())
@@ -100,9 +190,9 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertGreater(env.task_end_time[0], env.current_time)
         self.assertAlmostEqual(env.task_start_time[1], env.task_end_time[0])
         next_state = env.graph_state()
-        self.assertEqual(float(next_state.task_features[1, 3]), float(np.float32(env.task_end_time[0])))
+        self.assertEqual(float(next_state.task_features[1, 3]), float(np.float32(env.task_end_time[0] / env.state_normalizer.scales['T_ref'])))
         np.testing.assert_array_equal(next_state.task_features[2, :2], [1., 0.])
-        self.assertEqual(float(next_state.task_features[2, 3]), float(np.float32(env.task_end_time[1])))
+        self.assertEqual(float(next_state.task_features[2, 3]), float(np.float32(env.task_end_time[1] / env.state_normalizer.scales['T_ref'])))
         self.assertTrue(next_state.action_mask[3].all())
         legal = np.flatnonzero(next_state.action_mask.reshape(-1))
         self.assertGreater(len(legal), 0)
@@ -124,21 +214,22 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         env.task_baseline_finish[0] = now - 7.
         env.workflows[0].deadline = now + 13.
         state = env.graph_state()
+        scales = env.state_normalizer.scales
         self.assertEqual(state.task_features.shape, (5, len(TASK_FEATURES)))
         np.testing.assert_allclose(state.task_features[1:-1, 4],
-                                   np.asarray(env.task_baseline_finish) - now)
-        np.testing.assert_array_equal(state.task_features[1:-1, 5], [13.] * 3)
-        np.testing.assert_allclose(state.task_features[1:-1, 6], env.task_in_bits)
-        np.testing.assert_allclose(state.task_features[1:-1, 7], env.task_out_bits)
+                                   (np.asarray(env.task_baseline_finish) - now) / scales['T_ref'])
+        np.testing.assert_allclose(state.task_features[1:-1, 5], np.array([13.] * 3) / scales['T_ref'])
+        np.testing.assert_allclose(state.task_features[1:-1, 6], np.array(env.task_in_bits) / scales['input_bits_ref'])
+        np.testing.assert_allclose(state.task_features[1:-1, 7], np.array(env.task_out_bits) / scales['output_bits_ref'])
         np.testing.assert_array_equal(state.task_features[[0, -1], 4:], 0.)
         env.task_baseline_finish[0] = now + 5.
         changed = env.graph_state()
-        self.assertEqual(float(state.task_features[1, 4]), -7.)
-        self.assertEqual(float(changed.task_features[1, 4]), 5.)
+        self.assertAlmostEqual(float(state.task_features[1, 4]), -7. / scales['T_ref'])
+        self.assertAlmostEqual(float(changed.task_features[1, 4]), 5. / scales['T_ref'])
         np.testing.assert_array_equal(state.task_features[:, :4], changed.task_features[:, :4])
         np.testing.assert_array_equal(state.vm_features, changed.vm_features)
         env.workflows[0].deadline = now - 3.
-        np.testing.assert_array_equal(env.graph_state().task_features[1:-1, 5], [-3.] * 3)
+        np.testing.assert_allclose(env.graph_state().task_features[1:-1, 5], np.array([-3.] * 3) / scales['T_ref'])
 
     def test_public_vm_bandwidth_busy_time_and_shared_host_state(self):
         env = DRLGNNEnv(**self.kwargs(num_hosts=2, vms_per_host=(2, 1),
@@ -147,15 +238,16 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         now = float(env.current_time)
         env.pair_step(3)  # Task 0 actually runs on VM 0.
         state = env.graph_state()
+        scales = env.state_normalizer.scales
         self.assertEqual(state.vm_features.shape, (3, len(VM_FEATURES)))
-        np.testing.assert_array_equal(state.vm_features[:, 3], [1000., 2000., 1000.])
-        np.testing.assert_allclose(state.vm_features[:, 4], [env.task_end_time[0] - now, 0., 0.])
+        np.testing.assert_allclose(state.vm_features[:, 3], np.array([1000., 2000., 1000.]) / scales['vm_bw_ref'])
+        np.testing.assert_allclose(state.vm_features[:, 4], np.array([env.task_end_time[0] - now, 0., 0.]) / scales['T_ref'])
         load = env.vms[0].pc / env.hosts[0].total_pc
         np.testing.assert_allclose(state.vm_features[:, 5], [load, load, 0.])
         np.testing.assert_allclose(state.vm_features[:, 6],
-            [env.hosts[0].power(load)] * 2 + [env.hosts[1].power(0.)])
+            np.array([env.hosts[0].power(load)] * 2 + [env.hosts[1].power(0.)]) / 100.)
         np.testing.assert_allclose(state.vm_features[:, 7],
-            [env.hosts[0].power(0.)] * 2 + [env.hosts[1].power(0.)])
+            np.array([env.hosts[0].power(0.)] * 2 + [env.hosts[1].power(0.)]) / 100.)
         np.testing.assert_array_equal(state.vm_features[:, 8], [0., 0., 1.])
         self.assertTrue(state.action_mask[2].all())
         self.assertFalse(state.action_mask[1].any())
@@ -177,7 +269,7 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
             state = env.graph_state()
             self.assertEqual(float(state.task_features[-1, 0]), 0.)
             for gid, meta in enumerate(env.task_meta):
-                expected = env.workflows[meta.wf_id].deadline - env.current_time
+                expected = (env.workflows[meta.wf_id].deadline - env.current_time) / env.state_normalizer.scales['T_ref']
                 self.assertAlmostEqual(float(state.task_features[gid + 1, 5]),
                                        float(np.float32(expected)))
             actions = np.flatnonzero(state.action_mask.reshape(-1))
@@ -215,7 +307,7 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         state = env.graph_state()
         load = env.vms[0].pc / env.hosts[0].total_pc
         np.testing.assert_allclose(state.vm_features[:, 5], [load, load])
-        np.testing.assert_allclose(state.vm_features[:, 6], [env.hosts[0].power(load)] * 2)
+        np.testing.assert_allclose(state.vm_features[:, 6], np.array([env.hosts[0].power(load)] * 2) / 100.)
         self.assertGreater(state.vm_features[1, 4], 0.)  # Reservation tail, not active load.
         self.assertEqual(snapshot.task_features.shape[0], 5)
         self.assertEqual(state.task_features.shape[0], 8)
@@ -316,6 +408,7 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         loaded, obj = load_checkpoint(path, scene)
         self.assertEqual(obj['scheduling_protocol'], SCHEDULING_PROTOCOL)
         self.assertEqual(obj['observation_fields'], dict(task=list(TASK_FEATURES), vm=list(VM_FEATURES)))
+        self.assertEqual(obj['shared_reference_normalization']['observation_scales'], env.state_normalizer.scales)
         for key, value in agent.network.state_dict().items():
             torch.testing.assert_close(loaded.network.state_dict()[key], value, rtol=0, atol=0)
         a, _ = evaluate(agent, scene, [700], kwargs=kwargs)
@@ -326,6 +419,17 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         legacy['policy_input'] = 'source_raw_task4_vm3_bn_v1'
         torch.save(legacy, path)
         with self.assertRaisesRegex(ValueError, 'checkpoint mismatch'):
+            load_checkpoint(path, scene)
+        # Raw task8/VM9 has identical shapes but different units: reject on semantics.
+        raw = deepcopy(obj)
+        raw['policy_input'] = 'public_raw_task8_vm9_bn_v2'
+        torch.save(raw, path)
+        with self.assertRaisesRegex(ValueError, 'checkpoint mismatch: policy_input'):
+            load_checkpoint(path, scene)
+        wrong_scales = deepcopy(obj)
+        wrong_scales['shared_reference_normalization']['observation_scales']['T_ref'] *= 2.
+        torch.save(wrong_scales, path)
+        with self.assertRaisesRegex(ValueError, 'reference mismatch: observation_scales'):
             load_checkpoint(path, scene)
         old_idle = deepcopy(obj)
         old_idle['model_version'] = 'drl_gnn_source_be67762_public_state_v2'
@@ -351,6 +455,23 @@ class DRLGNNEnvironmentTests(unittest.TestCase):
         self.assertEqual(summary['completed_episodes'], 1)
         self.assertTrue(summary['final_rollout_retained'])
 
+    @unittest.skipUnless(torch.cuda.is_available(), 'CUDA required')
+    def test_cuda_training_checkpoint_and_evaluation_use_memory_budget(self):
+        scene = Scenario(mode='train', episodes=1)
+        kwargs = self.kwargs(**COMMON_REWARD)
+        with patch('algorithms.drl_gnn.runner.planned_assignments', return_value=3):
+            agent, directory = train(scene, DRLGNNConfig(device='cuda'), kwargs,
+                                     Path(self.directory.name) / 'cuda_models')
+        loaded, obj = load_checkpoint(directory / 'final.pth', scene, device='cuda')
+        self.assertEqual(loaded.device.type, 'cuda')
+        self.assertEqual(obj['execution']['ppo_update'], PPO_UPDATE_EXECUTION)
+        budget = loaded.network.cuda_memory_policy
+        self.assertLessEqual(budget['allocator_fraction'], .85)
+        summary = json.loads((directory / 'logs/training_summary.json').read_text())
+        self.assertLess(summary['cuda_memory_usage']['peak_reserved_bytes'], budget['allocator_limit_bytes'])
+        a, _ = evaluate(agent, scene, [700], kwargs=kwargs)
+        b, _ = evaluate(loaded, scene, [700], kwargs=kwargs)
+        self.assertEqual(a, b)
 
 
 if __name__ == "__main__":

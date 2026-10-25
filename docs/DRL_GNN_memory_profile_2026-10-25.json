@@ -1,0 +1,178 @@
+{
+  "device": "NVIDIA GeForce RTX 4060 Ti",
+  "torch_version": "2.5.1+cu121",
+  "scope": "synthetic upper task counts; one complete 128-sample PPO minibatch per scene; allocator metrics exclude CUDA context",
+  "rows": [
+    {
+      "scene": "SS",
+      "tasks": 1502,
+      "vms": 25,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 232783872,
+      "peak_allocated_bytes": 159938048,
+      "peak_reserved_bytes": 232783872,
+      "seconds": 1.184,
+      "loss": -0.10392773151397705
+    },
+    {
+      "scene": "SM",
+      "tasks": 1502,
+      "vms": 50,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 369098752,
+      "peak_allocated_bytes": 281866240,
+      "peak_reserved_bytes": 369098752,
+      "seconds": 1.506,
+      "loss": -0.11105306446552277
+    },
+    {
+      "scene": "SL",
+      "tasks": 1502,
+      "vms": 75,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 530579456,
+      "peak_allocated_bytes": 402453504,
+      "peak_reserved_bytes": 530579456,
+      "seconds": 2.06,
+      "loss": -0.11349689960479736
+    },
+    {
+      "scene": "MS",
+      "tasks": 2902,
+      "vms": 25,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 379584512,
+      "peak_allocated_bytes": 294577152,
+      "peak_reserved_bytes": 379584512,
+      "seconds": 1.53,
+      "loss": -0.10940483212471008
+    },
+    {
+      "scene": "MM",
+      "tasks": 2902,
+      "vms": 50,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 679477248,
+      "peak_allocated_bytes": 529112576,
+      "peak_reserved_bytes": 679477248,
+      "seconds": 2.574,
+      "loss": -0.11570808291435242
+    },
+    {
+      "scene": "ML",
+      "tasks": 2902,
+      "vms": 75,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 983564288,
+      "peak_allocated_bytes": 757825024,
+      "peak_reserved_bytes": 983564288,
+      "seconds": 3.538,
+      "loss": -0.0981580838561058
+    },
+    {
+      "scene": "LS",
+      "tasks": 5002,
+      "vms": 25,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 633339904,
+      "peak_allocated_bytes": 495782912,
+      "peak_reserved_bytes": 633339904,
+      "seconds": 2.459,
+      "loss": -0.11552175879478455
+    },
+    {
+      "scene": "LM",
+      "tasks": 5002,
+      "vms": 50,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 1119879168,
+      "peak_allocated_bytes": 893593088,
+      "peak_reserved_bytes": 1119879168,
+      "seconds": 4.133,
+      "loss": -0.1043606624007225
+    },
+    {
+      "scene": "LL",
+      "tasks": 5002,
+      "vms": 75,
+      "minibatch": 128,
+      "policy": {
+        "device_type": "cuda",
+        "total_memory_bytes": 8585216000,
+        "allocator_fraction": 0.85,
+        "allocator_limit_bytes": 7297433600,
+        "scope": "one process PyTorch allocator; excludes external CUDA allocations"
+      },
+      "allocated_bytes": 18307072,
+      "reserved_bytes": 1608515584,
+      "peak_allocated_bytes": 1289839616,
+      "peak_reserved_bytes": 1608515584,
+      "seconds": 5.707,
+      "loss": -0.0976809486746788
+    }
+  ]
+}

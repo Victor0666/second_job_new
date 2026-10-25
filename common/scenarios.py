@@ -309,7 +309,7 @@ class Scenario:
             from algorithms.drl_gnn.config import INPUT_ENCODING, SCHEDULING_PROTOCOL
             result['scheduling_protocol'] = SCHEDULING_PROTOCOL
             result['normalization'] = {'policy_input': INPUT_ENCODING,
-                'additional_input_scaling': False, 'shared_calibration': self.normalization_kwargs()}
+                'additional_input_scaling': True, 'shared_calibration': self.normalization_kwargs()}
         if algorithm == 'pd3qn':
             from algorithms.pd3qn.config import agent_kwargs, run_name
             result['algorithm'] = run_name(self)

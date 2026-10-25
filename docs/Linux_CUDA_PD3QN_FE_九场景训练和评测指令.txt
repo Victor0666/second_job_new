@@ -1,0 +1,99 @@
+# Linux / Bash：PD3QN-FE 九场景训练和评测
+# 在服务器项目根目录、已激活的 Python/CUDA 环境执行。
+# 九种场景：task=S，resource=S/M/L × deadline=Tight/Medium/Loose，即 SS/SM/SL × 三种截止期。
+# 每个模型600回合，model-seed=1；训练种子0-599，固定验证seed600，测试seed700-729。
+# F22划分、F19观测；规则select_sr099_esp099_v1：实例成功率>=99%，ESP>=99%，可行模型中选最低能耗。
+# 本清单评测九个同规模目标，各30个测试实例，共270次实例评测。
+# 逐段复制所需场景，不要直接运行整个清单；根据GPU显存和CPU资源安排并发。
+# CUDA_VISIBLE_DEVICES=0表示物理GPU0；按服务器实际分配调整。--device cuda不可用时会退出。
+# 先完成对应场景训练，再执行其评测。模型、训练日志及评测结果与其他算法隔离。
+# 既有非空训练/评测目录拒绝覆盖；重复启动会先覆盖下面同名控制台日志，请先归档。
+
+# 一、首次检查（只检查现有缓存和校准，不执行训练）
+mkdir -p outputs/server_console_logs outputs/server_eval_logs
+nvidia-smi
+python launch.py common/f22_cache.py --all
+python -c "from common.f18_calibrate_normalization import nine_scenarios; [s.normalization_metadata() for s in nine_scenarios()]; print('All nine normalization scenes OK')"
+
+# 二、九条独立后台训练命令
+
+# PD3QN-FE 训练 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SS_Tight_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SS_Tight_select_sr099_esp099_v1_ep600_model1.pid
+
+# PD3QN-FE 训练 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SS_Medium_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SS_Medium_select_sr099_esp099_v1_ep600_model1.pid
+
+# PD3QN-FE 训练 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SS_Loose_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SS_Loose_select_sr099_esp099_v1_ep600_model1.pid
+
+# PD3QN-FE 训练 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SM_Tight_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SM_Tight_select_sr099_esp099_v1_ep600_model1.pid
+
+# PD3QN-FE 训练 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SM_Medium_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SM_Medium_select_sr099_esp099_v1_ep600_model1.pid
+
+# PD3QN-FE 训练 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SM_Loose_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SM_Loose_select_sr099_esp099_v1_ep600_model1.pid
+
+# PD3QN-FE 训练 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SL_Tight_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SL_Tight_select_sr099_esp099_v1_ep600_model1.pid
+
+# PD3QN-FE 训练 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SL_Medium_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SL_Medium_select_sr099_esp099_v1_ep600_model1.pid
+
+# PD3QN-FE 训练 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_SL_Loose_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_SL_Loose_select_sr099_esp099_v1_ep600_model1.pid
+
+# 三、九条独立后台评测命令（读取对应best_pd3qn_fe.pth）
+
+# PD3QN-FE 评测 | 源SS/Tight -> 目标SS/Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SS_Tight_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SS_Tight_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SS/Medium -> 目标SS/Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource S --deadline Medium --train-task S --train-resource S --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SS_Medium_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SS_Medium_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SS/Loose -> 目标SS/Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource S --deadline Loose --train-task S --train-resource S --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SS_Loose_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SS_Loose_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SM/Tight -> 目标SM/Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource M --deadline Tight --train-task S --train-resource M --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SM_Tight_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SM_Tight_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SM/Medium -> 目标SM/Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource M --deadline Medium --train-task S --train-resource M --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SM_Medium_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SM_Medium_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SM/Loose -> 目标SM/Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource M --deadline Loose --train-task S --train-resource M --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SM_Loose_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SM_Loose_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SL/Tight -> 目标SL/Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource L --deadline Tight --train-task S --train-resource L --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SL_Tight_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SL_Tight_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SL/Medium -> 目标SL/Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource L --deadline Medium --train-task S --train-resource L --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SL_Medium_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SL_Medium_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SL/Loose -> 目标SL/Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe/evaluate.py --task S --resource L --deadline Loose --train-task S --train-resource L --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_eval_logs/eval_pd3qn_fe_SL_Loose_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_SL_Loose_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# 四、检查进度与结果
+# 将SS_Tight替换成对应场景；检查日志末尾train completed / eval completed及退出错误。
+tail -n 40 outputs/server_console_logs/pd3qn_fe_SS_Tight_select_sr099_esp099_v1_ep600_model1.log
+# training_summary.json中feasible_model_found=false表示全程未找到可行模型，best保存备用模型。
+# 结果：outputs/run/pd3qn_fe/<源模型标识>/<目标场景与种子>/eval_pd3qn_fe.csv
+# 如要检查命令解析而不训练，可提取python命令，去掉nohup及日志重定向，并追加--dry-run。

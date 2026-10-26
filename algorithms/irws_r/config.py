@@ -3,13 +3,14 @@ from dataclasses import dataclass, asdict
 
 ALGORITHM = 'irws_r'
 DISPLAY_NAME = 'IRWS-R'
-MODEL_VERSION = 'irws_r_v2_batch'
+MODEL_VERSION = 'irws_r_v3_rollout'
 IMPLEMENTATION = dict(
     graph_aggregation='predecessor_mean_feature_softmax_v2',
-    update_rule='interval_minibatch_mean_v2',
-    meta_estimator='observed_interval_mean_local_intrinsic_partials_v2',
+    update_rule='cross_interval_rollout_mean_v3',
+    meta_estimator='observed_rollout_mean_local_intrinsic_partials_v3',
     boundary_rule='old_policy_expectation_then_post_update_selection_v2',
     task_score='fixed_seeded_Q',
+    graph_execution='cached_topological_frontier_batch_v3',
 )
 BEST_CHECKPOINT = 'best_irws_r.pth'
 FINAL_CHECKPOINT = 'final_irws_r.pth'
@@ -29,6 +30,8 @@ class PaperConfig:
     embedding_dim: int = 5
     trajectory_length: int = 16
     batch_size: int = 64
+    rollout_size: int = 64
+    precision: str = 'float32'
     actor_hidden: tuple = (128,64)
     critic_hidden: tuple = (64,64,32)
     # Not specified by the paper: one topological pass, TD(0)=Eq.(31),
@@ -45,5 +48,9 @@ class PaperConfig:
             raise ValueError('Learning rates must be positive')
         if min(self.batch_size,self.trajectory_length,self.message_passes,self.embedding_dim,self.update_rounds,self.rnn_hidden)<1:
             raise ValueError('Invalid network/training dimensions')
+        if not 1 <= self.rollout_size <= self.batch_size:
+            raise ValueError('rollout_size must be between 1 and batch_size; no rollout samples are discarded')
+        if self.precision not in ('float32', 'float64'):
+            raise ValueError('Unsupported network precision')
 
     def as_dict(self):return asdict(self)

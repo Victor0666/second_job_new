@@ -25,7 +25,12 @@ def seed_everything(seed):
 
 def queue_settings(scenario):
     options=scenario.paper_options or {}
-    return dict(queue_capacity=options.get('queue_capacity',10),slot_duration=options.get('slot_duration',1.))
+    return dict(queue_capacity=options.get('queue_capacity',10),slot_duration=options.get('slot_duration',5.))
+
+
+def learning_settings(scenario):
+    options=scenario.paper_options or {}
+    return dict(rollout_size=options.get('rollout_size',64),precision=options.get('precision','float32'))
 
 
 def env_kwargs(scenario,seed):
@@ -45,7 +50,8 @@ def output_dir(scenario,kind):
     norm=scenario.normalization_metadata()
     if norm['normalization_version'] not in SHARED_VERSIONS:raise ValueError('Formal IRWS must use the existing F18 shared configuration')
     encoding = '_'+norm['normalization_version'] if norm['normalization_version'] != VERSION else ''
-    return ROOT/'outputs'/kind/ALGORITHM/MODEL_VERSION/(source+'_'+digest+'_'+norm['normalization_config_hash'][:12]+encoding+'_'+ENERGY_ACCOUNTING+f"_q{queue_settings(scenario)['queue_capacity']}_dt{queue_settings(scenario)['slot_duration']:g}")/f'model{scenario.model_seed}'
+    learning=learning_settings(scenario)
+    return ROOT/'outputs'/kind/ALGORITHM/MODEL_VERSION/(source+'_'+digest+'_'+norm['normalization_config_hash'][:12]+encoding+'_'+ENERGY_ACCOUNTING+f"_q{queue_settings(scenario)['queue_capacity']}_dt{queue_settings(scenario)['slot_duration']:g}_n{learning['rollout_size']}_{learning['precision']}")/f'model{scenario.model_seed}'
 
 
 def artifact_name(scenario,kind):
@@ -68,15 +74,14 @@ def run_episode(env,learner,seed,training=False,evaluation=None):
         checkpoint_directory=str(evaluation[0].checkpoint_override or output_dir(evaluation[0],'ckpts'))) if evaluation else None
     decision=learner.prepare(env,deterministic=not training) if not env.done_flag else None
     while decision is not None:
-        interval=env.interval_index
         action,logp,value=learner.act(decision,deterministic=not training)
         reward,_,info=env.paper_step(action)
         external_return+=reward;physical_cost+=info['outer_cost']
         weights.append(info['fusion_weight']);boundaries+=int(info['fusion_boundary'])
-        # Algorithm 1 keeps policy/clock fixed for this interval's dispatch sequence.
+        # Scheduling ticks and frozen-policy rollout windows are independent clocks.
         if not env.can_dispatch():env.finish_phase_and_advance()
         done=env.done_flag
-        if training and not done and env.interval_index!=interval:
+        if training and not done and len(learner.buffer)+1>=learner.cfg.rollout_size:
             # Estimate the boundary without selecting a task. Algorithm 1's next
             # interval ordering must use the newly updated embedding network.
             boundary=learner.boundary_snapshot(env)
@@ -119,7 +124,7 @@ def save_checkpoint(path,learner,scenario,episode,best_energy,environment_config
         episode=episode,steps=learner.steps,updates=learner.updates,best_validation_energy=best_energy,
         normalization=scenario.normalization_metadata(),protocol=scenario.protocol().metadata(),
         environment=environment_config,scenario=scenario.describe(),rng=rng,git_commit=git_commit(),
-        recurrent_hidden=learner.hidden.detach().cpu(),vm_count=learner.vm_count,numerical_precision='float64')
+        recurrent_hidden=learner.hidden.detach().cpu(),vm_count=learner.vm_count,numerical_precision=learner.cfg.precision)
     Path(path).parent.mkdir(parents=True,exist_ok=True)
     torch.save(obj,path)
 
@@ -143,6 +148,8 @@ def load_checkpoint(path,scenario,device='cpu',restore_training=False):
     check_checkpoint(obj.get('normalization'),expected)
     if obj.get('protocol')!=scenario.protocol().metadata():raise ValueError('Checkpoint experiment protocol mismatch')
     cfg=dict(obj['paper_config']);cfg['device']=device
+    if any(cfg.get(k)!=v for k,v in learning_settings(scenario).items()) or obj.get('numerical_precision')!=cfg['precision']:
+        raise ValueError('Checkpoint rollout/precision settings mismatch')
     for k in ('actor_hidden','critic_hidden'):cfg[k]=tuple(cfg[k])
     learner=PaperLearner(obj['vm_count'],PaperConfig(**cfg))
     if learner.vm_count!=sum(scenario.vms_per_host):raise ValueError('Source/target VM dimensions are incompatible')
@@ -190,7 +197,9 @@ def train(scenario,config=None,kwargs=None,out=None,resume=None):
         kwargs[key]=value
     env=PaperCloudEnv(**kwargs)
     scenario.normalization_metadata();seed_everything(scenario.model_seed)
-    cfg=config or PaperConfig(device=(scenario.paper_options or {}).get('device','cpu'))
+    cfg=config or PaperConfig(device=(scenario.paper_options or {}).get('device','cpu'),**learning_settings(scenario))
+    if any(getattr(cfg,k)!=v for k,v in learning_settings(scenario).items()):
+        raise ValueError('Scenario/learner rollout or precision mismatch')
     start=0;best=float('inf')
     if resume:
         learner,obj=load_checkpoint(resume,scenario,cfg.device,True);start=obj['episode']+1;best=obj['best_validation_energy']

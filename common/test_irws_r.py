@@ -33,6 +33,7 @@ class IRWSRTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.path, self.scene = fixture(self.root)
+        self.scene=replace(self.scene,paper_options=dict(precision='float64'))
 
     def test_source_algorithms_and_learning_settings_unchanged(self):
         root = Path(__file__).resolve().parents[1]
@@ -58,9 +59,11 @@ class IRWSRTests(unittest.TestCase):
             raw=(snapshot/file).read_bytes()
             lf=raw.replace(b'\r\n',b'\n')
             self.assertIn(digest,[hashlib.sha256(b).hexdigest() for b in (raw,lf,lf.replace(b'\n',b'\r\n'))],file)
-        self.assertEqual((root/'algorithms/irws_r/environment.py').read_bytes(),
+        self.assertEqual((root/'algorithms/irws_r_v2/environment.py').read_bytes(),
                          (root/'algorithms/irws_restored/environment.py').read_bytes())
-        self.assertEqual(PaperConfig().as_dict(), SourceConfig().as_dict())
+        current=PaperConfig().as_dict()
+        for key in ('precision','rollout_size'):current.pop(key)
+        self.assertEqual(current,SourceConfig().as_dict())
 
     def test_output_names_and_model_seeds_are_separate(self):
         for kind in ('ckpts', 'run'):
@@ -81,9 +84,9 @@ class IRWSRTests(unittest.TestCase):
         with synthetic_env(self.path, runner.PaperCloudEnv) as current, synthetic_env(
                 self.path, runner.PaperCloudEnv) as previous:
             runner.seed_everything(31)
-            learner = runner.PaperLearner(current.num_vms, PaperConfig())
+            learner = runner.PaperLearner(current.num_vms, PaperConfig(precision='float64'))
             runner.seed_everything(31)
-            old_learner = runner.PaperLearner(previous.num_vms, PaperConfig())
+            old_learner = runner.PaperLearner(previous.num_vms, PaperConfig(precision='float64'))
             actual = runner.run_episode(current, learner, 32, False)
             expected = runner.run_episode(previous, old_learner, 32, False)
             self.assertEqual(actual['metrics'], expected['metrics'])
@@ -115,7 +118,7 @@ class IRWSRTests(unittest.TestCase):
         self.assertGreater(float((changed-output.detach()).abs().max()),1e-8)
 
     def test_meta_contractions_keep_sample_factors_paired(self):
-        cfg=PaperConfig()
+        cfg=PaperConfig(precision='float64')
         pre=(torch.tensor([[1.,2.],[-3.,4.]],dtype=torch.float64),)
         cost=(torch.tensor([.3,-.7],dtype=torch.float64),)
         reward=(torch.tensor([.9,.2],dtype=torch.float64),)
@@ -143,7 +146,7 @@ class IRWSRTests(unittest.TestCase):
     def test_boundary_estimation_is_read_only_and_uses_expected_values(self):
         with synthetic_env(self.path,runner.PaperCloudEnv) as env:
             env.reset(seed=32)
-            learner=runner.PaperLearner(env.num_vms,PaperConfig())
+            learner=runner.PaperLearner(env.num_vms,PaperConfig(precision='float64'))
             before_rng=torch.get_rng_state().clone()
             ready=list(env.ready_task_ids)
             boundary=learner.boundary_snapshot(env)
@@ -153,7 +156,7 @@ class IRWSRTests(unittest.TestCase):
             self.assertGreater(len(boundary.decisions),1)
             self.assertAlmostEqual(float(boundary.probabilities.sum()),1.)
             expected=sum(float(p)*learner.value(d) for p,d in zip(boundary.probabilities,boundary.decisions))
-            self.assertAlmostEqual(boundary.value,expected,places=12)
+            self.assertAlmostEqual(float(boundary.value),float(expected),places=12)
 
     def _collect_interval(self,env,learner):
         env.reset(seed=32);learner.reset_history()
@@ -166,7 +169,7 @@ class IRWSRTests(unittest.TestCase):
             if env.done_flag:
                 learner.remember(decision,action,logp,value,reward,True,info,None)
                 return 0.
-            if env.interval_index!=interval:
+            if env.interval_index!=interval or len(learner.buffer)+1>=learner.cfg.rollout_size:
                 boundary=learner.boundary_snapshot(env)
                 learner.remember(decision,action,logp,value,reward,False,info,None,boundary=boundary)
                 return boundary.value
@@ -177,7 +180,7 @@ class IRWSRTests(unittest.TestCase):
     def test_replay_preserves_chronology_and_inner_outer_encoding(self):
         with synthetic_env(self.path,runner.PaperCloudEnv) as env:
             runner.seed_everything(23)
-            learner=runner.PaperLearner(env.num_vms,PaperConfig())
+            learner=runner.PaperLearner(env.num_vms,PaperConfig(precision='float64'))
             bootstrap=self._collect_interval(env,learner)
             stored=learner.tensor(np.stack([r['decision'].obs for r in learner.buffer])).clone()
             old_probabilities=[r['logp'] for r in learner.buffer]
@@ -206,7 +209,7 @@ class IRWSRTests(unittest.TestCase):
     def test_batch_steps_and_selection_follow_interval_updates(self):
         with synthetic_env(self.path,runner.PaperCloudEnv) as env:
             runner.seed_everything(23)
-            learner=runner.PaperLearner(env.num_vms,PaperConfig())
+            learner=runner.PaperLearner(env.num_vms,PaperConfig(precision='float64'))
             fixed=[p.detach().clone() for p in learner.task.score.parameters()]
             prepare=learner.prepare;update=learner.update
             events=[]
@@ -234,7 +237,7 @@ class IRWSRTests(unittest.TestCase):
     def test_short_batch_and_sampling_cap_are_recorded(self):
         for cap in (1,64):
             with self.subTest(cap=cap),synthetic_env(self.path,runner.PaperCloudEnv) as env:
-                learner=runner.PaperLearner(env.num_vms,replace(PaperConfig(),batch_size=cap))
+                learner=runner.PaperLearner(env.num_vms,replace(PaperConfig(precision='float64'),batch_size=cap,rollout_size=cap))
                 bootstrap=self._collect_interval(env,learner)
                 count=len(learner.buffer)
                 result=learner.update(bootstrap)
@@ -247,7 +250,7 @@ class IRWSRTests(unittest.TestCase):
     def test_actor_takes_one_mean_loss_adam_step(self):
         with synthetic_env(self.path,runner.PaperCloudEnv) as env:
             runner.seed_everything(23)
-            learner=runner.PaperLearner(env.num_vms,PaperConfig())
+            learner=runner.PaperLearner(env.num_vms,PaperConfig(precision='float64'))
             bootstrap=self._collect_interval(env,learner)
             observations,_=learner._replay()
             reference=deepcopy(learner.actor)
@@ -268,7 +271,7 @@ class IRWSRTests(unittest.TestCase):
     def test_boundary_reward_expectation_and_real_history_are_distinct(self):
         with synthetic_env(self.path,runner.PaperCloudEnv) as env:
             runner.seed_everything(23)
-            learner=runner.PaperLearner(env.num_vms,PaperConfig())
+            learner=runner.PaperLearner(env.num_vms,PaperConfig(precision='float64'))
             bootstrap=self._collect_interval(env,learner)
             record=learner.buffer[-1];boundary=record['boundary']
             self.assertIsNotNone(boundary)
@@ -300,21 +303,21 @@ class IRWSRTests(unittest.TestCase):
         make=lambda **kw:runner.PaperCloudEnv(queue_capacity=100,**kw)
         with synthetic_env(self.path,make) as env,patch('environments.irws.load_workflow_from_dax',
                 side_effect=lambda *a,**kw:(graph.copy(),deepcopy(tasks))):
-            learner=runner.PaperLearner(env.num_vms,PaperConfig())
+            learner=runner.PaperLearner(env.num_vms,PaperConfig(precision='float64'))
             bootstrap=self._collect_interval(env,learner)
-            self.assertEqual(len(learner.buffer),80)
+            self.assertEqual(len(learner.buffer),64)
             _,intrinsics=learner._replay()
             torch.testing.assert_close(intrinsics.detach(),learner.tensor([r['behavior_intrinsic'] for r in learner.buffer]))
             result=learner.update(bootstrap)
             self.assertEqual(len(set(result['sampled_indices'])),64)
             self.assertEqual(result['sample_presentations'],64)
-            self.assertEqual(result['collected_transitions'],80)
+            self.assertEqual(result['collected_transitions'],64)
             self.assertEqual(learner.updates,1)
 
     def test_checkpoint_resume_matches_uninterrupted_next_episode(self):
         with synthetic_env(self.path,runner.PaperCloudEnv) as env:
             runner.seed_everything(23)
-            learner=runner.PaperLearner(env.num_vms,PaperConfig())
+            learner=runner.PaperLearner(env.num_vms,PaperConfig(precision='float64'))
             runner.run_episode(env,learner,32,True)
             path=self.root/'resume.pth'
             runner.save_checkpoint(path,learner,self.scene,0,100.,runner.env_kwargs(self.scene,32))
@@ -368,7 +371,7 @@ class IRWSRTests(unittest.TestCase):
                 self.assertEqual(measurement['algorithm'], ALGORITHM)
                 self.assertEqual(set(measurement['optimizer_steps'].values()),{len(training['updates'])})
                 self.assertEqual(set(measurement['optimizer_sample_presentations'].values()),{sum(u['sample_presentations'] for u in training['updates'])})
-                for version in ('irws_r_v1',SOURCE_VERSION, 'irws_restored_queue_v1', 'irws_cloud_energy_tardiness_v2'):
+                for version in ('irws_r_v2_batch','irws_r_v1',SOURCE_VERSION, 'irws_restored_queue_v1', 'irws_cloud_energy_tardiness_v2'):
                     torch.save(dict(obj,model_version=version), self.root/'old.pth')
                     with self.assertRaisesRegex(ValueError,'algorithm/version mismatch'):
                         runner.load_checkpoint(self.root/'old.pth',self.scene)

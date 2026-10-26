@@ -1,0 +1,71 @@
+{
+  "device": "cuda",
+  "rows": [
+    {
+      "resource": "S",
+      "vm_count": 25,
+      "workflows": 50,
+      "assignments": 1369,
+      "updates": 22,
+      "batch_sizes": [
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        64,
+        25
+      ],
+      "seconds": 14.57366550003644,
+      "energy_reintegration_gap": 0.0,
+      "all_tasks_finished": true
+    },
+    {
+      "resource": "M",
+      "vm_count": 50,
+      "workflows": 5,
+      "assignments": 138,
+      "updates": 3,
+      "batch_sizes": [
+        64,
+        64,
+        10
+      ],
+      "seconds": 2.158800399978645,
+      "energy_reintegration_gap": 0.0,
+      "all_tasks_finished": true
+    },
+    {
+      "resource": "L",
+      "vm_count": 75,
+      "workflows": 5,
+      "assignments": 138,
+      "updates": 3,
+      "batch_sizes": [
+        64,
+        64,
+        10
+      ],
+      "seconds": 2.4113284000195563,
+      "energy_reintegration_gap": 0.0,
+      "all_tasks_finished": true
+    }
+  ],
+  "formal_training": false,
+  "limitations": "Temporary fixed normalization and no deadline cache; S has 50 workflows, M/L five each. No formal quality comparison."
+}

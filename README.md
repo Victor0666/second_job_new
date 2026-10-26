@@ -291,4 +291,4 @@ Linux/Bash 等价命令为 `python launch.py common/f18_calibrate_normalization.
 
 ### IRWS-R 独立对比算法
 
-此前修改的IRWS现在使用独立入口`algorithms/irws_r/train.py`、`evaluate.py`，显示名称为**IRWS-R**，算法ID为`irws_r`，模型版本为`irws_r_v1`。新模型使用`best_irws_r.pth`、`final_irws_r.pth`；训练、评测主文件均带`irws_r`前缀，目录按模型种子隔离。新训练及评测入口拒绝覆盖已有结果。旧IRWS目录及结果保留；本次独立命名不改变此前v2的算法计算。命令与文件示例见[IRWS-R输出说明](docs/IRWS_R_output_identity.md)。
+IRWS-R当前入口为 `algorithms/irws_r/train.py`、`evaluate.py`，模型标识 `irws_r_v3_rollout`。默认跨区间64条经验更新、5秒调度周期、float32；静态DAG缓存、拓扑层批处理、设备内观测和状态版本资源缓存加速执行。新配置须重训，输出独立，旧批量版在 `algorithms/irws_r_v2/` 可继续加载原模型。实现、测试及性能边界见 [加速说明](docs/IRWS_R_v3_implementation.md)，完整命令见 [训练与组合评测](docs/Linux_CUDA_IRWS_加速版_训练与组合评测指令.txt)。

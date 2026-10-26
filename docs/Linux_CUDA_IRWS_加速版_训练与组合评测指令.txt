@@ -1,0 +1,232 @@
+# 修改后的IRWS-R：irws_r_v3_rollout｜Linux CUDA训练和评测指令
+# 日期：2026-10-26。入口仍为algorithms/irws_r，旧批量版入口为algorithms/irws_r_v2。
+# 在项目根目录运行，先激活服务器的CUDA版PyTorch环境，并同步最新代码。
+# 公共截止期缓存和f19共享归一化文件须已准备好，沿用既有文件。
+# 每段命令独立启动一个后台任务；逐段复制，不要直接运行整个清单。
+# 先完成对应源模型训练，再启动其评测；显卡编号0可按服务器实际分配调整。
+# 训练：S任务档 × 资源S/M/L × Tight/Medium/Loose，共9个模型，每模型600回合。
+# 评测：S/M/L任务档 × 资源S/M/L × 三种截止期，共27个场景，每场景30个测试实例。
+# 每个评测加载S任务档、相同资源和截止期训练的模型；M/L任务档为泛化评测。
+# model-seed=1指模型初始化种子；700-729是30个测试实例种子，不是30次训练。
+# 新版本模型/结果自动写入irws_r_v3_rollout版本目录，不覆盖v1/v2。加速版须从头训练，不加载旧模型。
+# 控制台日志与PID使用irws_r_v3前缀。同一新版命令再次执行仍会覆盖同名控制台日志。
+# 算法内部训练/评测目标非空时拒绝覆盖。重复运行前请检查已有结果。
+
+mkdir -p outputs/server_console_logs
+python -c "from algorithms.irws_r.config import MODEL_VERSION; assert MODEL_VERSION == 'irws_r_v3_rollout', MODEL_VERSION; print(MODEL_VERSION)"
+
+# 一、训练：9条独立命令
+# IRWS-R v3训练 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SS_Tight_model1.pid
+
+# IRWS-R v3训练 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SS_Medium_model1.pid
+
+# IRWS-R v3训练 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SS_Loose_model1.pid
+
+# IRWS-R v3训练 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SM_Tight_model1.pid
+
+# IRWS-R v3训练 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SM_Medium_model1.pid
+
+# IRWS-R v3训练 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SM_Loose_model1.pid
+
+# IRWS-R v3训练 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SL_Tight_model1.pid
+
+# IRWS-R v3训练 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SL_Medium_model1.pid
+
+# IRWS-R v3训练 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"; exec python -u launch.py algorithms/irws_r/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda' > outputs/server_console_logs/train_irws_r_v3_SL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/train_irws_r_v3_SL_Loose_model1.pid
+
+# 二、评测：9条组合命令，每条完成本场景及两个泛化场景
+
+# IRWS-R v3：本场景与两个泛化场景的组合评测命令
+# 日期：2026-10-26。在Linux项目根目录运行，先激活已有CUDA版PyTorch环境。
+# 共9个独立命令组；每组固定一个已训练的S任务模型，依次评测S、M、L三个任务档。
+# 每场景使用测试种子700-729，共30个实例；每组90次，全部9组共810次实例评测。
+# 资源S：SS -> MS -> LS；资源M：SM -> MM -> LM；资源L：SL -> ML -> LL。
+# 每块整体复制执行即可后台完成三个场景；按需选择命令块，不要直接运行整个清单。
+# 同组内部顺序运行；不同组可按服务器资源情况并行，CUDA_VISIBLE_DEVICES=0按实际分配调整。
+# 统一加载对应源训练场景的best模型；--train-task始终为S，资源与截止期在组内固定。
+# 本文件对应新加速模型配置：queue-capacity=10、slot-duration=5、rollout-size=64、precision=float32。
+# 沿用已有F22截止期缓存及f19共享归一化文件；不重新训练、校准或生成缓存。
+# bash -e保证任一场景失败就停止该组；全部完成后日志打印ALL_DONE。
+# 各场景CSV/JSON/逐种子明细仍由原评测入口分别保存；已有结果目录非空会报错停止。
+# 组日志和PID使用新的source..._SML名称，便于区分原来的单场景控制台日志。
+# 再次运行同一组会覆盖同名组控制台日志与PID；请先确认该组未在运行且没有需要保留的组日志。
+
+# 源训练场景 SS/Tight：SS -> MS -> LS，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=S deadline=Tight source=SS/Tight seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource S --deadline Tight \
+    --train-task S --train-resource S --train-deadline Tight \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=S deadline=Tight"
+done
+echo "[ALL_DONE] source=SS/Tight targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSS_Tight_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSS_Tight_SML_model1.pid
+
+# 源训练场景 SS/Medium：SS -> MS -> LS，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=S deadline=Medium source=SS/Medium seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource S --deadline Medium \
+    --train-task S --train-resource S --train-deadline Medium \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=S deadline=Medium"
+done
+echo "[ALL_DONE] source=SS/Medium targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSS_Medium_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSS_Medium_SML_model1.pid
+
+# 源训练场景 SS/Loose：SS -> MS -> LS，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=S deadline=Loose source=SS/Loose seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource S --deadline Loose \
+    --train-task S --train-resource S --train-deadline Loose \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=S deadline=Loose"
+done
+echo "[ALL_DONE] source=SS/Loose targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSS_Loose_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSS_Loose_SML_model1.pid
+
+# 源训练场景 SM/Tight：SM -> MM -> LM，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=M deadline=Tight source=SM/Tight seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource M --deadline Tight \
+    --train-task S --train-resource M --train-deadline Tight \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=M deadline=Tight"
+done
+echo "[ALL_DONE] source=SM/Tight targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSM_Tight_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSM_Tight_SML_model1.pid
+
+# 源训练场景 SM/Medium：SM -> MM -> LM，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=M deadline=Medium source=SM/Medium seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource M --deadline Medium \
+    --train-task S --train-resource M --train-deadline Medium \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=M deadline=Medium"
+done
+echo "[ALL_DONE] source=SM/Medium targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSM_Medium_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSM_Medium_SML_model1.pid
+
+# 源训练场景 SM/Loose：SM -> MM -> LM，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=M deadline=Loose source=SM/Loose seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource M --deadline Loose \
+    --train-task S --train-resource M --train-deadline Loose \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=M deadline=Loose"
+done
+echo "[ALL_DONE] source=SM/Loose targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSM_Loose_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSM_Loose_SML_model1.pid
+
+# 源训练场景 SL/Tight：SL -> ML -> LL，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=L deadline=Tight source=SL/Tight seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource L --deadline Tight \
+    --train-task S --train-resource L --train-deadline Tight \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=L deadline=Tight"
+done
+echo "[ALL_DONE] source=SL/Tight targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSL_Tight_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSL_Tight_SML_model1.pid
+
+# 源训练场景 SL/Medium：SL -> ML -> LL，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=L deadline=Medium source=SL/Medium seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource L --deadline Medium \
+    --train-task S --train-resource L --train-deadline Medium \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=L deadline=Medium"
+done
+echo "[ALL_DONE] source=SL/Medium targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSL_Medium_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSL_Medium_SML_model1.pid
+
+# 源训练场景 SL/Loose：SL -> ML -> LL，每场景30个测试实例
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+python -c "import torch; assert torch.cuda.is_available(), \"CUDA unavailable: stopped\"; torch.ones(1, device=\"cuda\"); print(torch.cuda.get_device_name(0))"
+for task in S M L; do
+  echo "[START] task=${task} resource=L deadline=Loose source=SL/Loose seeds=700-729"
+  python -u launch.py algorithms/irws_r/evaluate.py \
+    --task "$task" --resource L --deadline Loose \
+    --train-task S --train-resource L --train-deadline Loose \
+    --seeds 700-729 --model-seed 1 \
+    --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 \
+    --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 --device cuda
+  echo "[DONE] task=${task} resource=L deadline=Loose"
+done
+echo "[ALL_DONE] source=SL/Loose targets=S,M,L seeds=700-729"
+' > outputs/server_console_logs/eval_irws_r_v3_sourceSL_Loose_SML_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/eval_irws_r_v3_sourceSL_Loose_SML_model1.pid

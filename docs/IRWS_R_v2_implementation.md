@@ -1,3 +1,5 @@
+> 历史批量版已保存在 `algorithms/irws_r_v2/`；当前入口的加速修订见 [新实现说明](IRWS_R_v3_implementation.md)。本页保留原验收记录。
+
 # IRWS-R v2 批量更新与最小机制补全
 
 日期：2026-10-25。算法ID仍为`irws_r`，显示名IRWS-R，模型版本`irws_r_v2_batch`。这是依据用户确认方案的实质修订，不宣称与论文作者源码等价。

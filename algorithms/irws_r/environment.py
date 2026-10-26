@@ -43,11 +43,11 @@ def fusion_weight(reference_time, downward_rank):
 class PaperCloudEnv(IRWSEnvRouteA):
     """FIFO queues and periodic policy ticks on the unchanged physical calculators.
 
-    Unspecified paper settings: 10 waiting tasks per VM, 1-second policy interval.
+    Adapted settings: 10 waiting tasks per VM, 5-second policy interval.
     FIFO is nonpreemptive. Reservation energy is charged once at dispatch; queued
     tasks have load records only on their predicted, deterministic service interval.
     """
-    def __init__(self, *args, queue_capacity=10, slot_duration=1., **kwargs):
+    def __init__(self, *args, queue_capacity=10, slot_duration=5., **kwargs):
         if isinstance(queue_capacity,bool) or int(queue_capacity)!=queue_capacity or queue_capacity<1:
             raise ValueError('queue_capacity must be a positive integer')
         if not np.isfinite(slot_duration) or slot_duration<=0:
@@ -56,6 +56,7 @@ class PaperCloudEnv(IRWSEnvRouteA):
         super().__init__(*args,**kwargs)
 
     def reset(self, **kwargs):
+        self._invalidate_resources()
         self.vm_queues={i:[] for i in range(self.num_vms)}
         self.vm_running={i:None for i in range(self.num_vms)}
         self.task_dispatch_time={};self.interval_index=0;self._paper_graphs={}
@@ -66,6 +67,11 @@ class PaperCloudEnv(IRWSEnvRouteA):
             self.interval_index=self._tick_at_or_after(self.current_time)
             self._advance_physics(self.interval_index*self.slot_duration)
         return result
+
+    def _invalidate_resources(self):
+        # Equal timestamps can still have different queues after a dispatch.
+        self.state_revision=getattr(self,'state_revision',0)+1
+        self._resource_cache={}
 
     def _tick_at_or_after(self, time):
         return int(np.ceil(float(time)/self.slot_duration-1e-10))
@@ -105,6 +111,7 @@ class PaperCloudEnv(IRWSEnvRouteA):
 
     def _advance_physics(self, target):
         if target<self.current_time-1e-10: raise ValueError('Physical time cannot go backwards')
+        self._invalidate_resources()
         while True:
             self._add_workflows_up_to_current_time()
             self._finish_and_start()
@@ -163,6 +170,7 @@ class PaperCloudEnv(IRWSEnvRouteA):
         return tuple(self._paper_graphs[w.workflow_id] for w in self.workflows)
 
     def resource_features(self,gid):
+        if gid in self._resource_cache:return self._resource_cache[gid]
         task=self._task_obj_from_gid(gid);parents=self._build_parents_loc(gid);now=float(self.current_time)
         result=[self.scale(task.workload_mi,'workload_mi_ref')]
         for vm_id in range(self.num_vms):
@@ -176,6 +184,8 @@ class PaperCloudEnv(IRWSEnvRouteA):
                 self.scale(vm.pc,'vm_pc_ref'),self.scale(vm.bw,'vm_bw_ref'),self.scale(transfer,'input_bits_ref')])
         result=np.asarray(result,dtype=np.float32)
         if not np.isfinite(result).all():raise ValueError('Nonfinite paper resource observation')
+        result.setflags(write=False)
+        self._resource_cache[gid]=result
         return result
 
     def get_vm_obs_and_mask(self):
@@ -188,6 +198,7 @@ class PaperCloudEnv(IRWSEnvRouteA):
             raise ValueError('Illegal VM action or full waiting queue; no physical mutation')
         gid=int(self.current_task_gid)
         if self.task_state[gid]!='Ready': raise ValueError('Task is not Ready')
+        self._invalidate_resources()
         ti=self.task_meta[gid]
         graph=next(g for g in self.graphs() if g.wf_id==ti.wf_id)
         before=float(self.total_energy);busy=self.vm_running[action] is not None

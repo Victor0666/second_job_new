@@ -22,19 +22,37 @@ class TopologicalLayer(nn.Module):
         super().__init__();self.self_weight=nn.Linear(dim,dim,bias=False);self.neighbor_weight=nn.Linear(dim,dim,bias=False)
         self.forward_gru=nn.GRUCell(dim,dim);self.reverse_gru=nn.GRUCell(dim,dim)
 
-    def forward(self,previous,neighbors,order):
-        output=[None]*len(neighbors)
+    @staticmethod
+    def plan(neighbors, order, device):
+        levels={}
+        groups={}
         for v in order:
-            # Eq.(16) omits the axis/reduction. Minimal convention: mean the
-            # predecessor states, then apply Softmax across embedding features.
-            mean=torch.stack([output[u] for u in neighbors[v]]).mean(0) if neighbors[v] else torch.zeros_like(previous[v])
-            aggregate=torch.softmax(self.self_weight(previous[v])+self.neighbor_weight(mean),dim=-1)
-            # Two-token Bi-GRU of (past self, aggregated neighbors), Eq.(17).
-            zero=torch.zeros_like(previous[v])
-            forward=self.forward_gru(aggregate,self.forward_gru(previous[v],zero))
-            reverse=self.reverse_gru(previous[v],self.reverse_gru(aggregate,zero))
-            output[v]=(forward+reverse)/2
-        return torch.stack(output)
+            depth=max((levels[u]+1 for u in neighbors[v]),default=0)
+            levels[v]=depth
+            groups.setdefault(depth,[]).append(v)
+        result=[]
+        sentinel=len(neighbors)
+        for nodes in groups.values():
+            width=max(1,max(len(neighbors[v]) for v in nodes))
+            parents=[list(neighbors[v])+[sentinel]*(width-len(neighbors[v])) for v in nodes]
+            result.append((torch.tensor(nodes,device=device),torch.tensor(parents,device=device),
+                           torch.tensor([max(1,len(neighbors[v])) for v in nodes],device=device).unsqueeze(-1)))
+        return tuple(result)
+
+    def forward(self,previous,neighbors=None,order=None,plan=None):
+        if plan is None:
+            plan=self.plan(neighbors,order,previous.device)
+        # A zero sentinel handles empty/padded predecessor lists without self edges.
+        output=previous.new_zeros((len(previous)+1,previous.shape[-1]))
+        for nodes,parents,counts in plan:
+            mean=output[parents].sum(1)/counts
+            old=previous[nodes]
+            aggregate=torch.softmax(self.self_weight(old)+self.neighbor_weight(mean),dim=-1)
+            zero=torch.zeros_like(old)
+            forward=self.forward_gru(aggregate,self.forward_gru(old,zero))
+            reverse=self.reverse_gru(old,self.reverse_gru(aggregate,zero))
+            output=output.index_copy(0,nodes,(forward+reverse)/2)
+        return output[:-1]
 
 
 class WorkflowEmbedding(nn.Module):
@@ -42,20 +60,60 @@ class WorkflowEmbedding(nn.Module):
         super().__init__();self.initial=nn.Linear(2,dim)
         self.forward_layers=nn.ModuleList(TopologicalLayer(dim) for _ in range(passes))
         self.reverse_layers=nn.ModuleList(TopologicalLayer(dim) for _ in range(passes));self.pool=nn.Linear(dim,dim)
+        self.clear_cache()
+
+    def clear_cache(self):
+        self._graphs={}
+        self._bundles={}
+
+    def _apply(self,fn):
+        result=super()._apply(fn)
+        self.clear_cache()
+        return result
+
+    def _prepare_graph(self,graph):
+        key=id(graph)
+        if key not in self._graphs:
+            dag=nx.DiGraph()
+            dag.add_nodes_from(range(len(graph.gids)))
+            dag.add_edges_from((u,v) for v,parents in enumerate(graph.parents) for u in parents)
+            order=tuple(nx.topological_sort(dag))
+            children=tuple(tuple(dag.successors(i)) for i in range(len(graph.gids)))
+            features=torch.tensor(graph.features,dtype=self.initial.weight.dtype,device=self.initial.weight.device)
+            self._graphs[key]=(graph,features,order,children)
+        return self._graphs[key]
+
+    def _prepare(self,graphs):
+        key=tuple(id(g) for g in graphs)
+        if key not in self._bundles:
+            features=[];parents=[];children=[];order=[];reverse_order=[];sizes=[]
+            offset=0
+            for graph in graphs:
+                _,x,topology,successors=self._prepare_graph(graph)
+                features.append(x);sizes.append(len(graph.gids))
+                parents.extend(tuple(u+offset for u in ps) for ps in graph.parents)
+                children.extend(tuple(u+offset for u in cs) for cs in successors)
+                order.extend(v+offset for v in topology)
+                reverse_order.extend(v+offset for v in reversed(topology))
+                offset+=len(graph.gids)
+            device=self.initial.weight.device
+            self._bundles[key]=(torch.cat(features),TopologicalLayer.plan(parents,order,device),
+                                TopologicalLayer.plan(children,reverse_order,device),sizes)
+        return self._bundles[key]
 
     def forward(self,graph):
-        device=self.initial.weight.device
-        x=torch.tensor(graph.features,dtype=self.initial.weight.dtype,device=device)
-        dag=nx.DiGraph();dag.add_nodes_from(range(len(graph.gids)))
-        dag.add_edges_from((u,v) for v,parents in enumerate(graph.parents) for u in parents)
-        order=list(nx.topological_sort(dag));children=tuple(tuple(dag.successors(i)) for i in range(len(graph.gids)))
+        return self.forward_many((graph,))[0]
+
+    def forward_many(self,graphs):
+        if not graphs:return ()
+        x,forward_plan,reverse_plan,sizes=self._prepare(graphs)
         forward=reverse=torch.tanh(self.initial(x))
         for fl,rl in zip(self.forward_layers,self.reverse_layers):
-            forward=fl(forward,graph.parents,order)
-            reverse=rl(reverse,children,list(reversed(order)))
+            forward=fl(forward,plan=forward_plan)
+            reverse=rl(reverse,plan=reverse_plan)
         # Eq.(18) is indexed by v: pool direction representations of each task,
         # not all tasks into one identical selection score (Fig.3).
-        return self.pool(torch.stack((forward,reverse)).mean(0))
+        return self.pool(torch.stack((forward,reverse)).mean(0)).split(sizes)
 
 
 class TaskPolicy(nn.Module):
@@ -67,8 +125,7 @@ class TaskPolicy(nn.Module):
 
     def embeddings(self,graphs):
         result={}
-        for graph in graphs:
-            tensor=self.embedding(graph)
+        for graph,tensor in zip(graphs,self.embedding.forward_many(graphs)):
             result.update({gid:tensor[i] for i,gid in enumerate(graph.gids)})
         return result
 

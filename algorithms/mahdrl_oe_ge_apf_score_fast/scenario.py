@@ -11,6 +11,7 @@ from common.f11 import LEARNING_MODEL
 from common.ta_weights import TA_WEIGHT_MODEL
 from common.workflow_opt import ENERGY_ACCOUNTING
 from .config import ALGORITHM, DISPLAY_NAME, MODEL_VERSION, variant_metadata, implementation_metadata
+from .selection import SELECTION_TAG, selection_metadata
 
 
 @dataclass(frozen=True)
@@ -79,10 +80,34 @@ class ScoreScenario(Scenario):
         return (Path(self.output_root)/"outputs/run"/ALGORITHM/version/source/
                 f"eval_task{self.task}_res{self.resource}_{self.deadline}")
 
+    @property
+    def output_version(self):
+        return MODEL_VERSION + "_" + super().output_version + "_" + SELECTION_TAG
+
+    def selection_protocol(self):
+        protocol = self.protocol()
+        metadata = protocol.metadata() if protocol else dict(version="legacy", validation=self.validation_seeds())
+        metadata.update(selection=SELECTION_TAG, checkpoint_selection=selection_metadata())
+        return metadata
+
+    def reproducibility_metadata(self):
+        metadata = super().reproducibility_metadata()
+        metadata.update(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+                        data_split=self.selection_protocol(), checkpoint_selection=selection_metadata())
+        return metadata
+
+    def normalization_metadata(self):
+        metadata = super().normalization_metadata()
+        metadata.update(model_version=MODEL_VERSION, experiment_protocol=self.selection_protocol(),
+                        checkpoint_selection=selection_metadata())
+        return metadata
+
     def describe(self, algorithm=ALGORITHM):
         result = super().describe(None)
         result.update(algorithm=ALGORITHM, display_name=DISPLAY_NAME, variant=variant_metadata(), implementation=implementation_metadata(),
                       diagnostics_every=self.diagnostics_every, profile_mode=self.profile_mode, profile_every=self.profile_every,
+                      model_version=MODEL_VERSION, checkpoint_selection=selection_metadata(),
+                      experiment_protocol=self.selection_protocol(),
                       checkpoint_dir=str(self.checkpoint_dir()), log_dir=str(self.log_dir()),
                       evaluation_dir=str(self.evaluation_dir()), device=self.device or "auto")
         return result

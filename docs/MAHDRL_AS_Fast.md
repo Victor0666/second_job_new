@@ -1,7 +1,7 @@
 # MAHDRL-AS-Fast
 
 独立入口为 `algorithms/mahdrl_oe_ge_apf_score_fast/`，环境为
-`environments/mahdrl_oe_ge_apf_score_fast.py`。运行身份是 `mahdrl_as_fast_v1`。
+`environments/mahdrl_oe_ge_apf_score_fast.py`。当前运行身份是 `mahdrl_as_fast_v2`。
 该版本是 MAHDRL-AS 的执行优化，不是改变目标函数的新学习方法。
 
 ## 保持一致的内容
@@ -14,13 +14,44 @@ TA/HA/VA 三层奖励、任务顺序、物理执行、通信模型和 OE 能耗�
 
 科学配置 `algorithm_variant` 保持 AS 身份，执行版本单独写入
 `implementation.json` 和 checkpoint 的 `normalization.implementation`。
-因此可以通过显式 `--checkpoint-dir` 用 Fast 评测原 AS 打分网络权重；
 网络形状、角色、训练源归一化、实验协议和 TA/HA/VA 保存组仍须全部匹配。
+v2 评测还要求新选择规则的来源证据；缺少证据的原 AS/Fast v1 权重不能作为
+新规则 best 加载。历史权重沿用提交 `220879a` 的 v1 入口评测。
 定长网络、不同 APF 参数及混合保存组不能加载。没有增加断点续训入口。
 
-模型与日志路径使用独立的 `mahdrl_as_fast_v1_...` 名字，评测路径使用
-`outputs/run/mahdrl_oe_ge_apf_score_fast/`。训练、评测均拒绝覆盖非空输出。
-没有修改其他算法、公共注册表或已有输出目录。
+模型与日志路径使用独立的 `mahdrl_as_fast_v2_...` 名字，评测路径使用
+`outputs/run/mahdrl_oe_ge_apf_score_fast/mahdrl_as_fast_v2_.../`。
+训练、评测均拒绝覆盖非空输出，已有 v1 输出保留。此次模型选择变更不修改
+其他算法、公共注册表、共享 F22 文件、环境或学习更新公式。
+
+## v2 模型选择（与 PD3QN_DAG_FE 相同）
+
+规则标识为 `select_sr099_minenergy_v1`。每个训练回合结束后，仍在原验证种子上
+进行一次确定性验证。用总成功工作流数除以总工作流数得到成功率 S，
+用各验证实例的 total_energy 算术平均得到 E。成功指工作流在自身截止期内完成，
+不是任务成功率，也不是要求每个验证实例分别达到阈值。
+
+- S >= 0.99 的候选优先；其中 E 最低者为 best，E 相同时选 S 更高者。
+- 尚无达标模型时，选 S 最高者，S 相同时选 E 最低者。
+- 两项完全相同则保留较早回合，不重复替换。
+- 默认 seed600 的 50 个验证工作流，49/50=0.98 未达标，须 50/50 成功。
+  该阈值仅描述验证集，不能保证未知实例的总体成功概率。
+
+TA/HA/VA 的 best 在选中回合一起保存，共享 checkpoint_group。每层 checkpoint 的
+`normalization.mahdrl_as_fast` 记录算法版本、角色、选择规则、协议、训练源、
+验证种子、当前回合及其验证记录、历史 best 回合及其验证记录。加载时重算两组
+指标，检查三层保存组、回合和证据一致。`final` 始终是最后一回合的权重，
+历史 best 单独记录；将 final 文件改名为 best 也不能通过新评测校验。
+
+`validation_selection.jsonl` 逐回合记录候选、历史 best 和是否发生替换；
+`training_summary.json` 增加 selected_episode、best_validation_selection、
+final_validation_selection 和 feasible_model_found。episode 从 0 开始，
+completed_episodes 表示已完成回合数。选择不依赖可关闭的测量/诊断日志。
+运行元数据局部声明新规则，共享 F22 划分文件及其哈希保持不变，归一化尺度和
+截止期缓存可继续使用。显式 legacy 调试仍标记为 legacy，不宣称其数据集互斥。
+
+已有旧 best/final 权重仅能在现存权重之间重新比较；验证日志不能恢复未保存
+回合的模型，也不能据此声称找到了整个训练过程按新规则的最优模型。
 
 ## 加速措施
 
@@ -95,7 +126,10 @@ python -X utf8 -B -m algorithms.mahdrl_oe_ge_apf_score_fast.benchmark \
 测试覆盖随机/并列 APF、同/混合/空候选 batch、只读回放、缓存失效、完整回合
 观测/掩码/三层奖励/账本、GE 随机序列、完整训练回合参数一致性、CPU/CUDA
 正式宽度参数更新、终止无 bootstrap、保存的后继掩码、诊断关闭时的异常梯度、
-CUDA 事件收集、原 AS 权重兼容与组/源校验，以及训练→保存→加载→评测。
+CUDA 事件收集、旧权重拒绝与组/源校验，以及训练→保存→加载→评测。
+v2 增加与 PD3QN_DAG_FE 的选择规则等价性、0.99 边界、回退、并列保留、
+验证证据复核和三层选中回合一致性测试；通过受控验证结果的完整训练测试检查
+测量开关不影响最终训练权重、更新次数与 best 选择。
 
 本机 CPU/CUDA 测量数据与条件见 `MAHDRL_AS_Fast_benchmark_2026-10-26.json`。
 Python 3.12.10 / PyTorch 2.5.1+cu121 / NumPy 2.1.2，CPU 单线程，
@@ -112,7 +146,7 @@ CUDA 更新计时各 100 次，CPU 各 15 次，均排除前 3 次预热；
 短回合每个实现只测一次，因此只作本机运行检查。CPU batch 拼装自身约快
 12–15 倍，并不表示整个训练有同样的加速比。原版采用默认逐次详细诊断，
 Fast 采用默认每 100 次详细诊断，两版的分析器均关闭。
-28 项新旧联合测试全部通过，包括本机 CUDA 测试。
+该性能记录来自 v1 加速实现，未包含 v2 模型选择变更的正式训练费用测量。
 
 短回合测量为 2 个工作流、预填合成经验、warmup=0，使用正式网络和 batch=256，
 只测 rollout 与更新，不包含验证、checkpoint 和文件写入；不能直接视为

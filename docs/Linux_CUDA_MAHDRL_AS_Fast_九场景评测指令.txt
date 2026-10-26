@@ -1,3 +1,4 @@
+# v2选择：验证工作流总体成功率>=0.99后最小能耗；未达标按成功率优先，默认50个验证工作流须全部成功。
 # 加速版：详细诊断每100次采样；阶段计时写入stage_timings.jsonl。
 # Linux / Bash：MAHDRL-AS-Fast（共享候选打分 + APF）九种源场景
 # 从项目根目录、已激活的 Python/CUDA 环境执行。CUDA_VISIBLE_DEVICES=0 为服务器物理 GPU 0。
@@ -6,7 +7,7 @@
 # 每组可单独复制；按服务器显存分批运行。测量训练成本/调度延迟时避免多个进程争用同一GPU。
 # 正式运行前须具备匹配的新版Deadline Cache与F19训练源归一化配置；启动时会严格审计。
 # --dry-run 只预览参数和路径，不替代正式入口的缓存/尺度审计。
-# 输出使用独立mahdrl_as_fast_v1身份，不能覆盖原AS；不要在训练尚未完成时评测同一组best权重。
+# 输出使用独立mahdrl_as_fast_v2身份，不能覆盖原AS；不要在训练尚未完成时评测同一组best权重。
 # 以下仅评测九个同规模目标，每场景30实例（700-729），共270次实例评测。
 # 每条命令固定 --train-task S、--train-resource 和 --train-deadline，加载对应源场景的best三层模型。
 # 若需要任务规模泛化，可另将 --task S 改为M或L；所有 --train-* 仍保持原源模型，累计为27个目标场景。
@@ -14,45 +15,45 @@
 
 # MAHDRL-AS-Fast | 源SS/Tight -> 目标SS/Tight
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SS_Tight_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SS_Tight_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SS_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SS_Tight_model1.pid
 
 # MAHDRL-AS-Fast | 源SS/Medium -> 目标SS/Medium
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource S --deadline Medium --train-task S --train-resource S --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SS_Medium_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SS_Medium_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource S --deadline Medium --train-task S --train-resource S --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SS_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SS_Medium_model1.pid
 
 # MAHDRL-AS-Fast | 源SS/Loose -> 目标SS/Loose
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource S --deadline Loose --train-task S --train-resource S --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SS_Loose_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SS_Loose_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource S --deadline Loose --train-task S --train-resource S --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SS_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SS_Loose_model1.pid
 
 # MAHDRL-AS-Fast | 源SM/Tight -> 目标SM/Tight
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource M --deadline Tight --train-task S --train-resource M --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SM_Tight_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SM_Tight_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource M --deadline Tight --train-task S --train-resource M --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SM_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SM_Tight_model1.pid
 
 # MAHDRL-AS-Fast | 源SM/Medium -> 目标SM/Medium
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource M --deadline Medium --train-task S --train-resource M --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SM_Medium_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SM_Medium_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource M --deadline Medium --train-task S --train-resource M --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SM_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SM_Medium_model1.pid
 
 # MAHDRL-AS-Fast | 源SM/Loose -> 目标SM/Loose
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource M --deadline Loose --train-task S --train-resource M --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SM_Loose_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SM_Loose_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource M --deadline Loose --train-task S --train-resource M --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SM_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SM_Loose_model1.pid
 
 # MAHDRL-AS-Fast | 源SL/Tight -> 目标SL/Tight
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource L --deadline Tight --train-task S --train-resource L --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SL_Tight_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SL_Tight_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource L --deadline Tight --train-task S --train-resource L --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SL_Tight_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SL_Tight_model1.pid
 
 # MAHDRL-AS-Fast | 源SL/Medium -> 目标SL/Medium
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource L --deadline Medium --train-task S --train-resource L --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SL_Medium_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SL_Medium_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource L --deadline Medium --train-task S --train-resource L --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SL_Medium_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SL_Medium_model1.pid
 
 # MAHDRL-AS-Fast | 源SL/Loose -> 目标SL/Loose
 mkdir -p outputs/server_eval_logs
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource L --deadline Loose --train-task S --train-resource L --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_SL_Loose_model1.log 2>&1 &
-echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_SL_Loose_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource L --deadline Loose --train-task S --train-resource L --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda --diagnostics-every 100 --profile-mode sampled --profile-every 100 > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SL_Loose_model1.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_mahdrl_as_fast_v2_SL_Loose_model1.pid

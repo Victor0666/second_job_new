@@ -1,5 +1,6 @@
 """Identical D3QN math, initialization and replay sampling, with less host overhead."""
 import random
+from copy import deepcopy
 import numpy as np
 import torch
 from torch import nn
@@ -7,7 +8,8 @@ from torch.nn import functional as F
 from common.d3qn_agent_EXDehid import _polyak_update
 from common.f11 import validate_transition
 from algorithms.mahdrl_oe_ge_apf_score.agent import TAAgent as OriginalTA, SetD3QNAgent as OriginalSet
-from .config import APF, implementation_metadata
+from .config import APF, ALGORITHM, MODEL_VERSION, implementation_metadata
+from .selection import selection_metadata, validate_checkpoint_selection
 from .packing import frozen_array, frozen_observation, validate_observation, pack, to_device, collate
 from .diagnostics import FastDiagnostics
 from .profiling import StageProfiler
@@ -30,7 +32,28 @@ class FastLearner:
     def bind(self, scenario, role):
         super().bind(scenario, role)
         self.normalization_metadata["implementation"] = implementation_metadata()
+        self.selection_expectation = dict(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+            learner_role=role, checkpoint_selection=selection_metadata(), protocol=scenario.selection_protocol(),
+            model_seed=scenario.model_seed, source_train_scene=scenario.normalization_kwargs()['source_train_scene'],
+            validation_seeds=scenario.validation_seeds())
         return self
+
+    def save(self, path):
+        validate_checkpoint_selection(self.normalization_metadata.get('mahdrl_as_fast'), self.selection_expectation)
+        super().save(path)
+
+    def load(self, path, strict=True, require_learning_model=False):
+        checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+        if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get('normalization'), dict):
+            raise ValueError('Missing MAHDRL-AS-Fast v2 checkpoint normalization/selection metadata')
+        actual = checkpoint.get('normalization', {})
+        record = validate_checkpoint_selection(actual.get('mahdrl_as_fast'), self.selection_expectation)
+        for key in ('model_version', 'checkpoint_selection', 'experiment_protocol'):
+            if actual.get(key) != self.normalization_metadata.get(key):
+                raise ValueError('MAHDRL-AS-Fast checkpoint selection mismatch: ' + key)
+        super().load(path, strict=strict, require_learning_model=require_learning_model)
+        self.loaded_selection = deepcopy(record)
+        self.normalization_metadata['mahdrl_as_fast'] = deepcopy(record)
 
     def select_action(self, *args, deterministic=False, **kwargs):
         n = self._action_calls

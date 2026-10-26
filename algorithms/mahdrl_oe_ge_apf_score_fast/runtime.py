@@ -4,6 +4,7 @@ import csv
 from pathlib import Path
 import random
 import uuid
+from copy import deepcopy
 import numpy as np
 import torch
 from common.f11 import F11Logger, protect_training_outputs
@@ -14,7 +15,8 @@ from common.experiment_measurements import TrainingRecorder, EvaluationRecorder,
 from algorithms.mahdrl_oe.reward import finish_lower_phase, LowerRewardAudit
 from environments.mahdrl_oe_ge_apf_score_fast import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
 from .agent import TAAgent, SetD3QNAgent
-from .config import ALGORITHM, DISPLAY_NAME, TA_HIDDEN, learning_kwargs, variant_metadata, implementation_metadata
+from .config import ALGORITHM, DISPLAY_NAME, MODEL_VERSION, TA_HIDDEN, learning_kwargs, variant_metadata, implementation_metadata
+from .selection import selection_metadata, validation_selection, selection_key, validate_checkpoint_selection
 from .trace import SetDecisionTrace, snapshot_decision
 
 
@@ -85,10 +87,18 @@ def build_agents(scene):
     return agents
 
 
-def save_agents(agents, directory, kind):
+def save_agents(agents, directory, kind, *, episode, candidate, best, rows, best_rows):
+    records = {role: dict(deepcopy(agent.selection_expectation), checkpoint_kind=kind,
+        episode=episode, completed_episodes=episode+1, selected_episode=best['episode'],
+        validation_selection=deepcopy(candidate), best_validation_selection=deepcopy(best),
+        validation_rows=deepcopy(rows), best_validation_rows=deepcopy(best_rows))
+        for role, agent in agents.items()}
+    for role, agent in agents.items():
+        validate_checkpoint_selection(records[role], agent.selection_expectation)
     group = uuid.uuid4().hex
     for role, agent in agents.items():
         agent.checkpoint_group = group
+        agent.normalization_metadata['mahdrl_as_fast'] = records[role]
         name = f"best_{FILES[role]}.pth" if kind == "best" else f"{FILES[role]}_{kind}.pth"
         agent.save(str(Path(directory)/name))
 
@@ -99,6 +109,12 @@ def load_agents(scene):
         agent.load(str(scene.checkpoint_dir()/f"best_{FILES[role]}.pth"), require_learning_model=True)
     if len({a.loaded_group for a in agents.values()}) != 1:
         raise ValueError("TA/HA/VA checkpoints are from different saved groups")
+    records = [{key: value for key, value in a.loaded_selection.items() if key != 'learner_role'}
+               for a in agents.values()]
+    if any(record['checkpoint_kind'] != 'best' for record in records):
+        raise ValueError("Evaluation requires best checkpoints")
+    if any(record != records[0] for record in records[1:]):
+        raise ValueError("TA/HA/VA checkpoints have different selection evidence or episodes")
     return agents
 
 
@@ -193,7 +209,7 @@ def train(scene):
         write_json(directory/"implementation.json", implementation_metadata())
     recorder = TrainingRecorder(scene.log_dir(), scene, ALGORITHM, env, agents)
     f11 = F11Logger(scene.log_dir())
-    best = float("inf")
+    best, best_rows = None, None
     if agents["TA"].device.type == "cuda":
         torch.cuda.reset_peak_memory_stats(agents["TA"].device)
     try:
@@ -211,23 +227,45 @@ def train(scene):
                 for seed in scene.validation_seeds():
                     validation = build_env(scene, seed)
                     validation.reset()
-                    values.append(run_episode(validation, agents))
+                    result = run_episode(validation, agents)
+                    if result['wf_count'] != validation.workflows_per_episode:
+                        raise RuntimeError('Validation ended before all workflows arrived')
+                    values.append(dict(seed=int(seed), **{key: result[key] for key in
+                        ('total_energy', 'wf_count', 'wf_success_count', 'wf_success_rate')}))
                     append_json(scene.log_dir()/"stage_timings.jsonl", dict(episode=episode, scope="validation", seed=seed,
                         environment=validation.profiler.report()))
                     collect_validation(validation)
-                return float(np.mean([v["total_energy"] for v in values]))
-            energy = recorder.validation(validate)
+                return values
+            rows = recorder.validation(validate)
+            candidate = validation_selection(rows)
+            selected = best is None or selection_key(candidate) < selection_key(best)
+            if selected:
+                best = dict(candidate, episode=episode, completed_episodes=episode+1)
+                best_rows = deepcopy(rows)
+                save_agents(agents, scene.checkpoint_dir(), "best", episode=episode,
+                            candidate=candidate, best=best, rows=rows, best_rows=best_rows)
+            energy = candidate['mean_total_energy']
             append_json(scene.log_dir()/"episodes.jsonl", dict(episode=episode,
-                        instance_seed=scene.training_seed(episode), validation_energy=energy, **result))
+                        instance_seed=scene.training_seed(episode), validation_energy=energy,
+                        validation_selection=candidate, selected_as_best=selected,
+                        best_episode=best['episode'], **result))
+            append_json(scene.log_dir()/"validation_selection.jsonl", dict(algorithm=ALGORITHM,
+                model_version=MODEL_VERSION, checkpoint_selection=selection_metadata(), episode=episode,
+                instance_seed=scene.training_seed(episode), validation_rows=rows,
+                validation_selection=candidate, best_validation_selection=best,
+                selected_as_best=selected, selected_episode=best['episode']))
             write_json(scene.log_dir()/f"apf_episode{episode}.json", apf_report(env))
-            if energy < best:
-                best = energy
-                save_agents(agents, scene.checkpoint_dir(), "best")
             print(f"[{DISPLAY_NAME}] episode={episode+1}/{scene.episodes} energy={result['total_energy']:.6f} "
-                  f"validation_energy={energy:.6f}", flush=True)
-        save_agents(agents, scene.checkpoint_dir(), "final")
-        write_json(scene.log_dir()/"training_summary.json", dict(episodes=scene.episodes,
-            best_validation_energy=best, peak_cuda_allocated_bytes=(
+                  f"validation_energy={energy:.6f} SR={candidate['workflow_success_rate']:.4f} "
+                  f"feasible={candidate['feasible']} selected={selected} best_episode={best['episode']}", flush=True)
+        save_agents(agents, scene.checkpoint_dir(), "final", episode=episode,
+                    candidate=candidate, best=best, rows=rows, best_rows=best_rows)
+        write_json(scene.log_dir()/"training_summary.json", dict(algorithm=ALGORITHM,
+            model_version=MODEL_VERSION, episodes=scene.episodes, checkpoint_selection=selection_metadata(),
+            protocol=scene.selection_protocol(), selected_episode=best['episode'],
+            best_validation_selection=best, final_validation_selection=candidate,
+            feasible_model_found=best['feasible'], resume_supported=False,
+            best_validation_energy=best['mean_total_energy'], peak_cuda_allocated_bytes=(
                 torch.cuda.max_memory_allocated(agents["TA"].device) if agents["TA"].device.type == "cuda" else None),
             parameter_counts={r: sum(p.numel() for p in a.online.parameters()) for r,a in agents.items()}))
     finally:
@@ -272,6 +310,9 @@ def evaluate(scene):
     summary = {key: dict(mean=float(np.mean([v[key] for v in values])),
                         std=float(np.std([v[key] for v in values], ddof=1)) if len(values)>1 else 0.)
                for key in ("total_energy", "wf_success_rate", "wf_avg_tardiness", "makespan", "wf_avg_response_time")}
-    write_json(directory/"summary.json", dict(algorithm=ALGORITHM, seeds=list(scene.seeds), metrics=summary))
+    write_json(directory/"summary.json", dict(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+        checkpoint_selection=selection_metadata(), selected_episode=agents['TA'].loaded_selection['selected_episode'],
+        best_validation_selection=agents['TA'].loaded_selection['best_validation_selection'],
+        seeds=list(scene.seeds), metrics=summary))
     print(f"[MAHDRL-AS-Fast eval completed] results={directory.resolve()}")
     return summary

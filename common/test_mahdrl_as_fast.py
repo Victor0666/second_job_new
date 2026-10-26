@@ -1,10 +1,12 @@
 """AS-Fast regression: numerical equivalence, cache lifetime, guards and real CLI flow."""
 from contextlib import redirect_stdout
+from copy import deepcopy
 from dataclasses import replace
 import io
 import json
 from pathlib import Path
 import random
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -20,6 +22,7 @@ from environments.mahdrl_oe_ge_apf_score_fast import CloudWorkflowEnv_VMAgents a
 from algorithms.mahdrl_oe_ge_apf_score import agent as old, runtime as old_runtime
 from algorithms.mahdrl_oe_ge_apf_score.networks import collate as old_collate
 from algorithms.mahdrl_oe_ge_apf_score_fast import agent as fast, runtime
+from algorithms.mahdrl_oe_ge_apf_score_fast import selection
 from algorithms.mahdrl_oe_ge_apf_score_fast.packing import collate
 from algorithms.mahdrl_oe_ge_apf_score_fast.scenario import ScoreScenario, parse_scenario
 
@@ -29,6 +32,43 @@ def tiny_agents(scene, module=fast):
                   HA=module.SetD3QNAgent(23, 10, hidden_dims=(16, 8), entity_dims=(8, 8), batch_size=2, buffer_size=8, device="cpu"),
                   VA=module.SetD3QNAgent(30, 7, hidden_dims=(16, 8), entity_dims=(8, 8), batch_size=2, buffer_size=8, device="cpu"))
     return {role: a.bind(scene, role) for role, a in agents.items()}
+
+
+def validation_row(success=50, energy=100., count=50, seed=600):
+    return dict(seed=seed, wf_count=count, wf_success_count=success,
+                wf_success_rate=success/count, total_energy=energy)
+
+
+class SelectionTests(unittest.TestCase):
+    def test_matches_pd3qn_dag_fe_boundary_and_aggregate_definition(self):
+        from algorithms.pd3qn_dag_fe import selection as reference
+        self.assertEqual(selection.selection_metadata(), reference.selection_metadata())
+        self.assertIsNot(selection.validation_selection, reference.validation_selection)
+        for rows in ([validation_row(49)], [validation_row(50)],
+                     [validation_row(100, count=100), validation_row(98, count=100)],
+                     [validation_row(1, 10, 1), validation_row(98, 30, 100)]):
+            self.assertEqual(selection.validation_selection(rows), reference.validation_selection(rows))
+        self.assertFalse(selection.validation_selection([validation_row(49)])['feasible'])
+        self.assertTrue(selection.validation_selection([validation_row(50)])['feasible'])
+        self.assertTrue(selection.validation_selection([validation_row(99, count=100)])['feasible'])
+
+    def test_order_feasible_fallback_energy_success_and_earlier_ties(self):
+        def candidate(success, energy):
+            return selection.validation_selection([validation_row(success, energy, 100)])
+        key = selection.selection_key
+        for better, worse in (((99, 1000), (98, 1)), ((99, 10), (100, 11)),
+                              ((100, 10), (99, 10)), ((98, 100), (97, 1)), ((98, 1), (98, 2))):
+            self.assertLess(key(candidate(*better)), key(candidate(*worse)))
+        candidates = [candidate(98, 1), candidate(99, 10), candidate(99, 10)]
+        self.assertEqual(min(range(3), key=lambda i: key(candidates[i])), 1)
+
+    def test_reject_invalid_validation_metrics(self):
+        for rows in ([], [validation_row(-1)], [validation_row(51)],
+                     [validation_row(1, float('nan'))], [validation_row(1, -1)],
+                     [dict(validation_row(), wf_count=0)], [dict(validation_row(), wf_success_rate=.99)],
+                     [dict(validation_row(), wf_success_count=1.5)]):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                selection.validation_selection(rows)
 
 
 class FastTests(unittest.TestCase):
@@ -284,13 +324,21 @@ class FastTests(unittest.TestCase):
         agents[0].select_action(observation(3), np.ones(3), deterministic=True, count_step=False)
         self.assertEqual(before, agents[0].f11.numerics.snapshot())
 
-    def test_old_checkpoint_compatibility_strict_group_and_source(self):
+    def test_legacy_checkpoint_rejected_and_new_group_source_role_checked(self):
         scene = self.scene()
         with tempfile.TemporaryDirectory(dir=self.root) as directory:
             agents = tiny_agents(scene, old)
             old_runtime.save_agents(agents, directory, "best")
             target = replace(scene, mode="eval", train_resource="S", checkpoint_override=directory)
             with patch.object(runtime, "build_agents", side_effect=tiny_agents):
+                with self.assertRaisesRegex(ValueError, 'Missing MAHDRL-AS-Fast v2'):
+                    runtime.load_agents(target)
+                agents = tiny_agents(scene)
+                rows = [validation_row(seed=scene.validation_seeds()[0])]
+                candidate = selection.validation_selection(rows)
+                best = dict(candidate, episode=0, completed_episodes=1)
+                runtime.save_agents(agents, directory, 'best', episode=0, candidate=candidate,
+                                    best=best, rows=rows, best_rows=rows)
                 loaded = runtime.load_agents(target)
                 self.assertEqual(parameter_hash(agents), parameter_hash(loaded))
                 agents["TA"].checkpoint_group = "different"
@@ -303,6 +351,55 @@ class FastTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "source_train_scene"):
                 wrong.load(str(Path(directory)/"best_host.pth"))
 
+    def test_checkpoint_evidence_recomputed_and_cross_layer_episodes_checked(self):
+        scene = self.scene()
+        with tempfile.TemporaryDirectory(dir=self.root) as directory:
+            agents = tiny_agents(scene)
+            rows = [validation_row(seed=scene.validation_seeds()[0])]
+            candidate = selection.validation_selection(rows)
+            best = dict(candidate, episode=0, completed_episodes=1)
+            runtime.save_agents(agents, directory, 'best', episode=0, candidate=candidate,
+                                best=best, rows=rows, best_rows=rows)
+            path = Path(directory)/'best_host.pth'
+            checkpoint = torch.load(path, weights_only=True)
+            for field, value in (('model_version', 'mahdrl_as_fast_v1'),
+                                 ('checkpoint_selection', {}), ('experiment_protocol', {})):
+                changed = deepcopy(checkpoint)
+                changed['normalization'][field] = value
+                tampered = Path(directory)/'tampered.pth'
+                torch.save(changed, tampered)
+                with self.subTest(top_level=field), self.assertRaisesRegex(ValueError, field):
+                    agents['HA'].load(str(tampered))
+            for field, value in (('checkpoint_selection', {}), ('model_version', 'mahdrl_as_fast_v1'),
+                                 ('model_seed', 999), ('selected_episode', 1), ('episode', -1),
+                                 ('validation_selection', {}), ('validation_seeds', [999]),
+                                 ('validation_rows', [validation_row(seed=999)]), ('best_validation_rows', [])):
+                changed = deepcopy(checkpoint)
+                changed['normalization']['mahdrl_as_fast'][field] = value
+                tampered = Path(directory)/'tampered.pth'
+                torch.save(changed, tampered)
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    agents['HA'].load(str(tampered))
+            # A valid record from another episode must fail even with the same group ID.
+            changed = deepcopy(checkpoint)
+            record = changed['normalization']['mahdrl_as_fast']
+            record.update(episode=1, completed_episodes=2, selected_episode=1,
+                          best_validation_selection=dict(candidate, episode=1, completed_episodes=2))
+            torch.save(changed, path)
+            target = replace(scene, mode='eval', train_resource='S', checkpoint_override=directory)
+            with patch.object(runtime, 'build_agents', side_effect=tiny_agents):
+                with self.assertRaisesRegex(ValueError, 'different selection evidence or episodes'):
+                    runtime.load_agents(target)
+            # Renaming final files to best cannot make them a selected checkpoint.
+            runtime.save_agents(agents, directory, 'final', episode=1, candidate=candidate,
+                                best=best, rows=rows, best_rows=rows)
+            for role, name in runtime.FILES.items():
+                final = torch.load(Path(directory)/f'{name}_final.pth', weights_only=True)
+                torch.save(final, Path(directory)/f'best_{name}.pth')
+            with patch.object(runtime, 'build_agents', side_effect=tiny_agents):
+                with self.assertRaisesRegex(ValueError, 'requires best'):
+                    runtime.load_agents(target)
+
     def test_real_train_save_load_evaluate_and_measurements(self):
         with tempfile.TemporaryDirectory(dir=self.root) as directory:
             protocol = Path(directory)/"protocol.json"
@@ -314,6 +411,9 @@ class FastTests(unittest.TestCase):
             scales.write_text(json.dumps(config), encoding="utf-8")
             scene = self.scene(output_root=directory, legacy_split=False, experiment_protocol=str(protocol), normalization_config=str(scales))
             original_kwargs = runtime.build_env_kwargs
+            old_dir = Path(str(scene.checkpoint_dir()).replace('mahdrl_as_fast_v2', 'mahdrl_as_fast_v1'))
+            old_dir.mkdir(parents=True)
+            (old_dir/'historical.txt').write_text('keep v1 outputs', encoding='utf-8')
             def small(scene, seed):
                 return dict(original_kwargs(scene, seed), workflows_per_episode=2, max_ready_tasks=100)
             with patch.object(runtime, "build_agents", side_effect=tiny_agents), patch.object(runtime, "build_env_kwargs", side_effect=small):
@@ -334,6 +434,79 @@ class FastTests(unittest.TestCase):
             measurements = json.loads((scene.log_dir()/"training_measurements.jsonl").read_text().splitlines()[0])
             self.assertTrue(all(v > 0 for v in measurements["optimizer_steps"].values()))
             self.assertTrue((target.evaluation_dir()/"measurements/episodes/seed700.json").exists())
+            self.assertEqual((old_dir/'historical.txt').read_text(encoding='utf-8'), 'keep v1 outputs')
+
+    def test_real_training_selects_same_layer_snapshot_and_ignores_measurement_flags(self):
+        schedule = [(0, 1.), (1, 30.), (2, 100.), (1, 1.), (2, 80.), (2, 80.)]
+        self.check_selection_training(schedule, expected_episode=4, feasible=True, compare_disabled=True)
+
+    def test_training_without_feasible_model_uses_success_then_energy(self):
+        self.check_selection_training([(1, 100.), (1, 10.), (0, 1.)], expected_episode=1, feasible=False)
+
+    def check_selection_training(self, schedule, expected_episode, feasible, compare_disabled=False):
+        with tempfile.TemporaryDirectory(dir=self.root) as directory:
+            root = Path(directory)
+            protocol = root/'protocol.json'
+            protocol.write_text(json.dumps(dict(version='as_fast_selection_smoke_v1', train=list(range(len(schedule))),
+                validation=[600], test=[700], episodes=len(schedule), selection='minimum_validation_total_energy')), encoding='utf-8')
+            scales, cache = root/'scales.json', root/'cache.json'
+            config = fixture_config(scales)
+            config['generation'] = dict(**protocol_binding(protocol), calibration_seeds={key: [0] for key in config['scenes']})
+            scales.write_text(json.dumps(config), encoding='utf-8')
+            with redirect_stdout(io.StringIO()):
+                precompute(Scenario(mode='precompute', seed_spec=','.join(map(str, [*range(len(schedule)), 600, 700])), cache_output=str(cache)))
+            original_kwargs, original_episode = runtime.build_env_kwargs, runtime.run_episode
+            scene = self.scene(episodes=len(schedule), legacy_split=False, experiment_protocol=str(protocol),
+                normalization_config=str(scales), cache_file=str(cache), output_root=str(root/'enabled'))
+            def small(scene, seed):
+                return dict(original_kwargs(scene, seed), workflows_per_episode=2, max_ready_tasks=100)
+            results = []
+            for disabled in ([False, True] if compare_disabled else [False]):
+                actual = replace(scene, output_root=str(root/('disabled' if disabled else 'enabled')))
+                snapshots, validation_index = [], 0
+                def rollout(env, agents, **kwargs):
+                    nonlocal validation_index
+                    result = original_episode(env, agents, **kwargs)
+                    if kwargs.get('training', False):
+                        snapshots.append(parameter_hash(agents))
+                    else:
+                        successes, energy = schedule[validation_index]
+                        validation_index += 1
+                        result.update(total_energy=energy, wf_success_count=successes, wf_success_rate=successes/2)
+                    return result
+                flags = {'EXPERIMENT_METRICS': '0' if disabled else '1',
+                         'F11_DIAGNOSTICS': '0' if disabled else '1', 'F19_DIAGNOSTICS': '0' if disabled else '1'}
+                with patch.dict(os.environ, flags), patch.object(runtime, 'build_agents', side_effect=tiny_agents), \
+                     patch.object(runtime, 'build_env_kwargs', side_effect=small), patch.object(runtime, 'run_episode', side_effect=rollout):
+                    with redirect_stdout(io.StringIO()):
+                        trained = runtime.train(actual)
+                        target = replace(actual, mode='eval', seed_spec='700', train_resource='S', train_deadline='Tight')
+                        loaded = runtime.load_agents(target)
+                summary = json.loads((actual.log_dir()/'training_summary.json').read_text())
+                records = [json.loads(line) for line in (actual.log_dir()/'validation_selection.jsonl').read_text().splitlines()]
+                expected = min(records, key=lambda row: selection.selection_key(row['validation_selection']))['episode']
+                self.assertEqual(expected, expected_episode)
+                self.assertEqual(summary['selected_episode'], expected_episode)
+                self.assertEqual(summary['feasible_model_found'], feasible)
+                for i, record in enumerate(records):
+                    prefix_best = min(records[:i+1], key=lambda row: selection.selection_key(row['validation_selection']))
+                    self.assertEqual(record['selected_episode'], prefix_best['episode'])
+                    self.assertEqual(record['selected_as_best'], prefix_best['episode'] == i)
+                self.assertEqual(parameter_hash(loaded), snapshots[expected_episode])
+                self.assertEqual(parameter_hash(trained), snapshots[-1])
+                self.assertEqual({a.loaded_selection['episode'] for a in loaded.values()}, {expected_episode})
+                self.assertEqual(len({a.loaded_group for a in loaded.values()}), 1)
+                for role, name in runtime.FILES.items():
+                    final = torch.load(actual.checkpoint_dir()/f'{name}_final.pth', weights_only=True)
+                    record = final['normalization']['mahdrl_as_fast']
+                    self.assertEqual(record['episode'], len(schedule)-1)
+                    self.assertEqual(record['selected_episode'], expected_episode)
+                    self.assertEqual(record['checkpoint_kind'], 'final')
+                    selection.validate_checkpoint_selection(record, trained[role].selection_expectation)
+                results.append((snapshots, records, summary['best_validation_selection'],
+                                {role: a._updates for role, a in trained.items()}))
+            if compare_disabled:
+                self.assertEqual(results[0], results[1])
 
     def test_cli_modes_options_and_output_isolation(self):
         from algorithms.mahdrl_oe_ge_apf_score.scenario import ScoreScenario as OldScene
@@ -346,9 +519,18 @@ class FastTests(unittest.TestCase):
             row = json.loads(out.getvalue())
             self.assertEqual(row["algorithm"], "mahdrl_oe_ge_apf_score_fast")
             self.assertEqual(row["diagnostics_every"], 200)
+            self.assertEqual(row['model_version'], 'mahdrl_as_fast_v2')
+            self.assertEqual(row['checkpoint_selection'], selection.selection_metadata())
+            self.assertEqual(row['experiment_protocol']['selection'], selection.SELECTION_TAG)
         self.assertEqual(before, MODEL_NAMES)
         self.assertNotEqual(OldScene().checkpoint_dir(), ScoreScenario().checkpoint_dir())
         self.assertLess(len(str(ScoreScenario(mode="eval").evaluation_dir()/"measurements/episodes/seed700.json")), 260)
+        scene = self.scene(legacy_split=False)
+        metadata = scene.normalization_metadata()
+        self.assertEqual(metadata['experiment_protocol']['selection'], selection.SELECTION_TAG)
+        self.assertEqual(metadata['reproducibility']['data_split']['selection'], selection.SELECTION_TAG)
+        self.assertEqual(scene.protocol().selection, 'minimum_validation_total_energy')
+        self.assertIn('mahdrl_as_fast_v2', str(scene.checkpoint_dir()))
 
 
 if __name__ == "__main__":

@@ -44,6 +44,12 @@ class FEScenario(Scenario):
         return ROOT / 'outputs' / 'run' / ALGORITHM / self.model_name() / target
 
     @property
+    def evaluation_csv(self):
+        seeds = self.seed_spec.replace(',', '_')
+        return self.evaluation_dir / (f'eval_{ALGORITHM}_task{self.task}_res{self.resource}_'
+            f'{self.deadline}_model{self.model_seed}_seeds{seeds}.csv')
+
+    @property
     def output_version(self):
         return super().output_version + '_' + SELECTION_TAG
 
@@ -71,6 +77,7 @@ class FEScenario(Scenario):
             checkpoint_dir=str(self.checkpoint_dir()), training_log_dir=str(self.log_dir()))
         if self.mode == 'eval':
             result['evaluation_directory'] = str(self.evaluation_dir)
+            result['evaluation_csv'] = str(self.evaluation_csv)
         return result
 
 

@@ -1,0 +1,48 @@
+# Linux / Bash：PD3QN-FE 27场景共用评测指令
+# 在项目根目录、已激活的Python/CUDA环境运行。先完成对应源模型训练。
+# 每条独立后台命令依次评测task=S/M/L：原训练规模1个+任务规模泛化2个。
+# 源训练始终为task=S；resource和deadline在该组内固定，三个目标使用同一个best_pd3qn_fe.pth。
+# 九个源模型 × 三种目标任务规模 = 27个场景；每场景30个测试实例，共810次实例评测。
+# 每组生成三个独立结果目录（taskS/taskM/taskL），共享该源模型的SML控制台日志与PID。
+# 主CSV名包含目标场景与种子，例如eval_pd3qn_fe_taskS_resS_Loose_model1_seeds700-729.csv；另有summary_pd3qn_fe.json。
+# 逐组复制启动，按GPU资源安排并发；CUDA_VISIBLE_DEVICES=0可按服务器实际分配修改。
+# 任何一个目标失败时，该组停止。非空结果目录拒绝覆盖；相同SML控制台日志重跑会被覆盖。
+# 如果原S目标已经完成，将对应for task in S M L改为for task in M L，只补两个泛化目标。
+
+mkdir -p outputs/server_eval_logs
+
+# PD3QN-FE 评测 | 源SS/Tight -> SS、MS、LS / Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSS_Tight_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSS_Tight_SML_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SS/Medium -> SS、MS、LS / Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource S --deadline Medium --train-task S --train-resource S --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSS_Medium_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSS_Medium_SML_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SS/Loose -> SS、MS、LS / Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource S --deadline Loose --train-task S --train-resource S --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSS_Loose_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSS_Loose_SML_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SM/Tight -> SM、MM、LM / Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource M --deadline Tight --train-task S --train-resource M --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSM_Tight_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSM_Tight_SML_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SM/Medium -> SM、MM、LM / Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource M --deadline Medium --train-task S --train-resource M --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSM_Medium_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSM_Medium_SML_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SM/Loose -> SM、MM、LM / Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource M --deadline Loose --train-task S --train-resource M --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSM_Loose_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSM_Loose_SML_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SL/Tight -> SL、ML、LL / Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource L --deadline Tight --train-task S --train-resource L --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSL_Tight_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSL_Tight_SML_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SL/Medium -> SL、ML、LL / Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource L --deadline Medium --train-task S --train-resource L --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSL_Medium_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSL_Medium_SML_select_sr099_esp099_v1_model1_seeds700-729.pid
+
+# PD3QN-FE 评测 | 源SL/Loose -> SL、ML、LL / Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe/evaluate.py --task "$task" --resource L --deadline Loose --train-task S --train-resource L --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_sourceSL_Loose_SML_select_sr099_esp099_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_sourceSL_Loose_SML_select_sr099_esp099_v1_model1_seeds700-729.pid

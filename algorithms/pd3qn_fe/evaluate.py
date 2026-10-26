@@ -37,7 +37,7 @@ def evaluate(scenario):
     directory.mkdir(parents=True, exist_ok=True)
     rows = evaluate_instances(agent, scenario, scenario.seeds, split='test', kwargs=kwargs,
                               directory=directory / 'measurements')
-    path = directory / 'eval_pd3qn_fe.csv'
+    path = scenario.evaluation_csv
     with path.open('x', encoding='utf-8', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()

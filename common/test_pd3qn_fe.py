@@ -122,8 +122,23 @@ class IsolationTests(unittest.TestCase):
             self.assertFalse(result['agent']['paper_mode'])
             self.assertEqual(result['checkpoint_selection'], selection_metadata())
             self.assertEqual(result['experiment_protocol']['validation'], [600])
+            if mode == 'eval':
+                self.assertEqual(Path(result['evaluation_csv']).name,
+                    'eval_pd3qn_fe_taskS_resS_Tight_model1_seeds700-729.csv')
         with redirect_stdout(io.StringIO()), patch('sys.stderr', io.StringIO()), self.assertRaises(SystemExit):
             parse_scenario('train', ['--normalization-mode', PD3QN_UNITS, '--dry-run'])
+
+    def test_csv_filenames_distinguish_target_scenes_models_and_seeds(self):
+        scene = FEScenario(mode='eval')
+        names = {replace(scene, task=task, resource=resource, deadline=deadline).evaluation_csv.name
+                 for task in 'SML' for resource in 'SML' for deadline in ('Tight', 'Medium', 'Loose')}
+        self.assertEqual(len(names), 27)
+        loose = replace(scene, deadline='Loose')
+        self.assertEqual(loose.evaluation_csv.name,
+                         'eval_pd3qn_fe_taskS_resS_Loose_model1_seeds700-729.csv')
+        self.assertNotEqual(scene.evaluation_csv.name, replace(scene, model_seed=2).evaluation_csv.name)
+        self.assertEqual(replace(scene, seed_spec='700,702').evaluation_csv.name,
+                         'eval_pd3qn_fe_taskS_resS_Tight_model1_seeds700_702.csv')
 
     def test_all_checkpoint_provenance_reports_actual_selector(self):
         metadata = FEScenario(normalization_mode='legacy').normalization_metadata()
@@ -269,7 +284,7 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(rows[0]['seed'], 700)
         self.assertEqual(rows[0]['wf_count'], 50)
         self.assertEqual(summary['algorithm'], ALGORITHM)
-        self.assertTrue((self.eval_scene.evaluation_dir / 'eval_pd3qn_fe.csv').is_file())
+        self.assertTrue(self.eval_scene.evaluation_csv.is_file())
         self.assertTrue((self.eval_scene.evaluation_dir / 'measurements/episodes/seed700.json').is_file())
 
 

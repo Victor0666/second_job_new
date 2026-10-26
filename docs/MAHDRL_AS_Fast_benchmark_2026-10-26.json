@@ -1,0 +1,251 @@
+{
+  "cpu": {
+    "python": "3.12.10",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "numpy": "2.1.2",
+    "torch": "2.5.1+cu121",
+    "cuda": "12.1",
+    "device": "cpu",
+    "gpu": null,
+    "threads": 1,
+    "batch_size": 256,
+    "scope": "synthetic_replay_formal_network_widths; warmups_excluded; not_600_episode_training",
+    "diagnostics": "original_default_full_vs_fast_default_every100; profiler_off",
+    "pack": {
+      "equal6": {
+        "original": {
+          "median_ms": 5.21755003137514,
+          "mean_ms": 5.392898666517188,
+          "p95_ms": 6.404510006541379,
+          "repeats": 150
+        },
+        "fast": {
+          "median_ms": 0.3396999672986567,
+          "mean_ms": 0.347101332154125,
+          "p95_ms": 0.3665199968963861,
+          "repeats": 150
+        },
+        "speedup": 15.359289177640647
+      },
+      "mixed": {
+        "original": {
+          "median_ms": 5.345300072804093,
+          "mean_ms": 5.530082666470358,
+          "p95_ms": 6.041094980901105,
+          "repeats": 150
+        },
+        "fast": {
+          "median_ms": 0.43700000969693065,
+          "mean_ms": 0.44768200255930424,
+          "p95_ms": 0.49845500616356736,
+          "repeats": 150
+        },
+        "speedup": 12.231807675499091
+      }
+    },
+    "updates": {
+      "TA": {
+        "original": {
+          "median_ms": 17.92620006017387,
+          "mean_ms": 18.241719994693995,
+          "p95_ms": 19.693740003276616,
+          "repeats": 15
+        },
+        "fast": {
+          "median_ms": 17.362000071443617,
+          "mean_ms": 17.560293339192867,
+          "p95_ms": 18.854600028134882,
+          "repeats": 15
+        },
+        "speedup": 1.0324962554088586,
+        "final_weights_exact": true,
+        "losses_exact": true
+      },
+      "HA": {
+        "original": {
+          "median_ms": 98.02450006827712,
+          "mean_ms": 98.5863933339715,
+          "p95_ms": 101.94546007551253,
+          "repeats": 15
+        },
+        "fast": {
+          "median_ms": 89.01019999757409,
+          "mean_ms": 90.18081333488226,
+          "p95_ms": 98.32168990978971,
+          "repeats": 15
+        },
+        "speedup": 1.1012726639300745,
+        "final_weights_exact": true,
+        "losses_exact": true
+      },
+      "VA": {
+        "original": {
+          "median_ms": 111.62020009942353,
+          "mean_ms": 113.17530668651064,
+          "p95_ms": 126.4716200530529,
+          "repeats": 15
+        },
+        "fast": {
+          "median_ms": 99.09650008194149,
+          "mean_ms": 100.65642666692536,
+          "p95_ms": 106.16847991477697,
+          "repeats": 15
+        },
+        "speedup": 1.1263788328258453,
+        "final_weights_exact": true,
+        "losses_exact": true
+      }
+    },
+    "short_episode": {
+      "original": {
+        "median_ms": 11500.021600048058,
+        "updates": {
+          "TA": 17,
+          "HA": 54,
+          "VA": 54
+        }
+      },
+      "fast": {
+        "median_ms": 10120.569000020623,
+        "updates": {
+          "TA": 17,
+          "HA": 54,
+          "VA": 54
+        }
+      },
+      "speedup": 1.1363018818432662,
+      "resource": "S",
+      "workflows": 2,
+      "scope": "one_short_training_episode_with_synthetic_prefilled_replay_and_warmup0; excludes_setup_validation_and_IO",
+      "final_weights_exact": true,
+      "scheduling_metrics_exact": true
+    }
+  },
+  "cuda": {
+    "python": "3.12.10",
+    "platform": "Windows-10-10.0.19045-SP0",
+    "numpy": "2.1.2",
+    "torch": "2.5.1+cu121",
+    "cuda": "12.1",
+    "device": "cuda",
+    "gpu": "NVIDIA GeForce RTX 4060 Ti",
+    "threads": 1,
+    "batch_size": 256,
+    "scope": "synthetic_replay_formal_network_widths; warmups_excluded; not_600_episode_training",
+    "diagnostics": "original_default_full_vs_fast_default_every100; profiler_off",
+    "pack": {
+      "equal6": {
+        "original": {
+          "median_ms": 5.173499986995012,
+          "mean_ms": 5.362657996981094,
+          "p95_ms": 6.088520045159383,
+          "repeats": 150
+        },
+        "fast": {
+          "median_ms": 0.3376500098966062,
+          "mean_ms": 0.34312800426657003,
+          "p95_ms": 0.3488949791062623,
+          "repeats": 150
+        },
+        "speedup": 15.322078588356089
+      },
+      "mixed": {
+        "original": {
+          "median_ms": 5.270649970043451,
+          "mean_ms": 5.372694664789984,
+          "p95_ms": 5.933450028533114,
+          "repeats": 150
+        },
+        "fast": {
+          "median_ms": 0.4329500370658934,
+          "mean_ms": 0.45156599720939994,
+          "p95_ms": 0.5231500254012644,
+          "repeats": 150
+        },
+        "speedup": 12.173806487609278
+      }
+    },
+    "updates": {
+      "TA": {
+        "original": {
+          "median_ms": 6.534949992783368,
+          "mean_ms": 6.576496002962813,
+          "p95_ms": 7.513459946494549,
+          "repeats": 100
+        },
+        "fast": {
+          "median_ms": 4.442199948243797,
+          "mean_ms": 4.590353992534801,
+          "p95_ms": 5.498209962388501,
+          "repeats": 100
+        },
+        "speedup": 1.4711066743780703,
+        "final_weights_exact": true,
+        "losses_exact": true
+      },
+      "HA": {
+        "original": {
+          "median_ms": 18.94360000733286,
+          "mean_ms": 19.313422004925087,
+          "p95_ms": 20.91943008126691,
+          "repeats": 100
+        },
+        "fast": {
+          "median_ms": 6.529249949380755,
+          "mean_ms": 6.691175998421386,
+          "p95_ms": 7.796854979824275,
+          "repeats": 100
+        },
+        "speedup": 2.9013439758313284,
+        "final_weights_exact": true,
+        "losses_exact": true
+      },
+      "VA": {
+        "original": {
+          "median_ms": 18.75280000967905,
+          "mean_ms": 19.32754200301133,
+          "p95_ms": 22.159410041058436,
+          "repeats": 100
+        },
+        "fast": {
+          "median_ms": 6.989500019699335,
+          "mean_ms": 7.098279002821073,
+          "p95_ms": 8.406419976381585,
+          "repeats": 100
+        },
+        "speedup": 2.682995916278105,
+        "final_weights_exact": true,
+        "losses_exact": true
+      }
+    },
+    "short_episode": {
+      "original": {
+        "median_ms": 2473.837499972433,
+        "updates": {
+          "TA": 17,
+          "HA": 54,
+          "VA": 54
+        }
+      },
+      "fast": {
+        "median_ms": 1011.4442999474704,
+        "updates": {
+          "TA": 17,
+          "HA": 54,
+          "VA": 54
+        }
+      },
+      "speedup": 2.445846499012266,
+      "resource": "S",
+      "workflows": 2,
+      "scope": "one_short_training_episode_with_synthetic_prefilled_replay_and_warmup0; excludes_setup_validation_and_IO",
+      "final_weights_exact": true,
+      "scheduling_metrics_exact": true
+    }
+  },
+  "notes": [
+    "Measured on 2026-10-26; local Windows, one CPU thread, formal network widths and batch256.",
+    "Microbenchmarks are synthetic; short training episode has 2 workflows, prefilled synthetic replay, warmup0; no validation/checkpoint/IO.",
+    "Exact loss/weight equality was asserted. These timings are not full 600-episode server training results."
+  ]
+}

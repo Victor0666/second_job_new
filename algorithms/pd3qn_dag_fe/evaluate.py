@@ -11,12 +11,12 @@ if str(ROOT) not in sys.path:
 import numpy as np
 
 from algorithms.pd3qn_dag_fe import ALGORITHM, DISPLAY_NAME
+from algorithms.pd3qn_dag_fe.environment import CloudWorkflowEnv_DAG_FE
 from algorithms.pd3qn_dag_fe.runtime import (env_kwargs, evaluate_instances, load_best_checkpoint,
     make_agent, set_seed)
 from algorithms.pd3qn_dag_fe.scenario import parse_scenario
 from algorithms.pd3qn_dag_fe.selection import selection_metadata
 from common.f11 import protect_training_outputs
-from environments.pd3qn import CloudWorkflowEnv_PD3QN_Cost
 
 
 def evaluate(scenario):
@@ -25,7 +25,7 @@ def evaluate(scenario):
     kwargs = env_kwargs(scenario)
     kwargs['random_seed'] = scenario.seeds[0]
     set_seed(scenario.model_seed)
-    env = CloudWorkflowEnv_PD3QN_Cost(**kwargs)
+    env = CloudWorkflowEnv_DAG_FE(**kwargs)
     try:
         agent = make_agent(scenario, env)
     finally:

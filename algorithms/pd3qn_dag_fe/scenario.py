@@ -4,23 +4,23 @@ import argparse
 import json
 from pathlib import Path
 
-from algorithms.pd3qn.config import agent_kwargs
-from algorithms.pd3qn_dag_fe import ALGORITHM, DISPLAY_NAME
+from algorithms.pd3qn_dag_fe.config import agent_kwargs
+from algorithms.pd3qn_dag_fe import ALGORITHM, DISPLAY_NAME, MODEL_VERSION, OBSERVATION_LAYOUT, HEAD_LAYOUT
 from algorithms.pd3qn_dag_fe.selection import SELECTION_TAG, selection_metadata
 from common.experiment_protocol import DEFAULT_PROTOCOL, protocol_hash
-from common.f18_state_normalization import PD3QN_UNITS, DEFAULT_CONFIG
+from common.f18_state_normalization import CURRENT_VERSION, DEFAULT_CONFIG
 from common.scenarios import ROOT, SMALL_PROBABILITY, VM_COUNTS, Scenario
 from common.workflow_opt import ENERGY_ACCOUNTING
 
 
 @dataclass(frozen=True)
 class DAGFEScenario(Scenario):
-    normalization_mode: str = PD3QN_UNITS
+    normalization_mode: str = CURRENT_VERSION
 
     def __post_init__(self):
         super().__post_init__()
-        if self.normalization_mode != PD3QN_UNITS:
-            raise ValueError('PD3QN-DAG-FE requires the PD3QN-DAG fixed-unit observation')
+        if self.normalization_mode != CURRENT_VERSION:
+            raise ValueError('PD3QN-DAG-FE requires f19_shared_v1 calibration')
         if self.mode not in ('train', 'eval') or self.protocol() is None:
             raise ValueError('PD3QN-DAG-FE requires a fixed, disjoint experiment protocol')
 
@@ -30,7 +30,7 @@ class DAGFEScenario(Scenario):
         task = self.task if self.mode == 'train' else self.train_task
         resource = self.resource if self.mode == 'train' else (self.train_resource or self.resource)
         deadline = self.deadline if self.mode == 'train' else (self.train_deadline or self.deadline)
-        return (f'{ALGORITHM}_task{task}_res{resource}_model{self.model_seed}_{deadline}_'
+        return (f'{MODEL_VERSION}_task{task}_res{resource}_model{self.model_seed}_{deadline}_'
                 f'{self.normalization_mode}_p{protocol_hash(self.experiment_protocol)[:12]}_'
                 f'{ENERGY_ACCOUNTING}_{SELECTION_TAG}')
 
@@ -55,7 +55,7 @@ class DAGFEScenario(Scenario):
 
     @property
     def output_version(self):
-        return super().output_version + '_' + SELECTION_TAG
+        return MODEL_VERSION + '_' + OBSERVATION_LAYOUT + '_' + super().output_version + '_' + SELECTION_TAG
 
     def selection_protocol(self):
         metadata = self.protocol().metadata()
@@ -64,19 +64,24 @@ class DAGFEScenario(Scenario):
 
     def reproducibility_metadata(self):
         metadata = super().reproducibility_metadata()
-        metadata.update(algorithm=ALGORITHM, data_split=self.selection_protocol(),
+        metadata.update(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+                        observation_layout=OBSERVATION_LAYOUT, head_layout=HEAD_LAYOUT,
+                        data_split=self.selection_protocol(),
                         checkpoint_selection=selection_metadata())
         return metadata
 
     def normalization_metadata(self):
         metadata = super().normalization_metadata()
-        metadata.update(experiment_protocol=self.selection_protocol(),
+        metadata.update(model_version=MODEL_VERSION, observation_layout=OBSERVATION_LAYOUT,
+                        head_layout=HEAD_LAYOUT, experiment_protocol=self.selection_protocol(),
                         checkpoint_selection=selection_metadata())
         return metadata
 
     def describe(self, algorithm=ALGORITHM):
         result = super().describe()
-        result.update(algorithm=ALGORITHM, display_name=DISPLAY_NAME, agent=agent_kwargs(self),
+        result.update(algorithm=ALGORITHM, display_name=DISPLAY_NAME, model_version=MODEL_VERSION,
+            observation_layout=OBSERVATION_LAYOUT, input_dim=3 + 3 * sum(self.vms_per_host),
+            head_layout=HEAD_LAYOUT, agent=agent_kwargs(self),
             checkpoint_selection=selection_metadata(), experiment_protocol=self.selection_protocol(),
             checkpoint_dir=str(self.checkpoint_dir()), training_log_dir=str(self.log_dir()))
         if self.mode == 'eval':
@@ -92,7 +97,7 @@ def parse_scenario(mode, argv=None):
     parser.add_argument('--deadline', choices=SMALL_PROBABILITY, default='Tight')
     parser.add_argument('--model-seed', type=int, default=1)
     parser.add_argument('--experiment-protocol', default=str(DEFAULT_PROTOCOL))
-    parser.add_argument('--normalization-mode', choices=(PD3QN_UNITS,), default=PD3QN_UNITS)
+    parser.add_argument('--normalization-mode', choices=(CURRENT_VERSION,), default=CURRENT_VERSION)
     parser.add_argument('--normalization-config', default=str(DEFAULT_CONFIG))
     parser.add_argument('--device', choices=('cpu', 'cuda'), default=None)
     parser.add_argument('--dry-run', action='store_true')

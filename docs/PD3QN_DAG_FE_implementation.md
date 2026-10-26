@@ -1,67 +1,78 @@
-# PD3QN-DAG-FE：PD3QN-DAG 的可行性优先选模变式
+# PD3QN-DAG-FE v2：精简观测、共享校准和单成功率门槛
 
-PD3QN-DAG-FE（算法ID：`pd3qn_dag_fe`）在PD3QN-DAG基础上使用双99%选模规则。实现、测试和指令均为新增文件，不修改PD3QN、PD3QN-DAG、PD3QN-FE及公共环境、学习器或参数解析器。
+算法ID仍为 `pd3qn_dag_fe`，入口仍为 `algorithms/pd3qn_dag_fe/train.py`、`evaluate.py`。本次直接更新该算法，不新建其他算法ID；模型版本为 `pd3qn_dag_fe_v2`。修改只涉及该算法目录、专属测试和本文及两份专属运行指令，公共学习器、环境、参数解析器以及PD3QN、PD3QN-DAG、PD3QN-FE保持不变。
 
-## 学习过程
+## 网络与学习
 
-直接复用原PD3QN-DAG的环境、`D3QNAgent`和`agent_kwargs`，固定`paper_mode=True`。学习率0.01、折扣0.95、batch 128、回放容量10000；隐层1024/1024/512/512/256；PER无IS校正、MSE、无梯度裁剪，target最大合法Q构造目标。目标网络硬同步周期60，时钟每训练回合重置；warmup只要求回放达到batch 128，沿用原DAG的每决策更新顺序。
+- 共享网络保留五层 `1024/1024/512/512/256`，每层ReLU。
+- V头直接 `Linear(256,1)`，A头直接 `Linear(256,N_VM)`，取消两个头原有的额外256维隐层，保留 `V+A-mean(A)` 合成。
+- Adam、学习率0.01、折扣0.95、batch128、回放容量10000、无权MSE、无IS校正、无梯度裁剪。
+- PER指数0.6、正数项1e-6，新经验按自身TD误差入池；回放达到128条后每决策更新。
+- 探索率从1到0.05，按80000次训练决策衰减，验证和测试不计数。这里不是MAHDRL按成功更新次数衰减的时钟。
+- 目标按原论文式(29)取target网络下一状态最大合法Q；终止或空后继动作集不bootstrap。目标网络硬复制周期60，回合内决策时钟重置。
 
-观测固定为`pd3qn_units_v1`，含父数据与Host历史窗口，SS为112维。拒绝历史PD3QN的legacy/f18/f19观测；不需要F19训练校准文件。物理能耗、奖励系数、截止期生成和每实例50个工作流均复用原DAG。
+局部 `config.py` 明确固定论文学习设置，避免切换共享归一化后公共配置选到历史学习模式。`agent.py`继承公共学习器，仅替换本算法实例的两个输出头，并重建Adam使其绑定新参数；保留原网络对象上的数值诊断hook。SS在线网络参数为2,055,962。
 
-默认数据划分为F22：训练seed0–599、固定验证seed600、测试seed700–729。默认600回合、模型初始化种子1。仅支持互不重叠的固定协议。
+## 精简观测与共享归一化
 
-## 检查点选择
+布局版本 `task3_vm3_shared_v1`，顺序为：
 
-完全复用PD3QN-FE的纯选模函数，规则版本`select_sr099_esp099_v1`。每训练回合结束后确定性验证，不更新权重、回放或探索计数；验证前后恢复Python、NumPy、Torch CPU/CUDA随机状态和网络模式。
+1. 任务工作量、总输入数据量、任务子截止期减当前时间的Slack。
+2. 按VM顺序展平的剩余占用时间、算力、带宽。
 
-每实例成功率=按时完成工作流数/该实例工作流总数，未完成计失败。成功率不低于99%的实例占比为ESP；ESP不低于99%时模型可行。
+维度为 `3+3*N_VM`，资源S/M/L分别为78/153/228维。删除Ready数、独立当前时间、单独输出数据量、逐VM父数据分布和每Host的使用标记/历史空闲间隔。
 
-- 可行模型始终优于不可行模型；可行模型按验证平均总能耗更低、总体工作流成功率更高排序。
-- 尚无可行模型时，按ESP更高、总体成功率更高、平均总能耗更低排序。
+局部环境子类只更改观测构造；内部当前时间、输出数据、父任务位置和Host历史能耗账本继续用于原物理计算。FCFS/ERTF、空闲VM合法动作、父任务真实完成事件、同VM父子数据免传输、截止期、Host任务窗口能耗及奖励均保持。删去这些输入会减少信息，不能视为无损压缩或完整MDP观测。
+
+仅允许 `f19_shared_v1`，与MAHDRL使用同一源训练场景的冻结共享校准文件。MI、输入bits、Slack/占用时间、PC、BW分别除对应参考尺度；保留负Slack及大于1的合法值。不使用整体L2、旧固定单位或在线拟合。
+
+默认配置路径仍为 `outputs/f18_normalization_calibration/f18_shared_normalization_v1.json`，文件名中的F18表示兼容的尺度文件格式，输入编码版本为F19。正式入口校验场景、单位、文件hash及F22训练分区绑定。已完成的公共校准直接复用；缺失时先用既有校准工具准备，不生成临时替代值。泛化到M/L任务规模仍使用S源训练场景尺度，禁止用目标验证/测试实例重拟合。
+
+## 单成功率选模
+
+规则版本 `select_sr099_minenergy_v1`。每训练回合结束后确定性评估固定验证集：
+
+- 总体成功率 = 所有验证实例按时完成工作流数之和 / 工作流总数之和，未完成计失败。
+- 总体成功率不低于99%时，当前模型可行。不计算ESP，不要求每个实例分别达到99%。
+- 可行模型优于不可行模型；可行模型按平均实例总能耗更低、总体成功率更高排序。
+- 尚无可行模型时，按总体成功率更高、平均实例总能耗更低排序。
 - 只有严格更优才替换，完全平局保留较早检查点。
 
-总体成功率按验证集总成功数除以总工作流数；平均能耗按各实例总能耗取算术平均。当前固定验证集只有seed600的50个工作流，因此双99%实际要求50/50按时完成，ESP只能为0或1；它是经验指标，不构成总体概率保证。
+当前F22验证只有seed600的一个实例、50个工作流，因此可行实际要求50/50按时完成，当前验证集下新旧选模排序一致；多实例时两种规则可不同。经验成功率不构成总体概率保证。
 
-## 独立输出与加载
+默认训练0–599、验证600、测试700–729，600回合、模型种子1不变。验证恢复Python/NumPy/Torch CPU/CUDA随机状态与网络模式，不更新权重、回放和训练时钟。
 
-模型、日志、结果使用`pd3qn_dag_fe`专属目录，源训练场景、目标场景和模型种子分别标识。所有非空训练/评测目录均拒绝覆盖。
+## 输出、版本及兼容性
 
-- `best_pd3qn_dag_fe.pth`：最优可行模型，或尚无可行模型时的最优备用模型。
-- `pd3qn_dag_fe_final.pth`：最后回合模型。
-- `train_metrics_pd3qn_dag_fe_cost.csv`：逐回合训练指标、验证能耗、成功率、ESP、是否可行、是否选中及最佳回合。
-- `validation_selection.jsonl`：逐实例验证明细及完整选模记录，可独立复算。
-- `training_summary.json`：规则、数据划分、最佳回合和`feasible_model_found`。
+检查点和日志目录以 `pd3qn_dag_fe_v2_` 开头，含源场景、模型种子、F19编码、协议hash、能耗版本和新选模规则；与旧DAG-FE目录隔离。评测目录继续区分源模型与目标场景。
 
-沿用原Agent保存机制，基础学习实现标记仍为`pd3qn_dag_v1`，新变式身份、规则、源场景、模型种子、检查点角色、回合及验证结果独立保存在`normalization.pd3qn_dag_fe`。专属加载器在载入权重前校验这些元数据，拒绝原PD3QN、PD3QN-DAG、PD3QN-FE和错误规则的模型。既有DAG模型无法补回未保存的逐回合候选，正式比较需要在新目录重训；不支持恢复训练。
+- `best_pd3qn_dag_fe.pth`：最佳可行模型，或尚无可行模型时的最佳备用模型。
+- `pd3qn_dag_fe_final.pth`：最终回合模型。
+- `train_metrics_pd3qn_dag_fe_cost.csv`：训练指标、验证能耗/成功率/可行标记及选中记录，不再含eval_ESP。
+- `validation_selection.jsonl`：逐实例验证明细与可复算的选模记录。
+- `training_summary.json`：最佳回合、实际规则及feasible_model_found。
+- 主评测CSV保留场景化文件名，例如 `eval_pd3qn_dag_fe_taskS_resS_Loose_model1_seeds700-729.csv`。
 
-评测结果位于`outputs/run/pd3qn_dag_fe/<源模型标识>/<目标场景与种子>/`，主CSV名包含目标场景、模型种子和测试种子，例如`eval_pd3qn_dag_fe_taskS_resS_Loose_model1_seeds700-729.csv`；同目录还保存`summary_pd3qn_dag_fe.json`及工作流/时间测量明细。关闭公共测量日志不影响选模。
+复用公共序列化，基础学习步骤标记 `pd3qn_implementation` 仍为 `pd3qn_dag_v1`；当前模型版本、观测布局、线性头及选择规则分别写入normalization与专属元数据。加载前校验这些信息、源场景、模型种子、校准hash及网络维度，拒绝旧DAG-FE、其他算法与错误配置。输入和输出头结构已变，必须重新训练，不支持把旧权重改标签复用或恢复训练。训练/评测非空目录继续拒绝覆盖。
 
-## 运行
+## 运行与验证
 
-[九个源模型的600回合训练指令](Linux_CUDA_PD3QN_DAG_FE_600代训练指令.txt)包含9条独立后台命令；[27场景共用评测指令](Linux_CUDA_PD3QN_DAG_FE_27场景共用评测指令.txt)包含9条分组后台命令，每条依次评测S/M/L，得到1个原训练规模结果和2个泛化结果。每场景测试seed700–729，共27×30=810次实例评测。
-
-Windows单场景示例（项目根目录）：
-
-```powershell
-.\run.cmd algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --normalization-mode pd3qn_units_v1
-.\run.cmd algorithms/pd3qn_dag_fe/evaluate.py --task S --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --normalization-mode pd3qn_units_v1
-```
+[九源场景600回合训练指令](Linux_CUDA_PD3QN_DAG_FE_600代训练指令.txt)和[27场景分组评测指令](Linux_CUDA_PD3QN_DAG_FE_27场景共用评测指令.txt)已同步为v2/F19/单成功率门槛；每条分组评测依次获得S/M/L三个结果。
 
 Linux/CUDA单场景示例：
 
 ```bash
-python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --normalization-mode pd3qn_units_v1 --device cuda
-python -u launch.py algorithms/pd3qn_dag_fe/evaluate.py --task S --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --normalization-mode pd3qn_units_v1 --device cuda
+python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --normalization-mode f19_shared_v1 --device cuda
+python -u launch.py algorithms/pd3qn_dag_fe/evaluate.py --task S --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --normalization-mode f19_shared_v1 --device cuda
 ```
 
-追加`--dry-run`只预览身份、学习配置、划分和路径。正式入口检查对应公共截止期缓存；无需新增依赖或校准。显式`--device cuda`在CUDA不可用时退出。
-
-## 验证
+两入口支持 `--dry-run` 预览新配置与路径；正式运行需公共截止期缓存及源场景校准就绪。显式CUDA不可用时退出。
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest common.test_pd3qn_dag_fe -v
+.\.venv\Scripts\python.exe -m unittest common.test_pd3qn common.test_pd3qn_paper common.test_pd3qn_fe common.test_scenarios -v
 ```
 
-测试覆盖与原DAG配置一致、历史模式拒绝、双99%纯函数复用、九源模型与27目标路径隔离、数据分区，以及真实环境中的两回合训练、梯度更新、检查点保存加载和S/M/L三种任务规模评测。烟雾检查只把隐层改为16/16，保留batch128、容量10000、学习率0.01、折扣0.95和同步周期60；正式入口使用完整原DAG网络。短训练验证流程，不证明600回合的收敛或可行性。
+专属测试覆盖聚合99%边界、与原FE多实例选模差异、加权成功率、能耗/平局排序、共享归一化与论文学习参数解耦、78维观测、固定动作物理轨迹一致、完整五层线性头梯度更新、128条预热、真实两回合训练保存加载、旧版本拒绝及S/M/L任务泛化。测试校准仅为临时夹具，不写公共正式校准；两回合闭环使用16/16共享层，另有完整生产网络的一次实际更新。未启动正式600回合或CUDA长程实验。
 
-本次验证：新增专属9项测试全部通过；原PD3QN、PD3QN-DAG、PD3QN-FE及公共场景共49项回归测试全部通过。9条训练命令和9条S/M/L分组评测命令的36次参数展开、27个独立结果路径及Bash循环语法检查通过，9组源训练缓存预检查通过。实施前后所审计的390个既有算法、公共代码、配置和文档文件SHA-256全部一致；本次仅新增10个文件，未启动600回合正式实验。
+本次验证：16项专属测试、50项原PD3QN/PD3QN-DAG/PD3QN-FE及公共场景回归全部通过，Python语法与补丁格式检查通过。修改前后270个其他算法、公共源文件及配置的SHA-256均一致。

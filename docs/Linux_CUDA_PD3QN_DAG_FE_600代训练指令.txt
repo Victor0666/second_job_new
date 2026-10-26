@@ -1,45 +1,48 @@
 # Linux / Bash：PD3QN-DAG-FE 九个源场景600回合训练
 # 项目根目录、已激活的Python/CUDA环境运行；CUDA_VISIBLE_DEVICES=0按实际GPU分配调整。
 # task=S，resource=S/M/L × deadline=Tight/Medium/Loose，共9个源模型，model-seed=1。
-# PD3QN-DAG学习配置与固定单位观测pd3qn_units_v1；无需F19校准，使用既有公共Deadline Cache。
-# 双99%选模；每完成一回合固定验证seed600，训练seed0-599。
+# v2：论文学习参数、精简观测及线性V/A头；使用MAHDRL相同的f19_shared_v1源场景冻结校准和公共Deadline Cache。
+# 总体工作流成功率>=99%时可行，再选最低能耗；无可行模型时成功率优先。不计算ESP。验证seed600，训练seed0-599。
 # 每组独立后台启动，按GPU/CPU资源分批运行；非空训练目录拒绝覆盖，控制台同名日志重跑会覆盖。
 
 mkdir -p outputs/server_console_logs
 python launch.py common/f22_cache.py --all
+# 必须已有九个源训练场景的共享校准；与MAHDRL使用同一个--normalization-config文件。
+# 如尚未完成，先运行：python launch.py common/f18_calibrate_normalization.py --all-nine --seeds 101-130 --resume
+# 已完成的校准直接复用，不在验证或目标测试场景重新拟合。
 
 # PD3QN-DAG-FE 训练 | SS | Tight
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SS_Tight_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SS_Tight_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SS_Tight_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SS_Tight_v2_select_sr099_minenergy_v1_ep600_model1.pid
 
 # PD3QN-DAG-FE 训练 | SS | Medium
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SS_Medium_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SS_Medium_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SS_Medium_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SS_Medium_v2_select_sr099_minenergy_v1_ep600_model1.pid
 
 # PD3QN-DAG-FE 训练 | SS | Loose
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SS_Loose_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SS_Loose_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SS_Loose_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SS_Loose_v2_select_sr099_minenergy_v1_ep600_model1.pid
 
 # PD3QN-DAG-FE 训练 | SM | Tight
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SM_Tight_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SM_Tight_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SM_Tight_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SM_Tight_v2_select_sr099_minenergy_v1_ep600_model1.pid
 
 # PD3QN-DAG-FE 训练 | SM | Medium
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SM_Medium_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SM_Medium_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SM_Medium_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SM_Medium_v2_select_sr099_minenergy_v1_ep600_model1.pid
 
 # PD3QN-DAG-FE 训练 | SM | Loose
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SM_Loose_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SM_Loose_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SM_Loose_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SM_Loose_v2_select_sr099_minenergy_v1_ep600_model1.pid
 
 # PD3QN-DAG-FE 训练 | SL | Tight
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SL_Tight_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SL_Tight_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SL_Tight_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SL_Tight_v2_select_sr099_minenergy_v1_ep600_model1.pid
 
 # PD3QN-DAG-FE 训练 | SL | Medium
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SL_Medium_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SL_Medium_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SL_Medium_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SL_Medium_v2_select_sr099_minenergy_v1_ep600_model1.pid
 
 # PD3QN-DAG-FE 训练 | SL | Loose
-CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode pd3qn_units_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SL_Loose_select_sr099_esp099_v1_ep600_model1.log 2>&1 &
-echo $! > outputs/server_console_logs/pd3qn_dag_fe_SL_Loose_select_sr099_esp099_v1_ep600_model1.pid
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_dag_fe/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_dag_fe_SL_Loose_v2_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_dag_fe_SL_Loose_v2_select_sr099_minenergy_v1_ep600_model1.pid

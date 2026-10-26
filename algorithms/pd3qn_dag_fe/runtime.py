@@ -2,14 +2,14 @@
 import numpy as np
 import torch
 
-from algorithms.pd3qn.config import agent_kwargs
+from algorithms.pd3qn_dag_fe.config import agent_kwargs
 from algorithms.pd3qn_fe.runtime import env_kwargs, isolated_evaluation, set_seed
-from algorithms.pd3qn_dag_fe import ALGORITHM
+from algorithms.pd3qn_dag_fe import ALGORITHM, MODEL_VERSION, OBSERVATION_LAYOUT, HEAD_LAYOUT
+from algorithms.pd3qn_dag_fe.agent import DAGFEAgent
+from algorithms.pd3qn_dag_fe.environment import CloudWorkflowEnv_DAG_FE
 from algorithms.pd3qn_dag_fe.selection import selection_metadata, validation_selection
-from common.d3qn_agent_PER import D3QNAgent
 from common.experiment_measurements import EvaluationRecorder, collect_validation, episode_metrics
 from common.f18_state_normalization import bind_normalization
-from environments.pd3qn import CloudWorkflowEnv_PD3QN_Cost
 
 
 def make_agent(scenario, env):
@@ -18,7 +18,7 @@ def make_agent(scenario, env):
         raise ValueError('PD3QN-DAG-FE requires the PD3QN-DAG learner')
     obs, _ = env.reset()
     device = (scenario.paper_options or {}).get('device') or ('cuda' if torch.cuda.is_available() else 'cpu')
-    return bind_normalization(D3QNAgent(input_dim=int(obs.shape[0]),
+    return bind_normalization(DAGFEAgent(input_dim=int(obs.shape[0]),
         output_dim=int(env.action_space.n), device=torch.device(device), **settings), scenario)
 
 
@@ -30,7 +30,7 @@ def evaluate_instances(agent, scenario, seeds, split='validation', kwargs=None, 
     rows = []
     with isolated_evaluation(agent):
         for seed in seeds:
-            env = CloudWorkflowEnv_PD3QN_Cost(**dict(kwargs or env_kwargs(scenario), random_seed=int(seed)))
+            env = CloudWorkflowEnv_DAG_FE(**dict(kwargs or env_kwargs(scenario), random_seed=int(seed)))
             recorder = None
             try:
                 obs, _ = env.reset()
@@ -61,6 +61,7 @@ def evaluate_instances(agent, scenario, seeds, split='validation', kwargs=None, 
 def save_checkpoint(agent, path, scenario, episode, candidate, best, rows, role):
     # D3QNAgent.save already persists this dictionary; no shared serializer changes.
     agent.normalization_metadata['pd3qn_dag_fe'] = dict(algorithm=ALGORITHM,
+        model_version=MODEL_VERSION, observation_layout=OBSERVATION_LAYOUT, head_layout=HEAD_LAYOUT,
         checkpoint_selection=selection_metadata(), protocol=scenario.selection_protocol(),
         model_seed=scenario.model_seed, source_train_scene=scenario.normalization_kwargs()['source_train_scene'],
         episode=episode, completed_episodes=episode + 1, role=role,
@@ -71,7 +72,8 @@ def save_checkpoint(agent, path, scenario, episode, candidate, best, rows, role)
 def load_best_checkpoint(agent, path, scenario):
     obj = torch.load(path, map_location=agent.device, weights_only=True)
     metadata = obj.get('normalization', {}).get('pd3qn_dag_fe', {})
-    expected = dict(algorithm=ALGORITHM, checkpoint_selection=selection_metadata(),
+    expected = dict(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+        observation_layout=OBSERVATION_LAYOUT, head_layout=HEAD_LAYOUT, checkpoint_selection=selection_metadata(),
         protocol=scenario.selection_protocol(), model_seed=scenario.model_seed, role='best',
         source_train_scene=scenario.normalization_kwargs()['source_train_scene'])
     for key, value in expected.items():

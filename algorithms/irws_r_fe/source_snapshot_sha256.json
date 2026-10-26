@@ -1,0 +1,12 @@
+{
+  "algorithms\\irws_r\\config.py": "71b0c1af99162decbfe9847289b1fa8f537eb73bbad101fa398fb89072d9dca7",
+  "algorithms\\irws_r\\environment.py": "f15ce899b895111f00099b2eb54aa1cf87fb7b6813c9d331dc5c32a9c6a57fdb",
+  "algorithms\\irws_r\\evaluate.py": "3c19576784c02baf5fdfe8478ce3bfc79e85364c932d5691208be4fd73f4e9e4",
+  "algorithms\\irws_r\\learner.py": "8cb94f3ee7c872344e2d71a2e0ce2418aafcdaf96d585bbe4546190c7f30c54f",
+  "algorithms\\irws_r\\networks.py": "0faa3bc9e8b679109a8998c48a1cb36c1f00dfad126483555fbbbbd8278843ba",
+  "algorithms\\irws_r\\numerics.py": "6f4d146faab81b4b1234d9f97cb1d2c30a5ed6139c3dddc43b9e8661199e9bb6",
+  "algorithms\\irws_r\\runner.py": "eed69d406ccd897f5dc4f7fce294cecad78a9ec391d5302bcc696f3cd84efbbc",
+  "algorithms\\irws_r\\scenario.py": "4299fb52aa098d7c876accc9b8c66f7a0450ff16688f5cd935f910bf29aa95a4",
+  "algorithms\\irws_r\\train.py": "d94d577f8db82686a18feb2c6f0ed0a167b647be9901c46bdaeccf0ab3f8d261",
+  "algorithms\\irws_r\\__init__.py": "095131b08dd1e60a85e9c8f9cb439f8c8501000ba740b8e41c7e50f20bcd2296"
+}

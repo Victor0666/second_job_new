@@ -200,6 +200,9 @@ class F11Tests(unittest.TestCase):
         for cls, advance in ((Main, '_advance_until_decision_energy_only'), (Marl, '_advance_until_decision')):
             env = object.__new__(cls)
             env.host_ids = []
+            env.current_time = 0.
+            env.horizon = 1e9
+            env.ready_task_ids = []
             env._add_workflow_if_arrived = lambda: None
             env._has_decision_point = lambda: False
             env.event_heap = []

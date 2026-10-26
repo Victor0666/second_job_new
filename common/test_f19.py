@@ -63,14 +63,19 @@ class F19Tests(unittest.TestCase):
                 if kind=='mahdrl_fcfs':task=env._compute_block1(gid)[0]
                 else:
                     maps=env.host_vm_indices[0];mapping=list(maps)+[-1]*(env.max_vms_per_host-len(maps))
-                    task=env._build_local_obs(gid,0,mapping)[:12]
+                    task=env._build_local_obs(gid,0,mapping)[:4]
                 fields.append(task.copy())
             self.assertEqual(fields[0].shape,fields[1].shape)
+            if kind == 'marl':
+                # V4 has no I/O ratio; both encodings scale its four retained fields equally.
+                self.assertEqual(fields[0].shape,(4,))
+                np.testing.assert_array_equal(fields[0],fields[1])
+                continue
             expected=fields[0][3]/((2e9+3e9)/400.)
             self.assertAlmostEqual(fields[1][3],expected,places=5)
             np.testing.assert_array_equal(np.delete(fields[0],3),np.delete(fields[1],3))
             reference.append(fields[1][3])
-        self.assertEqual(reference[0],reference[1])
+        self.assertEqual(len(reference),1)
 
     def test_cli_default_version_and_old_override(self):
         from common.f18_state_normalization import PD3QN_UNITS

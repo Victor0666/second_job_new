@@ -42,19 +42,19 @@ class MARLQTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Missing'):
             agent._q(self.decision())
 
-    def test_critic_uses_one_sampled_successor_q_and_terminal_is_zero(self):
+    def test_critic_uses_actual_successor_q_and_terminal_is_zero(self):
         agent = self.agent()
         with torch.no_grad():
             agent.critic[0].weight.zero_(); agent.critic[0].bias.fill_(10)
             agent.critic[0].weight[0, 3] = 1000
             agent.actor[0].weight.zero_()
             agent.actor[0].bias.copy_(torch.log(torch.tensor([.75,.25])))
-        with patch.object(agent, 'sample_target_action', return_value=0) as sample, \
+        with patch.object(agent, 'select_action', side_effect=AssertionError('Extra action draw')), \
                 patch.object(agent, '_q', wraps=agent._q) as q:
-            tail = agent.sampled_q(np.ones(2), np.ones(2))
+            tail = agent.successor_q(self.decision(0))
             self.assertEqual(tail, 10)  # Neither the expectation 260 nor the maximum 1010.
-            sample.assert_called_once(); q.assert_called_once()
-        self.assertEqual(agent.sampled_q(np.ones(2), np.array([1,0])), 10)
+            q.assert_called_once()
+        self.assertEqual(agent.successor_q(self.decision(1)), 1010)
         self.assertTrue(all(p.grad is None for p in (*agent.actor.parameters(), *agent.critic.parameters())))
         agent.update_critic(self.decision(), -2, tail)
         self.assertAlmostEqual(agent.f11.snapshot()['target_mean'], 7, places=4)
@@ -62,19 +62,19 @@ class MARLQTests(unittest.TestCase):
         agent.update_critic(self.decision(), -2)
         self.assertEqual(agent.f11.snapshot()['target_mean'], -2)
 
-    def test_target_action_samples_policy_probabilities_and_respects_mask(self):
+    def test_behavior_samples_policy_probabilities_and_respects_mask(self):
         agent = self.agent()
         with torch.no_grad():
             agent.actor[0].weight.zero_()
             agent.actor[0].bias.copy_(torch.log(torch.tensor([.75,.25])))
         with torch.random.fork_rng():
             torch.manual_seed(31)
-            draws = [agent.sample_target_action(np.ones(2), np.ones(2)) for _ in range(512)]
+            draws = [agent.select_action(np.ones(2), np.ones(2)) for _ in range(512)]
             self.assertTrue(.15 < np.mean(draws) < .35)  # Policy sampling, not argmax or uniform.
             for _ in range(8):
-                self.assertEqual(agent.sample_target_action(np.ones(2), np.array([0,1])), 1)
+                self.assertEqual(agent.select_action(np.ones(2), np.array([0,1])), 1)
 
-    def test_global_sample_queries_one_local_and_one_q_without_behavior_draw(self):
+    def test_global_successor_reads_actual_pair_without_local_policy_query(self):
         agent = self.agent(peer=2)
         with torch.no_grad():
             agent.actor[0].weight.zero_()
@@ -83,28 +83,24 @@ class MARLQTests(unittest.TestCase):
             agent.critic[0].weight[0,3] = 4
             agent.critic[0].weight[0,5] = 10
         locals = IndependentLocalAgents(2,2,2,QConfig(hidden_dims=()))
-        def sample_peer(host_index):
-            self.assertEqual(host_index, 1)
-            return locals.agents[host_index].sample_target_action(np.ones(2), np.array([0,1]))
-        with patch.object(locals.agents[0], 'sample_target_action', side_effect=AssertionError('Unselected Local queried')), \
-                patch.object(locals.agents[1], 'sample_target_action', wraps=locals.agents[1].sample_target_action) as local_draw, \
+        with patch.object(locals.agents[0], 'select_action', side_effect=AssertionError('Local queried')), \
+                patch.object(locals.agents[1], 'select_action', side_effect=AssertionError('Local queried')), \
                 patch.object(agent, '_q', wraps=agent._q) as q, \
-                patch.object(agent, 'select_action', side_effect=AssertionError('Behavior draw used for target')):
+                patch.object(agent, 'select_action', side_effect=AssertionError('Extra Global draw')):
             rng = torch.get_rng_state().clone()
-            tail = agent.sampled_q(np.ones(2), np.array([0,1]), sample_peer)
+            tail = agent.successor_q(self.decision(1, 1))
             self.assertEqual(tail, 16)
-            self.assertFalse(torch.equal(rng, torch.get_rng_state()))
-            local_draw.assert_called_once(); q.assert_called_once()
-        for candidate, peer in ((agent, None), (self.agent(), sample_peer)):
-            with self.assertRaises(ValueError): candidate.sampled_q(np.ones(2), np.ones(2), peer)
-        with self.assertRaises(ValueError): agent.sampled_q(np.ones(2), np.ones(2), lambda h: 2)
+            self.assertTrue(torch.equal(rng, torch.get_rng_state()))
+            q.assert_called_once()
+        with self.assertRaises(ValueError): agent.successor_q(self.decision(1))
+        self.assertFalse(hasattr(agent, 'sample_target_action'))
+        self.assertFalse(hasattr(agent, 'sampled_q'))
 
     def test_terminal_trace_has_no_successor_sampling(self):
         agent = self.agent(peer=2)
         trace = QDecisionTrace(agent)
         trace.record(self.decision(0,1), -2)
-        with patch.object(agent, 'sampled_q', side_effect=AssertionError('Terminal bootstrap sampled')), \
-                patch.object(agent, 'sample_target_action', side_effect=AssertionError('Terminal action sampled')):
+        with patch.object(agent, 'successor_q', side_effect=AssertionError('Terminal bootstrap')):
             trace.finish()
         self.assertEqual(agent.f11.snapshot()['target_mean'], -2)
 
@@ -128,7 +124,7 @@ class MARLQTests(unittest.TestCase):
                 patch.object(agent, 'update_actor', side_effect=actor):
             trace.record(self.decision(), -2)
             self.assertEqual(events, [])
-            trace.advance(np.ones(2), np.ones(2))
+            trace.advance(self.decision())
             self.assertEqual(events, ['critic','actor'])
             trace.record(self.decision(1), -3)
             trace.finish(); trace.finish()
@@ -179,10 +175,10 @@ class MARLQTests(unittest.TestCase):
         ta, tb = QDecisionTrace(a), QDecisionTrace(b)
         d = self.decision()
         ta.record(d, -2)
-        tb.advance(d.obs, d.mask); tb.record(d, -3)
+        tb.advance(d); tb.record(d, -3)
         self.assertEqual(a.f11.transitions, 0)
         self.assertIsNotNone(ta.pending)
-        ta.advance(d.obs, d.mask); ta.record(self.decision(1), -4)
+        ta.advance(d); ta.record(self.decision(1), -4)
         self.assertEqual(a.f11.nonterminal, 1)
         self.assertEqual(b.f11.transitions, 0)
         ta.finish(); tb.finish()
@@ -206,7 +202,7 @@ class MARLQTests(unittest.TestCase):
             self.assertTrue(restored.actor_optim.state); self.assertTrue(restored.critic_optim.state)
             for path, agent in ((gp, restored), (lp, restored_l)):
                 old = torch.load(path, weights_only=True)
-                for version in ('marl_q_v2','marl_independent_q_v2','marl_independent_q_v1'):
+                for version in ('marl_q_v3','marl_q_v2','marl_independent_q_v2','marl_independent_q_v1'):
                     old['model_version'] = version
                     torch.save(old, path)
                     before = path.read_bytes()
@@ -223,7 +219,7 @@ class MARLQTests(unittest.TestCase):
 
     def test_output_identity_separates_legacy_models_sources_and_evaluation_scenes(self):
         self.assertEqual(DISPLAY_NAME, 'MARL-Q')
-        self.assertEqual(MODEL_VERSION, 'marl_q_v3')
+        self.assertEqual(MODEL_VERSION, 'marl_q_v4')
         scene = Scenario()
         root = Path('verification-root').resolve()
         directory = evaluation_directory(scene, root)
@@ -294,19 +290,21 @@ class MARLQTests(unittest.TestCase):
             workflows_per_episode=1, deadline_mode='poisson_heftlike',
             dump_deadlines=False, print_deadlines=False)
         env.reset(seed=2)
-        env.vm_available_at = np.array([env.current_time+10, 0, 0, env.current_time+10])
+        env.vm_running_task[:] = [0, -1, -1, 1]
+        env._host_running_pc = {0:1., 1:4.}
         a, ma = env.get_global_state()
-        env.vm_available_at = np.array([0, env.current_time+10, env.current_time+10, 0])
+        env.vm_running_task[:] = [-1, 0, 1, -1]
+        env._host_running_pc = {0:4., 1:1.}
         b, mb = env.get_global_state()
-        self.assertEqual(a.shape, (22+5*2,))
-        self.assertFalse(np.array_equal(a[-10:], b[-10:]))
+        self.assertEqual(a.shape, (5+2*2,))
+        self.assertFalse(np.array_equal(a[-4:], b[-4:]))
         np.testing.assert_array_equal(ma, mb)
         local, mask, _ = env.get_local_state(env.host_ids[0])
-        self.assertEqual(local.shape, (27+5*2,))
+        self.assertEqual(local.shape, (4+3*2,))
         self.assertEqual(len(local), env.local_obs_dim)
-        np.testing.assert_array_equal(local[5:8], np.zeros(3))
+        np.testing.assert_array_equal(local[:4], b[:4])
 
-    def test_global_matches_mahdrl_ha_on_same_physical_state(self):
+    def test_retained_task_payload_matches_shared_instance(self):
         from common.precompute_deadlines import main as precompute
         from common.test_f18 import fixture_config
         from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents
@@ -326,10 +324,10 @@ class MARLQTests(unittest.TestCase):
             ma = CloudWorkflowEnv_VMAgents(**kwargs,deadline_alpha_small_prob=.8)
             with redirect_stdout(io.StringIO()): ma.reset(); marl.reset(seed=0)
             tid = marl._cur_task_gid
-            np.testing.assert_allclose(marl.get_global_state()[0],ma._build_host_obs_for_task(tid)[0],rtol=1e-6,atol=1e-6)
-            # Global construction must leave Local's historical features alone.
+            np.testing.assert_allclose(marl.get_global_state()[0][:3],ma._build_host_obs_for_task(tid)[0][:3],rtol=1e-6,atol=1e-6)
+            # The retained task payload is shared, but V4 no longer copies HA's layout.
             local = marl.get_local_state(marl.host_ids[0])[0]
-            np.testing.assert_array_equal(local[5:8],np.zeros(3))
+            self.assertEqual(local.shape, (31,))
             marl.get_global_state()
             np.testing.assert_array_equal(local,marl.get_local_state(marl.host_ids[0])[0])
 

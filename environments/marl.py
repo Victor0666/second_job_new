@@ -1,26 +1,14 @@
 # -*- coding: utf-8 -*-
 """
-b_marl_FCFS/env_marl.py
+MARL-Q V4：Host/VM FIFO 排队与精简观测。
 
-MARL 环境（两级）对齐 HRL0.75 公平口径版：
-
-对齐点（A-H）：
-A) deadline_mode=cache_fcfs：wf.deadline = arrival + alpha * makespan_ref（来自离线 FCFS+VM-first cache JSON）
-B) exec_time_components + parents_loc：考虑仅同 VM 近似零传输
-C) idle energy：时间推进时写入 host 的 0-load LoadRecord 段
-D) reset(seed) 绑定 RNG；payload seed = episode_seed + wf_index_in_episode
-E) get_episode_metrics()：统一输出能耗/工期/迟交等指标
-F) budget：训练脚本按 assignment steps 控制（env 每 step 一个任务分配）
-G) eval seeds：训练脚本控制
-H) alpha_delay=0.75（默认）
-
-新增强制需求：
-- wf 级 ddl + task 级 ddl：每个 workflow 到达时打印，并写入 txt + jsonl 文件
-- 支持混合 ddlAlpha：每个 workflow 独立采样 ddlAlpha，再计算
-    wf.deadline = arrival + ddlAlpha_i * makespan_ref
+只调度 Ready 任务，忙 VM 接受非抢占预约，Queued 不计入运行负载。
+复用公共任务、通信、LF 子截止期和 Host 任务窗口能耗定义。
+固定源训练尺度；Global=task4+ready1+host2H，Local=task4+vm3M。
+工作流截止期沿用离线 FCFS 参考缓存及配对混合 alpha，不改奖励公式。
 """
 
-from common.f18_state_normalization import checked_observation, load_normalizer, queue_features
+from common.f18_state_normalization import checked_observation, load_normalizer, observe_rr
 
 import os
 import json
@@ -44,10 +32,6 @@ from common.workflow_opt import (
 )
 from common.read_xml_opt_Tsize import validate_cached_instance, load_workflow_from_dax, poisson_arrival_times, dax_template_id
 from common.resource_opt import create_cluster
-
-
-def _safe_div(a, b, eps=1e-9):
-    return float(a) / float(b if abs(b) > eps else (eps if b >= 0 else -eps))
 
 
 class CloudWorkflowEnv_MARL(gym.Env):
@@ -164,15 +148,14 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         self.max_ready = int(max_ready_tasks) if max_ready_tasks is not None else 64
 
-        # MAHDRL HA layout: task(12), queue(10), per-Host resources(5H).
-        self.global_obs_dim = 22 + 5 * self.num_hosts
+        # V4: task(4), Ready count(1), mean speed/utilization per Host(2H).
+        self.global_obs_dim = 5 + 2 * self.num_hosts
         self.global_act_dim = self.num_hosts
 
-        # 局部观测：task(12)+queue(10)+host(5)+vm(5*max_vms_per_host)
-        self.block_task_dim = 12
-        self.block_queue_dim = 10
-        self.block_host_dim = 5
-        self.vm_feat_dim = 5
+        self.block_task_dim = 4
+        self.block_queue_dim = 0
+        self.block_host_dim = 0
+        self.vm_feat_dim = 3
         self.local_obs_dim = (
             self.block_task_dim
             + self.block_queue_dim
@@ -313,7 +296,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         """
         一个决策步：
         1) Global：为“当前任务(FCFS)”选择 Host（必须 host_mask=1）
-        2) Local：在该 Host 内选 idle VM slot
+        2) Local：在该 Host 内选真实 VM，忙 VM 按 FIFO 排队
         3) 分配 -> 推进到下一个决策点 -> 计算能耗差分 + 延迟差分奖励
         """
         if self.done_flag:
@@ -337,12 +320,9 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         gmask = self._global_mask()
         if host_action < 0 or host_action >= self.num_hosts or gmask[host_action] <= 0.5:
-            valid_hosts = np.flatnonzero(gmask > 0.5)
-            host_action = int(valid_hosts[0]) if valid_hosts.size > 0 else 0
+            raise ValueError('Invalid MARL Host action')
         host_id = int(self.host_ids[int(host_action)])
         host_index = int(host_action)
-
-        self.host_pending_tasks[host_id].append(tid)
 
         lobs, lmask, vm_map = self.get_local_state(host_id)
         if len(vm_map) == 0:
@@ -351,11 +331,11 @@ class CloudWorkflowEnv_MARL(gym.Env):
             return {"global_obs": gobs2, "global_mask": gmask2}, float(rE_total), float(rE_total), bool(self.done_flag), {}
 
         if vm_action < 0 or vm_action >= self.local_act_dim or lmask[vm_action] <= 0.5:
-            valid = np.flatnonzero(lmask > 0.5)
-            vm_action = int(valid[0]) if valid.size > 0 else 0
+            raise ValueError('Invalid MARL VM action')
 
         vm_index_global = int(vm_map[int(vm_action)])
         vm_id = int(self.vm_ids[vm_index_global])
+        self.host_pending_tasks[host_id].append(tid)
 
         end_time = self._assign_task_to_vm(tid, vm_index_global)
 
@@ -453,7 +433,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         mask = np.zeros((self.local_act_dim,), dtype=np.float32)
         for slot, vmg in enumerate(vm_map):
-            if vmg >= 0 and self.vm_available_at[vmg] <= self.current_time + 1e-9:
+            if vmg >= 0:
                 mask[slot] = 1.0
 
         return obs.astype(np.float32), mask.astype(np.float32), vm_map
@@ -545,6 +525,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         self.event_heap: List[Tuple[float, str, int, int]] = []
         self.vm_available_at = np.zeros(self.num_vms, dtype=np.float64)
+        # available_at is the reservation tail, not the instantaneous running load.
+        self.vm_running_task = np.full(self.num_vms, -1, dtype=np.int64)
 
         self.completed_workflows = 0
         self.wf_remaining_tasks: Dict[int, int] = {}
@@ -578,17 +560,16 @@ class CloudWorkflowEnv_MARL(gym.Env):
     # decision point
     # =========================================================
     def _has_decision_point(self) -> bool:
-        return (len(self.ready_task_ids) > 0) and np.any(self._vm_idle_mask())
+        return len(self.ready_task_ids) > 0
 
     def _vm_idle_mask(self):
-        return self.vm_available_at <= self.current_time + 1e-9
+        return self.vm_running_task < 0
 
     def _global_mask(self):
         mask = np.zeros((self.num_hosts,), dtype=np.float32)
-        vm_idle = self._vm_idle_mask()
         for hi, h in enumerate(self.host_ids):
             idxs = self.host_vm_indices[h]
-            if any(vm_idle[j] for j in idxs):
+            if idxs:
                 mask[hi] = 1.0
         return mask
 
@@ -721,7 +702,12 @@ class CloudWorkflowEnv_MARL(gym.Env):
         rE_host_acc = {h: 0.0 for h in self.host_ids}
 
         while True:
+            self._process_finish_events()
             self._add_workflow_if_arrived()
+
+            if self._episode_should_end() or self.current_time >= self.horizon:
+                self.done_flag = True
+                break
 
             if self._has_decision_point():
                 self._no_event_streak = 0
@@ -741,26 +727,12 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 raise RuntimeError("Unfinished MARL episode has no arrival/completion event")
 
             next_t = min(next_times)
-            if next_t <= self.current_time + 1e-12:
-                next_t = self.current_time + 1e-9
-
-            self.current_time = float(next_t)
+            self.current_time = float(min(next_t, self.horizon))
 
             r0, rb = self._energy_rewards_to_current_time()
             rE_total_acc += r0
             for h in self.host_ids:
                 rE_host_acc[h] += rb[h]
-
-            self._process_finish_events()
-
-            if self._has_decision_point():
-                self._no_event_streak = 0
-                self._update_current_task_fcfs()
-                break
-
-            if self._episode_should_end() or self.current_time >= self.horizon:
-                self.done_flag = True
-                break
 
         return float(rE_total_acc), rE_host_acc
 
@@ -811,8 +783,6 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
             pc_mean = float(np.mean([self.vms[v].pc for v in self.vms])) if len(self.vms) > 0 else 1.0
             bw_mean = float(np.mean([self.vms[v].bw for v in self.vms])) if len(self.vms) > 0 else 1.0
-            wf.compute_upward_ranks(pc_mean, bw_mean)
-            wf.compute_downward_ranks(pc_mean, bw_mean)
 
             self.wf_remaining_tasks[wf_id] = len(tasks)
 
@@ -884,23 +854,18 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
     def _process_finish_events(self):
         while len(self.event_heap) > 0 and self.event_heap[0][0] <= self.current_time + 1e-12:
-            _, etype, gid, vm_index_global = heapq.heappop(self.event_heap)
-            if etype != "finish":
+            event_time, etype, gid, vm_index_global = heapq.heappop(self.event_heap)
+            vm = self.vms[self.vm_ids[vm_index_global]]
+            host_id = int(vm.host_id)
+            if etype == 'start':
+                self._start_task(gid, vm_index_global)
                 continue
-
-            self.task_state[gid] = "Finished"
-            self.task_end_time[gid] = self.current_time
-
-            try:
-                vm_id_done = int(self.vm_ids[int(vm_index_global)])
-                host_id_done = int(self.vms[vm_id_done].host_id)
-                pc_done = float(self.vms[vm_id_done].pc)
-                new_pc = float(self._host_running_pc.get(host_id_done, 0.0) - pc_done)
-                if new_pc < 0.0:
-                    new_pc = 0.0
-                self._host_running_pc[host_id_done] = new_pc
-            except Exception:
-                pass
+            if etype != 'finish' or self.vm_running_task[vm_index_global] != gid:
+                raise RuntimeError('Invalid MARL VM execution event')
+            self.task_state[gid] = 'Finished'
+            self.task_end_time[gid] = float(event_time)
+            self.vm_running_task[vm_index_global] = -1
+            self._host_running_pc[host_id] -= float(vm.pc)
 
             wf_id, local_tid = self.task_meta[gid]
 
@@ -928,6 +893,14 @@ class CloudWorkflowEnv_MARL(gym.Env):
                     self.ready_task_ids.append(c_gid)
 
         self.ready_task_ids = [x for x in self.ready_task_ids if self.task_state[x] == "Ready"]
+
+    def _start_task(self, gid, vm_index):
+        if self.vm_running_task[vm_index] != -1 or self.task_state[gid] != 'Queued':
+            raise RuntimeError('MARL VM tasks overlap or start twice')
+        self.vm_running_task[vm_index] = gid
+        self.task_state[gid] = 'Running'
+        vm = self.vms[self.vm_ids[vm_index]]
+        self._host_running_pc[int(vm.host_id)] += float(vm.pc)
 
     # =========================================================
     # 分配
@@ -961,7 +934,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         start_time = max(now, float(self.vm_available_at[vm_index_global]))
         end_time = float(start_time + float(tau_exec))
 
-        self.task_state[gid] = "Running"
+        self.task_state[gid] = 'Queued'
         self.task_end_time[gid] = end_time
         self.vm_available_at[vm_index_global] = end_time
 
@@ -969,8 +942,11 @@ class CloudWorkflowEnv_MARL(gym.Env):
             self.ready_task_ids.remove(gid)
 
         heapq.heappush(self.event_heap, (end_time, "finish", gid, vm_index_global))
-
-        self._host_running_pc[int(host_id)] = float(self._host_running_pc.get(int(host_id), 0.0) + float(vm.pc))
+        # Tuple ordering processes 'finish' before 'start' at the same timestamp.
+        if start_time <= now:
+            self._start_task(gid, vm_index_global)
+        else:
+            heapq.heappush(self.event_heap, (start_time, 'start', gid, vm_index_global))
 
         self._records.append(LoadRecord(float(start_time), float(end_time), int(host_id), float(vm.pc)))
 
@@ -987,197 +963,53 @@ class CloudWorkflowEnv_MARL(gym.Env):
             return np.zeros(self.global_obs_dim, dtype=np.float32)
         if self._cur_task_gid is None:
             self._update_current_task_fcfs()
-        task, queue = self._task_queue_blocks(
-            self._cur_task_gid, range(self.num_vms), global_view=True)
+        ready = len(self.ready_task_ids)
+        if self.state_normalizer:
+            observe_rr(self, ready)
+            ready_value = self.state_normalizer.rr(ready)
+        else:
+            ready_value = ready / max(1, self.max_ready)
         hosts = [self._host_features(h) for h in self.host_ids]
-        return checked_observation(self, np.concatenate([task, queue, *hosts]))
+        return checked_observation(self, np.concatenate([
+            self._task_features(self._cur_task_gid), [ready_value], *hosts]).astype(np.float32))
 
-    def _task_queue_blocks(self, tid: int, vm_map, global_view=False):
-        now = self.current_time
-
-        ready_cnt = float(len(self.ready_task_ids))
-        waiting_cnt = float(sum(1 for s in self.task_state if s == "unReady"))
-        running_cnt = float(sum(1 for s in self.task_state if s == "Running"))
-        waits = [max(0.0, now - self.task_ready_time[x]) for x in self.ready_task_ids]
-        avg_wait = float(np.mean(waits)) if len(waits) > 0 else 0.0
-        max_wait = float(np.max(waits)) if len(waits) > 0 else 0.0
-
-
-        urgent_cnt = 0
-        slacks = []
-        for x in self.ready_task_ids:
-            wf_id, local_id = self.task_meta[x]
-            wf = self.workflows[int(wf_id)]
-            dl = getattr(wf, "deadline", None)
-            if dl is None:
-                continue
-            task_obj = wf.tasks[int(local_id)]
-            in_bits_total = float((task_obj.ext_in_bits or 0.0) + (task_obj.from_parents_bits or 0.0))
-            exp_t = float(np.mean([self._task_duration(x, j) for j in range(self.num_vms)]))
-            s = float(dl) - (now + exp_t)
-            slacks.append(s)
-            if s < 0:
-                urgent_cnt += 1
-
-        min_slack = float(np.min(slacks)) if len(slacks) > 0 else 0.0
-        avg_slack = float(np.mean(slacks)) if len(slacks) > 0 else 0.0
-
-        block_queue = np.array(
-            [
-                ready_cnt / max(1.0, self.max_ready),
-                waiting_cnt / max(1.0, len(self.task_state) if len(self.task_state) > 0 else 1.0),
-                running_cnt / max(1.0, self.num_vms),
-                avg_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                max_wait / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                0.0,
-                float(urgent_cnt) / max(1.0, len(self.ready_task_ids)),
-                min_slack / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                avg_slack / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                float(len(set([self.task_meta[x][0] for x in self.ready_task_ids]))) / max(1.0, len(self.workflows) if len(self.workflows) > 0 else 1.0),
-            ],
-            dtype=np.float32,
-        )
-
-        if getattr(self, 'state_normalizer', None):
-            q = queue_features(self)
-            block_queue[[0, 1, 2, 3, 4, 7, 8, 6]] = q
-
+    def _task_features(self, tid):
         wf_id, local_id = self.task_meta[tid]
         wf = self.workflows[int(wf_id)]
         task_obj = wf.tasks[int(local_id)]
         in_bits = float((task_obj.ext_in_bits or 0.0) + (task_obj.from_parents_bits or 0.0))
         out_bits = float(task_obj.out_file_size_sum_bits)
         mi = float(task_obj.workload_mi)
-
-        io_ratio = _safe_div(in_bits + out_bits, max(mi, 1.0))
-        wait_norm = (now - self.task_ready_time[tid]) / self._obs_ref('T_ref', max(self.horizon, 1.0))
-
-        durations = []
-        for slot, vmg in enumerate(vm_map):
-            if vmg < 0:
-                continue
-            if self.vm_available_at[vmg] > now + 1e-12:
-                continue
-            vm_id = self.vm_ids[vmg]
-            durations.append(self._task_duration(tid, vmg))
-
-        est_best = float(np.min(durations)) if len(durations) > 0 else 0.0
-        est_mean = float(np.mean(durations)) if len(durations) > 0 else 0.0
-        slack_on_best = float(wf.deadline - (now + est_best)) if getattr(wf, "deadline", None) is not None else 0.0
-
-        same_wf_ready_frac = 0.0
-        if len(self.ready_task_ids) > 0:
-            same = [x for x in self.ready_task_ids if self.task_meta[x][0] == wf_id]
-            same_wf_ready_frac = float(len(same)) / float(max(1, len(self.ready_task_ids)))
-
-        block_task = np.array(
-            [
-                mi / max(1.0, np.mean([t.workload_mi for w in self.workflows for t in w.tasks]) if len(self.workflows) > 0 else 1.0),
-                in_bits / max(1.0, np.mean([float((t.ext_in_bits or 0.0) + (t.from_parents_bits or 0.0)) for w in self.workflows for t in w.tasks]) if len(self.workflows) > 0 else 1.0),
-                out_bits / max(1.0, np.mean([float(t.out_file_size_sum_bits) for w in self.workflows for t in w.tasks]) if len(self.workflows) > 0 else 1.0),
-                io_ratio,
-                wait_norm,
-                0.0, 0.0, 0.0,
-                est_best / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                est_mean / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                slack_on_best / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                same_wf_ready_frac,
-            ],
-            dtype=np.float32,
-        )
-
-        if getattr(self, 'state_normalizer', None):
-            block_task[3] = self.state_normalizer.io_ratio(io_ratio)
-            block_task[:3] = [self.state_normalizer.scale(v, k) for v, k in zip(
-                (mi, in_bits, out_bits), ('workload_mi_ref', 'input_bits_ref', 'output_bits_ref'))]
-
-        if global_view:
-            all_tasks = [t for w in self.workflows for t in w.tasks]
-            block_task[5] = len(task_obj.children) / max(
-                1.0, np.mean([len(t.children) for t in all_tasks]) + 1e-6)
-            for index, attr, scale in ((6, 'upward_rank', 'up_rank_ref'),
-                                        (7, 'downward_rank', 'down_rank_ref')):
-                raw = float(getattr(task_obj, attr) or 0.0)
-                block_task[index] = raw / max(
-                    1.0, np.mean([float(getattr(t, attr) or 0.0) for t in all_tasks]))
-                if self.state_normalizer:
-                    block_task[index] = self.state_normalizer.scale(raw, scale)
-            total_mi = sum(float(self.workflows[w].tasks[t].workload_mi)
-                           for w, t in (self.task_meta[g] for g in self.ready_task_ids))
-            block_queue[5] = total_mi / max(1.0, np.mean([t.workload_mi for t in all_tasks]))
-            if self.state_normalizer:
-                block_queue[5] = self.state_normalizer.scale(total_mi, 'workload_mi_ref')
-        return block_task, block_queue
+        return np.array([
+            mi / self._obs_ref('workload_mi_ref', 1.),
+            in_bits / self._obs_ref('input_bits_ref', 1.),
+            out_bits / self._obs_ref('output_bits_ref', 1.),
+            (wf.deadline - self.current_time) / self._obs_ref('T_ref', max(self.horizon, 1.)),
+        ], dtype=np.float32)
 
     def _host_features(self, host_id):
-        now = self.current_time
         idxs = self.host_vm_indices[int(host_id)]
-        active_pc = 0.0
-        running = 0
-        idle = 0
-        soonest = None
-        for j in idxs:
-            vm_id = self.vm_ids[j]
-            if self.vm_available_at[j] > now + 1e-12:
-                active_pc += self.vms[vm_id].pc
-                running += 1
-            else:
-                idle += 1
-            if soonest is None or self.vm_available_at[j] < soonest:
-                soonest = self.vm_available_at[j]
-        vm_cnt = max(1, len(idxs))
-        host_load = _safe_div(active_pc, max(self.hosts[int(host_id)].total_pc, 1e-9))
-        host_idle_vm = float(idle) / vm_cnt
-        host_soonest_delay = max(0.0, float((soonest or now) - now))
-        host_running_ratio = _safe_div(running, vm_cnt)
-        total_pc_n = self.hosts[int(host_id)].total_pc / max(
-            1.0, np.mean([self.hosts[x].total_pc for x in self.host_ids])
-        )
-        if getattr(self, 'state_normalizer', None):
-            total_pc_n = self.state_normalizer.scale(self.hosts[int(host_id)].total_pc, 'host_pc_ref')
-        block_host = np.array(
-            [
-                total_pc_n,
-                host_load,
-                host_idle_vm,
-                host_soonest_delay / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                host_running_ratio,
-            ],
-            dtype=np.float32,
-        )
-
-        return block_host
+        mean_pc = np.mean([self.vms[self.vm_ids[j]].pc for j in idxs])
+        return np.array([mean_pc / self._obs_ref('vm_pc_ref', 1.),
+            self._host_running_pc[host_id] / self.hosts[host_id].total_pc], dtype=np.float32)
 
     def _build_local_obs(self, tid: int, host_id: int, vm_map):
-        now = self.current_time
-        block_task, block_queue = self._task_queue_blocks(tid, vm_map)
-        block_host = self._host_features(host_id)
-        mean_vm_pc = max(1.0, np.mean([self.vms[v].pc for v in self.vms]))
-        mean_vm_bw = max(1.0, np.mean([self.vms[v].bw for v in self.vms]))
-
         vm_block = np.zeros((self.max_vms_per_host, self.vm_feat_dim), dtype=np.float32)
         for slot, vmg in enumerate(vm_map):
             if vmg < 0:
                 continue
             vm_id = self.vm_ids[vmg]
             vm = self.vms[vm_id]
-            idle_flag = 1.0 if self.vm_available_at[vmg] <= now + 1e-12 else 0.0
-            avail_delay = max(0.0, float(self.vm_available_at[vmg] - now))
-
-            pred_finish = max(now, float(self.vm_available_at[vmg])) + self._task_duration(tid, vmg)
-
             vm_block[slot] = np.array(
                 [
-                    idle_flag,
-                    avail_delay / self._obs_ref('T_ref', max(self.horizon, 1.0)),
-                    vm.pc / self._obs_ref('vm_pc_ref', mean_vm_pc),
-                    vm.bw / self._obs_ref('vm_bw_ref', mean_vm_bw),
-                    (max(0.0, pred_finish - now) if self.state_normalizer else pred_finish) / self._obs_ref('T_ref', max(self.horizon, 1.0)),
+                    vm.pc / self._obs_ref('vm_pc_ref', 1.),
+                    vm.bw / self._obs_ref('vm_bw_ref', 1.),
+                    float(self.vm_running_task[vmg] < 0),
                 ],
                 dtype=np.float32,
             )
 
-        obs = np.concatenate([block_task, block_queue, block_host, vm_block.reshape(-1)], axis=0)
+        obs = np.concatenate([self._task_features(tid), vm_block.reshape(-1)], axis=0)
         return checked_observation(self, obs)
 
     def _obs_ref(self, key, legacy):

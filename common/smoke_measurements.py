@@ -10,6 +10,7 @@ import tempfile
 from unittest.mock import patch
 import torch
 from common.scenarios import Scenario
+from algorithms.marl.scenario import MARLScenario
 from common.test_f18 import fixture_config
 from common.precompute_deadlines import main as precompute
 from common.experiment_measurements import TrainingRecorder, EvaluationRecorder, episode_metrics
@@ -26,13 +27,16 @@ def run(training_metrics=True):
             def model_name(self,algorithm):return str(root/'logs'/super().model_name(algorithm))
             def checkpoint_dir(self,algorithm):return root/'models'/super().model_name(algorithm)
             def log_dir(self,algorithm):return root/'logs'/super().model_name(algorithm)
+        class LocalMARLScenario(LocalScenario, MARLScenario):
+            pass
         with redirect_stdout(io.StringIO()):
             precompute(Scenario(mode='precompute',seed_spec='0,600,700',cache_output=str(root/'cache.json')))
         names=('mahdrl','pd3qn','marl','ablation_hostrand','ablation_mgrrand','ablation_vmrand','ablation_nohost','ablation_tl2','irws')
         for name in names:
             entry='ablation_nohost' if name=='ablation_tl2' else name
             module=importlib.import_module('algorithms.'+entry+'.train')
-            scene=LocalScenario(mode='train',episodes=1,normalization_config=str(scales))
+            scene_class = LocalMARLScenario if entry == 'marl' else LocalScenario
+            scene=scene_class(mode='train',episodes=1,normalization_config=str(scales))
             env_name={'pd3qn':'CloudWorkflowEnv_PD3QN_Cost','marl':'CloudWorkflowEnv_MARL','irws':'IRWSEnvRouteA'}.get(entry,'CloudWorkflowEnv_VMAgents')
             original_env=getattr(module,env_name)
             if name=='ablation_tl2':

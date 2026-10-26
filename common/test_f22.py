@@ -187,6 +187,7 @@ class F22Tests(unittest.TestCase):
         class Policy:
             def __init__(self, pair=False):
                 self.parameter=torch.tensor([3.]);self.replay=['training sentinel'];self.calls=0;self.pair=pair
+                self.actor=torch.nn.Identity();self.critic=torch.nn.Identity();self.agents=[]
             def select_action(self, obs, mask, **kw):
                 assert kw.get('deterministic') is True
                 assert kw.get('count_step',False) is False

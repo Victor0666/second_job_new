@@ -1,0 +1,32 @@
+# MARL-Q marl_q_v4: 600 episodes, nine source training scenarios.
+# Run from the project root in Bash with the Python environment activated.
+
+train_marl_v4() {
+    local res="$1" ddl="$2"
+    local prefix="outputs/server_console_logs/marl_q_v4_S${res}_${ddl}_select_sr099_minenergy_v1_ep600_model1"
+    mkdir -p outputs/server_console_logs || return 1
+    CUDA_VISIBLE_DEVICES=0 python -c \
+        'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; torch.ones(1, device="cuda")' || return 1
+    CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/marl/train.py \
+        --task S --resource "$res" --deadline "$ddl" \
+        --episodes 600 --model-seed 1 \
+        --experiment-protocol configs/f22_split_v1.json \
+        --normalization-mode f19_shared_v1 \
+        > "${prefix}.log" 2>&1 &
+    echo $! > "${prefix}.pid"
+}
+
+# SS: small tasks, small resources
+train_marl_v4 S Tight
+train_marl_v4 S Medium
+train_marl_v4 S Loose
+
+# SM: small tasks, medium resources
+train_marl_v4 M Tight
+train_marl_v4 M Medium
+train_marl_v4 M Loose
+
+# SL: small tasks, large resources
+train_marl_v4 L Tight
+train_marl_v4 L Medium
+train_marl_v4 L Loose

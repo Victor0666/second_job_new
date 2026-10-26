@@ -1,7 +1,7 @@
 """Paper-style action-conditioned critics with independent Local policies.
 
-The paper leaves the TD target unspecified. We sample one successor action pair
-for Q estimation, update Critic before Actor, then draw a fresh behavior action.
+V4 uses the cached, actually executed successor action in its one-step TD target.
+Every experience still updates Critic before Actor, without a target-only draw.
 """
 from dataclasses import asdict, dataclass
 
@@ -71,18 +71,9 @@ class QAgent:
         return int(dist.logits.argmax(-1).item() if deterministic else dist.sample().item())
 
     @torch.no_grad()
-    def sample_target_action(self, obs, mask):
-        """A TD-only draw, separate from select_action and environment execution."""
-        return int(self._distribution(obs, mask).sample().item())
-
-    @torch.no_grad()
-    def sampled_q(self, obs, mask, peer_action_sampler=None):
-        """One masked policy sample; Global queries only the sampled Host's Local."""
-        if bool(self.peer_act_dim) != (peer_action_sampler is not None):
-            raise ValueError('Only Global successor Q requires a Local action sampler')
-        action = self.sample_target_action(obs, mask)
-        peer = peer_action_sampler(action) if self.peer_act_dim else None
-        return float(self._q(Decision(obs, mask, action, peer)).item())
+    def successor_q(self, decision):
+        """Read Q for an already selected real action; never sample another action."""
+        return float(self._q(decision).item())
 
     def _q(self, decision):
         parts = [self._obs(decision.obs)]
@@ -155,7 +146,7 @@ class QAgent:
         torch.save(dict(model_version=MODEL_VERSION, learning_model=LEARNING_MODEL,
                         normalization=checkpoint_metadata(self), cfg=asdict(self.cfg),
                         obs_dim=self.obs_dim, act_dim=self.act_dim, peer_act_dim=self.peer_act_dim,
-                        state=self.state()), path)
+                        training_selection=getattr(self, 'training_selection', None), state=self.state()), path)
 
     def load(self, path):
         ckpt = _load(path, self.device, checkpoint_metadata(self))
@@ -167,12 +158,13 @@ class QAgent:
                 k:v for k,v in asdict(self.cfg).items() if k != 'device'}:
             raise ValueError('MARL Q checkpoint configuration differs')
         self.restore(ckpt['state'])
+        self.training_selection = ckpt.get('training_selection')
 
 
 def _load(path, device, normalization):
     ckpt = torch.load(path, map_location=device, weights_only=True)
     if not isinstance(ckpt, dict) or ckpt.get('model_version') != MODEL_VERSION or ckpt.get('learning_model') != LEARNING_MODEL:
-        raise ValueError(f'Expected {MODEL_VERSION} (single-sample Q) checkpoint; retrain the new model')
+        raise ValueError(f'Expected {MODEL_VERSION} (actual-action TD) checkpoint; retrain the new model')
     check_checkpoint(ckpt.get('normalization'), normalization)
     return ckpt
 
@@ -193,6 +185,7 @@ class IndependentLocalAgents:
         torch.save(dict(model_version=MODEL_VERSION, learning_model=LEARNING_MODEL,
                         normalization=checkpoint_metadata(self), cfg=asdict(self.cfg),
                         obs_dim=self.obs_dim, act_dim=self.act_dim, num_hosts=self.num_hosts,
+                        training_selection=getattr(self, 'training_selection', None),
                         states=[a.state() for a in self.agents]), path)
 
     def load(self, path):
@@ -205,6 +198,7 @@ class IndependentLocalAgents:
             raise ValueError('MARL Local checkpoint configuration differs')
         for agent, state in zip(self.agents, ckpt['states']):
             agent.restore(state)
+        self.training_selection = ckpt.get('training_selection')
 
 
 def learner_map(global_agent, locals):
@@ -227,16 +221,17 @@ class Decision:
 
 
 class QDecisionTrace:
-    """One agent's decision chain. Update both networks before its next action draw."""
+    """One agent's chain; its cached successor action is executed after the update."""
     def __init__(self, agent):
         self.agent, self.pending = agent, None
         self.recorded_reward = self.emitted_reward = 0.0
 
-    def advance(self, obs, mask, peer_action_sampler=None):
+    def advance(self, decision, next_value=None):
         if self.pending is not None:
-            decision, reward = self.pending
-            next_value = self.agent.sampled_q(obs, mask, peer_action_sampler)
-            self.agent.update(decision, reward, next_value)
+            previous, reward = self.pending
+            if next_value is None:
+                next_value = self.agent.successor_q(decision)
+            self.agent.update(previous, reward, next_value)
             self.emitted_reward += reward
             self.pending = None
 

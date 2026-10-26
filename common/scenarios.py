@@ -333,7 +333,7 @@ class Scenario:
         return result
 
 
-def parse_scenario(mode, algorithm=None):
+def parse_scenario(mode, algorithm=None, scenario_class=Scenario):
     parser = argparse.ArgumentParser(description=f'{algorithm or "Deadline cache"}: {mode}')
     explicit_pd3qn_dag = algorithm in ('pd3qn_v5', PD3QN_DAG)
     if explicit_pd3qn_dag:
@@ -394,7 +394,7 @@ def parse_scenario(mode, algorithm=None):
         parser.add_argument('--device', choices=('cpu', 'cuda'), default=None)
     args = parser.parse_args()
     try:
-        scenario = Scenario(
+        scenario = scenario_class(
             paper_options=({k:getattr(args,k) for k in ('resume_checkpoint','device')} if algorithm == 'irws_paper'
                            else {'device': args.device} if algorithm in ('drl_gnn', 'two_stage_gat') else None),
             experiment_protocol=getattr(args, 'experiment_protocol', str(DEFAULT_PROTOCOL)),

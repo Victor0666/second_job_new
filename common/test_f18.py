@@ -139,15 +139,15 @@ class F18Tests(unittest.TestCase):
                 j=env.host_to_vm_indices[env.host_ids[0]][0]
                 self.assertAlmostEqual(block[0,4],env._task_duration(tid,j)/123.,places=4)
             else:
-                g=env._build_global_obs();self.assertEqual(g.shape,(22+5*env.num_hosts,))
+                g=env._build_global_obs();self.assertEqual(g.shape,(5+2*env.num_hosts,))
                 tid=env.ready_task_ids[0];maps=env.host_vm_indices[0]
                 mapping=list(maps)+[-1]*(env.max_vms_per_host-len(maps))
                 local=env._build_local_obs(tid,0,mapping)
-                np.testing.assert_array_equal(g[12:22][[0,1,2,3,4,7,8]],local[12:22][[0,1,2,3,4,7,8]])
+                np.testing.assert_array_equal(g[:4],local[:4])
                 self.assertEqual(local.shape,(env.local_obs_dim,))
                 self.assertTrue(np.isfinite(g).all())
                 for wf in env.workflows:wf.deadline=-100.
-                self.assertLess(env._build_global_obs()[19],0)
+                self.assertLess(env._build_global_obs()[3],0)
 
     def test_T12_pd3qn_attribute_scaling_no_l2(self):
         env=PD(**self.kwargs(PD));obs,_=env.reset();gid=env._cur_task_gid

@@ -68,18 +68,12 @@ class CommunicationTests(unittest.TestCase):
         return env.vm_assign(slot)[-1]['finish_time']
 
     def prediction(self, env, name, gid, vm):
-        if name == 'pd3qn':
-            return None  # PD3QN exposes raw VM resources, with no duration feature.
+        if name in ('pd3qn', 'marl'):
+            return None  # These observations expose resources, not predicted completion.
         if name == 'irws':
             return env._build_vm_obs_for_task(gid)[7:].reshape(env.num_vms, 6)[vm, 4]
         host = env.vms[vm].host_id
-        if name == 'marl':
-            vm_map = list(env.host_vm_indices[host])
-            obs = env._build_local_obs(gid, host, vm_map)
-            offset = env.block_task_dim + env.block_queue_dim + env.block_host_dim
-            slot = vm_map.index(vm)
-            finish = obs[offset:offset + env.max_vms_per_host * 5].reshape(-1, 5)[slot, 4] * env.horizon
-        elif name == 'ablation_nohost':
+        if name == 'ablation_nohost':
             obs, _ = env._build_global_vm_obs_for_task(gid)
             offset = env.block1_dim + env.block2_dim
             finish = obs[offset:].reshape(env.num_vms, 8)[vm, 4] * env.horizon

@@ -17,6 +17,7 @@ from algorithms.marl.q_agents import MODEL_VERSION, QAgent, QConfig, QDecisionTr
 from algorithms.marl.identity import evaluation_directory
 from common.precompute_deadlines import main as precompute
 from common.scenarios import Scenario
+from algorithms.marl.scenario import MARLScenario
 from common.test_f18 import fixture_config
 
 
@@ -26,7 +27,7 @@ def run_smoke(hidden_dims=(16,8)):
         root = Path(directory)
         config = root/'normalization.json'; fixture_config(config)
 
-        class SmokeScenario(Scenario):
+        class SmokeScenario(MARLScenario):
             @property
             def cache_path(self): return root/'cache.json'
             def model_name(self, algorithm): return str(root/'logs'/super().model_name(algorithm))
@@ -45,9 +46,11 @@ def run_smoke(hidden_dims=(16,8)):
         pending = set()
         original_record, original_update = QDecisionTrace.record, QAgent.update
         original_select = QAgent.select_action
-        original_target = QAgent.sampled_q
-        target_calls = dict(Global=0, Local=0, queried_locals=0)
+        original_target = QAgent.successor_q
+        target_calls = dict(Global=0, Local=0)
+        chosen = {}
         def record(trace, *args, **kwargs):
+            assert args[0].action == chosen[trace.agent], 'Recorded a different action from the cached draw'
             original_record(trace, *args, **kwargs)
             pending.add(trace.agent)
         def update(agent, *args, **kwargs):
@@ -56,28 +59,22 @@ def run_smoke(hidden_dims=(16,8)):
             pending.remove(agent)
             return result
         def select(agent, *args, **kwargs):
-            assert agent not in pending, 'Next action sampled before pending Critic/Actor updates'
-            return original_select(agent, *args, **kwargs)
+            action = original_select(agent, *args, **kwargs)
+            if not kwargs.get('deterministic', False):
+                chosen[agent] = action
+            return action
 
-        def target(agent, obs, mask, peer_action_sampler=None):
+        def target(agent, decision):
             target_calls['Global' if agent.peer_act_dim else 'Local'] += 1
-            if peer_action_sampler is None:
-                return original_target(agent, obs, mask)
-            queried = []
-            def peer(host_index):
-                queried.append(host_index)
-                return peer_action_sampler(host_index)
-            value = original_target(agent, obs, mask, peer)
-            assert len(queried) == 1, 'Global target queried multiple Locals'
-            target_calls['queried_locals'] += len(queried)
-            return value
+            assert decision.action == chosen[agent]
+            return original_target(agent, decision)
 
         with redirect_stdout(io.StringIO()):
             precompute(Scenario(mode='precompute', seed_spec='0,600,700', cache_output=str(scene.cache_path)))
             with patch.object(train,'SCENARIO',scene), patch.object(train,'QConfig',side_effect=cfg), \
                     patch.object(train,'CloudWorkflowEnv_MARL',side_effect=environment), \
                     patch.object(QDecisionTrace,'record',record), patch.object(QAgent,'update',update), \
-                    patch.object(QAgent,'select_action',select), patch.object(QAgent,'sampled_q',target):
+                    patch.object(QAgent,'select_action',select), patch.object(QAgent,'successor_q',target):
                 train.train()
                 saved = {path:hashlib.sha256(path.read_bytes()).hexdigest()
                          for directory in (scene.checkpoint_dir('marl'),scene.log_dir('marl'))
@@ -108,7 +105,6 @@ def run_smoke(hidden_dims=(16,8)):
                 assert measurement['optimizer_steps'][role+'.critic_optim'] == diagnostics['transitions']
             assert target_calls['Global'] == final['learners']['Global']['nonterminal']
             assert target_calls['Local'] == sum(v['nonterminal'] for k,v in final['learners'].items() if k.startswith('Local_'))
-            assert target_calls['queried_locals'] == target_calls['Global']
 
             eval_scene = replace(scene, mode='eval', seed_spec='700')
             recorder = evaluate.EvaluationRecorder
@@ -118,7 +114,7 @@ def run_smoke(hidden_dims=(16,8)):
             with patch.object(evaluate,'SCENARIO',eval_scene), patch.object(evaluate,'QConfig',side_effect=cfg), \
                     patch.object(evaluate,'CloudWorkflowEnv_MARL',side_effect=environment), \
                     patch.object(evaluate,'EvaluationRecorder',side_effect=evaluation_recorder), \
-                    patch.object(QAgent,'sample_target_action',side_effect=AssertionError('Evaluation sampled TD action')):
+                    patch.object(QAgent,'successor_q',side_effect=AssertionError('Evaluation read TD target')):
                 kwargs = evaluate.build_env_kwargs(str(scene.cache_path))
                 kwargs.update(eval_scene.normalization_kwargs())
                 g, locals, dims = evaluate.build_agents_and_probe_dims(kwargs,700,'cpu',
@@ -136,7 +132,7 @@ def run_smoke(hidden_dims=(16,8)):
             cli_scene = replace(eval_scene, marl_options={'out':str(out),'device':'cpu'})
             with patch.object(evaluate,'SCENARIO',cli_scene), patch.object(evaluate,'QConfig',side_effect=cfg), \
                     patch.object(evaluate,'CloudWorkflowEnv_MARL',side_effect=environment), \
-                    patch.object(QAgent,'sample_target_action',side_effect=AssertionError('Evaluation sampled TD action')):
+                    patch.object(QAgent,'successor_q',side_effect=AssertionError('Evaluation read TD target')):
                 evaluate.main()
                 with out.open(newline='') as stream:
                     rows = list(csv.DictReader(stream))
@@ -154,11 +150,11 @@ def run_smoke(hidden_dims=(16,8)):
                     raise AssertionError('Repeated evaluation did not refuse existing output')
                 assert all(path.read_bytes() == contents for path,contents in before.items())
         return dict(model_version=MODEL_VERSION, hidden_dims=hidden_dims, dims=dims, learners=final['learners'],
-                    target_estimator='single_sample_q', target_q_calls=target_calls,
+                    target_estimator='actual_successor_action_q', target_q_calls=target_calls,
                     numerics=final['numerics'],
                     reward_balances=dict(global_balance=final['global_reward_balance'],local_balance=final['local_reward_balance']),
                     assignment_count=measurement['assignment_calls'], policy_calls=measurement['policy_calls'],
-                    optimizer_steps=measurement['optimizer_steps'], update_before_next_action=True,
+                    optimizer_steps=measurement['optimizer_steps'], cached_action_before_update=True,
                     checkpoint_reload=True, evaluation_no_update=True,
                     distinct_algorithm_identity=True, evaluation_csv=True,
                     repeated_training_preserves_outputs=True, repeated_evaluation_preserves_outputs=True)

@@ -3,19 +3,22 @@
 import os
 import sys
 import json
+from contextlib import ExitStack
 import numpy as np
 import torch
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if ROOT_DIR not in sys.path:
     sys.path.append(ROOT_DIR)
-from common.scenarios import Scenario, parse_scenario
+from algorithms.marl.scenario import MARLScenario as Scenario, parse_scenario
 from common.f18_state_normalization import bind_normalization, normalization_diagnostics
 from common.f11 import F11Logger, protect_training_outputs, valid_decision
 
 SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
-from common.experiment_measurements import TrainingRecorder, collect_validation
+from common.experiment_measurements import TrainingRecorder, collect_validation, episode_metrics
+from algorithms.marl.runtime import isolated_evaluation, selection_record
+from algorithms.pd3qn_dag_fe.selection import selection_metadata, selection_key, validation_selection
 from common.workflow_opt import energy_from_records
 from algorithms.marl.q_agents import MODEL_VERSION, QAgent, QConfig, IndependentLocalAgents, Decision, QDecisionTrace, learner_map
 from algorithms.marl.identity import DISPLAY_NAME
@@ -64,6 +67,7 @@ def evaluate_marl(
     eval_seeds,
     episode_id_base: int = 0,
 ):
+    rows = []
     eval_energy_list = []
     eval_ret_g_list = []
     eval_ret_l_list = []
@@ -117,6 +121,12 @@ def evaluate_marl(
             end_time=float(env.current_time),
         ))
         collect_validation(env)
+        metrics = episode_metrics(env)
+        if metrics['wf_count'] != env.workflows_per_episode:
+            raise RuntimeError('MARL validation ended before all workflows arrived')
+        if not np.isfinite(list(metrics.values())).all():
+            raise FloatingPointError('Nonfinite MARL validation metrics')
+        rows.append(dict(seed=int(s), **metrics))
         E_acc = float(env.total_energy)
         diff = abs(E_re - E_acc)
         print(f"[EnergyCheck] E_acc={E_acc:.6f}  E_re={E_re:.6f}  diff={diff:.6f}")
@@ -126,17 +136,19 @@ def evaluate_marl(
         eval_total_late_list.append(ep_total_late)
         eval_avg_late_list.append(ep_avg_late)
         eval_wf_avg_late_list.append(ep_wf_avg_late)
-    return (
-        float(np.mean(eval_ret_g_list)),
-        float(np.mean(eval_ret_l_list)),
-        float(np.mean(eval_energy_list)),
-        float(np.mean(eval_total_late_list)),
-        float(np.mean(eval_avg_late_list)),
-        float(np.mean(eval_wf_avg_late_list)),
-    )
+        env.close()
+    return dict(rows=rows, ret_g=float(np.mean(eval_ret_g_list)),
+        ret_l=float(np.mean(eval_ret_l_list)), energy=float(np.mean(eval_energy_list)),
+        total_late=float(np.mean(eval_total_late_list)), avg_late=float(np.mean(eval_avg_late_list)),
+        wf_avg_late=float(np.mean(eval_wf_avg_late_list)))
 
 
 def train():
+    with ExitStack() as resources:
+        return _train(resources)
+
+
+def _train(resources):
     print(f"[{DISPLAY_NAME}] algorithm={MODEL_VERSION}")
     random_seed = SCENARIO.first_training_seed()
     set_seed(SCENARIO.model_seed)
@@ -177,6 +189,7 @@ def train():
     env_kwargs.update(SCENARIO.normalization_kwargs())
     protect_training_outputs(SCENARIO.checkpoint_dir("marl"), SCENARIO.log_dir("marl"))
     env = CloudWorkflowEnv_MARL(**env_kwargs)
+    resources.callback(env.close)
     from common.f22_instances import write_run_metadata, episode_identity
     write_run_metadata(SCENARIO.checkpoint_dir("marl"), SCENARIO)
     write_run_metadata(SCENARIO.log_dir("marl"), SCENARIO)
@@ -225,10 +238,6 @@ def train():
     for agent in local_agent.agents:
         bind_normalization(agent, SCENARIO)
 
-    def sample_local_target(host_index):
-        lobs, lmask, _ = env.get_local_state(env.host_ids[host_index])
-        return local_agent.agents[host_index].sample_target_action(lobs, lmask)
-
     save_dir = str(SCENARIO.checkpoint_dir("marl"))
     log_path = os.path.join(
         ROOT_DIR, "outputs", "logs", SCENARIO.model_name("marl"), f"train_metrics_{MODEL_VERSION}.csv"
@@ -252,6 +261,7 @@ def train():
             "eval_ret_global",
             "eval_ret_local",
             "eval_energy",
+            "eval_workflow_success_rate", "eval_feasible", "selected_as_best", "best_episode",
             "host_action",
             "vm_action",
             "lateness",
@@ -269,7 +279,8 @@ def train():
             "eval_workflow_avg_lateness",
         ],
     )
-    best_eval_energy = float("inf")
+    resources.callback(logger.close)
+    best = None
     best_global_path = os.path.join(save_dir, "best_global.pth")
     best_local_path = os.path.join(save_dir, "best_local_actor_critics.pth")
     max_episodes = SCENARIO.episodes
@@ -279,6 +290,7 @@ def train():
     episode_idx = 0
     f11_log = F11Logger(os.path.dirname(log_path))
     recorder = TrainingRecorder(os.path.dirname(log_path), SCENARIO, MODEL_VERSION, env, learners)
+    resources.callback(recorder.close)
     save_locals = recorder.checkpoint(local_agent.save)
     while episode_idx < max_episodes:
         train_seed = SCENARIO.training_seed(episode_idx)
@@ -304,7 +316,6 @@ def train():
             gobs = np.array(obs["global_obs"], copy=True)
             gmask = np.array(obs["global_mask"], copy=True)
             valid_decision(gobs, gmask)
-            global_trace.advance(gobs, gmask, sample_local_target)
             a_host = global_agent.select_action(gobs, gmask, deterministic=False)
             host_id = env.host_ids[int(a_host)]
             host_index = int(a_host)
@@ -313,10 +324,14 @@ def train():
                 raise RuntimeError("Global selected a legal Host without a real Local VM decision")
             lobs, lmask = np.array(lobs, copy=True), np.array(lmask, copy=True)
             local_trace = local_traces[host_index]
-            local_trace.advance(lobs, lmask)
             a_vm = local_agent.select_action(lobs, lmask, host_index=host_index, deterministic=False)
             global_decision = Decision(gobs, gmask, a_host, peer_action=a_vm)
             local_decision = Decision(lobs, lmask, a_vm)
+            # Both targets read pre-update Q; the cached actions are executed once below.
+            next_g = global_agent.successor_q(global_decision) if global_trace.pending else None
+            next_l = local_trace.agent.successor_q(local_decision) if local_trace.pending else None
+            global_trace.advance(global_decision, next_g)
+            local_trace.advance(local_decision, next_l)
             obs2, r_g, r_l, done, info2 = env.step(int(a_host), int(a_vm))
             late, _wf = _update_lateness_stats(info2, ep_wf_late)
             ep_total_late += late
@@ -416,20 +431,23 @@ def train():
             f"[episode={episode_idx}] seed={train_seed} steps={global_step} energy={ep_energy:.3f}J ret_g={ep_ret_g:.4f} ret_l={ep_ret_l:.4f} late_sum={ep_total_late:.3f} late_avg={ep_avg_late:.6f} wf_late_avg={ep_wf_avg_late:.6f} wf={getattr(env, 'completed_workflows', 0)}/{getattr(env, 'workflows_per_episode', '∞')}"
         )
         if episode_idx % eval_interval_episode == 0:
-            (
-                eval_ret_g,
-                eval_ret_l,
-                eval_energy,
-                eval_total_late,
-                eval_avg_late,
-                eval_wf_avg_late,
-            ) = recorder.validation(evaluate_marl,
-                env_kwargs,
-                global_agent,
-                local_agent,
-                eval_seeds=eval_seeds,
-                episode_id_base=100000 + episode_idx * 10,
-            )
+            with isolated_evaluation(global_agent, local_agent):
+                validation = recorder.validation(evaluate_marl, env_kwargs, global_agent, local_agent,
+                    eval_seeds=eval_seeds, episode_id_base=100000 + episode_idx * 10)
+            candidate = validation_selection(validation['rows'])
+            selected = best is None or selection_key(candidate) < selection_key(best)
+            if selected:
+                best = dict(candidate, episode=episode_idx, completed_episodes=episode_idx+1)
+                record = selection_record(SCENARIO, episode_idx, candidate, best, validation['rows'], 'best')
+                global_agent.training_selection = local_agent.training_selection = record
+                global_agent.save(best_global_path)
+                save_locals(best_local_path)
+            with open(os.path.join(os.path.dirname(log_path), 'validation_selection.jsonl'), 'a', encoding='utf-8') as stream:
+                stream.write(json.dumps(dict(episode=episode_idx, validation=validation['rows'],
+                    validation_selection=candidate, best_validation_selection=best,
+                    selected_as_best=selected), allow_nan=False) + '\n')
+            eval_ret_g, eval_ret_l, eval_energy = validation['ret_g'], validation['ret_l'], validation['energy']
+            eval_total_late, eval_avg_late, eval_wf_avg_late = validation['total_late'], validation['avg_late'], validation['wf_avg_late']
             logger.log(
                 algorithm=MODEL_VERSION,
                 step=global_step,
@@ -445,6 +463,8 @@ def train():
                 eval_ret_global=eval_ret_g,
                 eval_ret_local=eval_ret_l,
                 eval_energy=eval_energy,
+                eval_workflow_success_rate=candidate['workflow_success_rate'],
+                eval_feasible=candidate['feasible'], selected_as_best=selected, best_episode=best['episode'],
                 host_action="",
                 vm_action="",
                 lateness="",
@@ -464,18 +484,19 @@ def train():
             print(
                 f"  [eval] seeds={eval_seeds} ret_g={eval_ret_g:.4f} ret_l={eval_ret_l:.4f} eval_energy={eval_energy:.3f}J eval_late_sum={eval_total_late:.3f} eval_late_avg={eval_avg_late:.6f} eval_wf_late_avg={eval_wf_avg_late:.6f}"
             )
-            if eval_energy < best_eval_energy:
-                best_eval_energy = eval_energy
-                global_agent.save(best_global_path)
-                save_locals(best_local_path)
-                print(
-                    f"  ⭐ save best: {best_eval_energy:.3f}J -> {best_global_path} / {best_local_path}"
-                )
+            print(f"  [selection] SR={candidate['workflow_success_rate']:.4f} feasible={candidate['feasible']} selected={selected}")
         episode_idx += 1
     global_final = os.path.join(save_dir, "global_final.pth")
     local_final = os.path.join(save_dir, "local_final.pth")
+    record = selection_record(SCENARIO, episode_idx-1, candidate, best, validation['rows'], 'final')
+    global_agent.training_selection = local_agent.training_selection = record
     global_agent.save(global_final)
     save_locals(local_final)
+    with open(os.path.join(os.path.dirname(log_path), 'training_summary.json'), 'w', encoding='utf-8') as stream:
+        json.dump(dict(algorithm=MODEL_VERSION, checkpoint_selection=selection_metadata(),
+            protocol=SCENARIO.selection_protocol(), completed_episodes=episode_idx,
+            best_validation_selection=best, feasible_model_found=best['feasible'],
+            best_global=best_global_path, best_local=best_local_path), stream, indent=2, allow_nan=False)
     print("训练结束：")
     print(f"  total_episodes={episode_idx}")
     print(f"  total_steps   ={global_step}")
@@ -485,8 +506,6 @@ def train():
     print(f"  best_local    ={best_local_path}")
     print(f"  log_path      ={log_path}")
 
-    recorder.close()
-    logger.close()
 
 
 if __name__ == "__main__":

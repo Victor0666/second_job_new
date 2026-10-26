@@ -13,8 +13,10 @@ import torch
 PROJECT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if PROJECT_DIR not in sys.path:
     sys.path.append(PROJECT_DIR)
-from common.scenarios import Scenario, parse_scenario
-from common.experiment_measurements import EvaluationRecorder, episode_duration
+from algorithms.marl.scenario import MARLScenario as Scenario, parse_scenario
+from common.experiment_measurements import EvaluationRecorder, episode_duration, episode_metrics
+from algorithms.marl.runtime import isolated_evaluation, validate_pair
+from algorithms.pd3qn_dag_fe.selection import selection_metadata
 from common.f18_state_normalization import bind_normalization
 from algorithms.marl.identity import MODEL_VERSION, DISPLAY_NAME, evaluation_directory, evaluation_csv
 
@@ -176,6 +178,7 @@ def build_agents_and_probe_dims(
     global_agent.load(ckpt_global)
     print(f"[{DISPLAY_NAME} load] local : {ckpt_local}")
     local_agent.load(ckpt_local)
+    validate_pair(global_agent, local_agent, SCENARIO)
     dims = dict(
         global_obs_dim=global_obs_dim,
         global_act_dim=global_act_dim,
@@ -214,7 +217,7 @@ def evaluate_one_seed(
     ret_g = 0.0
     ret_l = 0.0
     steps = 0
-    with torch.no_grad():
+    with isolated_evaluation(global_agent, local_agent):
         while not done:
             gobs = obs["global_obs"]
             gmask = obs["global_mask"]
@@ -234,6 +237,9 @@ def evaluate_one_seed(
             steps += 1
             obs = obs2
     m = env.get_episode_metrics()
+    counts = episode_metrics(env)
+    if counts['wf_count'] != env.workflows_per_episode:
+        raise RuntimeError('MARL evaluation ended before all workflows arrived')
     energy = _get_metric(m, ["total_energy_J", "total_energy"], getattr(env, "total_energy", 0.0))
     makespan = episode_duration(env)
     task_avg_lateness = _get_metric(m, ["task_avg_lateness", "avg_lateness"])
@@ -250,10 +256,7 @@ def evaluate_one_seed(
         m, ["wf_avg_tardiness", "workflow_avg_tardiness", "wf_tardiness_mean"]
     )
     wf_pct_tardy = _get_metric(m, ["wf_pct_tardy", "workflow_pct_tardy", "wf_tardy_ratio"])
-    if np.isfinite(wf_pct_tardy):
-        wf_success_rate = 1.0 - wf_pct_tardy
-    else:
-        wf_success_rate = float("nan")
+    wf_success_rate = counts['wf_success_rate']
     recs = env.records if hasattr(env, "records") else getattr(env, "_records", None)
     E_re = float(energy_from_records(
         recs, env.hosts,
@@ -464,6 +467,13 @@ def main():
         energy_check_diff=float(diff_m),
     )
     logger.close()
+    summary = dict(algorithm=MODEL_VERSION, checkpoint_selection=selection_metadata(),
+        selected_checkpoint=global_agent.training_selection,
+        test_seeds=seeds, mean_energy=e_m, mean_workflow_success_rate=wf_succ_m)
+    directory = evaluation_directory(SCENARIO, PROJECT_DIR)
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f'summary_{MODEL_VERSION}.json').write_text(
+        json.dumps(summary, indent=2, allow_nan=False), encoding='utf-8')
     print(f"\n================= {DISPLAY_NAME}（multi-seed）汇总 =================")
     print(
         f"[{DISPLAY_NAME}] vm={vm_m:.6f} host={host_m:.6f} mgr={mgr_m:.6f} energy={e_m:.3f} J | task_avg_lateness={task_late_m:.6f} task_avg_tardiness={task_tard_m:.6f} task_success_rate={task_succ_m:.6f} task_pct_tardy={task_pct_m:.6f} | wf_avg_lateness={wf_late_m:.6f} wf_avg_tardiness={wf_tard_m:.6f} wf_success_rate={wf_succ_m:.6f} wf_pct_tardy={wf_pct_m:.6f} | makespan={ms_m:.3f}"

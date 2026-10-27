@@ -1,0 +1,48 @@
+# Linux / Bash：在实际项目根目录运行，对应 R090 源模型训练完成后执行。
+# 每次调用依次完成 S 同规模评测、M/L 任务规模泛化；固定源模型，不重新训练。
+# 九次调用共27个目标，每目标700-729共30实例；不是主机数量泛化。
+# 非空目标结果目录拒绝重复；已完成S时可加第三参数 "M L" 仅补泛化。
+# 每次调用启动一个后台进程；按 GPU 容量分批运行。
+eval_mahdrl_as_fast_r090_all() {
+    local res="$1" ddl="$2"
+    local targets="${3:-S M L}"
+    local prefix="outputs/server_eval_logs/eval_mahdrl_as_fast_r090_sourceS${res}_${ddl}_targets${targets// /}_select_sr099_minenergy_v1_seeds700-729_model1"
+    mkdir -p outputs/server_eval_logs
+
+    CUDA_VISIBLE_DEVICES=0 nohup bash -c '
+        res="$1"
+        ddl="$2"
+        targets="$3"
+        for task in $targets; do
+            echo "[START] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+            python -u launch.py \
+                algorithms/mahdrl_oe_ge_apf_score_fast_r090/evaluate.py \
+                --task "$task" --resource "$res" --deadline "$ddl" \
+                --train-task S --train-resource "$res" --train-deadline "$ddl" \
+                --seeds 700-729 --model-seed 1 \
+                --experiment-protocol configs/f22_split_v1.json \
+                --normalization-mode f19_shared_v1 --device cuda \
+                --diagnostics-every 100 --profile-mode sampled --profile-every 100 \
+                || exit 1
+            echo "[DONE] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+        done
+        echo "[ALL_DONE] source=S${res}/${ddl} targets=${targets}"
+    ' mahdrl_as_fast_r090_eval "$res" "$ddl" "$targets" \
+        > "${prefix}.log" 2>&1 &
+    echo $! > "${prefix}.pid"
+}
+
+# SS源模型 -> SS、MS、LS
+eval_mahdrl_as_fast_r090_all S Tight
+eval_mahdrl_as_fast_r090_all S Medium
+eval_mahdrl_as_fast_r090_all S Loose
+
+# SM源模型 -> SM、MM、LM
+eval_mahdrl_as_fast_r090_all M Tight
+eval_mahdrl_as_fast_r090_all M Medium
+eval_mahdrl_as_fast_r090_all M Loose
+
+# SL源模型 -> SL、ML、LL
+eval_mahdrl_as_fast_r090_all L Tight
+eval_mahdrl_as_fast_r090_all L Medium
+eval_mahdrl_as_fast_r090_all L Loose

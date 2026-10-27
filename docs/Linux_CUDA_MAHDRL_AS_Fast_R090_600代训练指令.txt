@@ -1,0 +1,33 @@
+# Linux / Bash：在实际项目根目录运行，使用已有匹配的截止期缓存和 F19 源归一化。
+# 独立 MAHDRL-AS-Fast-R090：TA/HA/VA 时延权重0.9，能耗权重0.1，SR099选模。
+# 每次调用启动一个后台进程；按 GPU 容量分批运行。
+train_mahdrl_as_fast_r090() {
+    local res="$1" ddl="$2"
+    local prefix="outputs/server_console_logs/mahdrl_as_fast_r090_S${res}_${ddl}_select_sr099_minenergy_v1_ep600_model1"
+    mkdir -p outputs/server_console_logs
+
+    CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py \
+        algorithms/mahdrl_oe_ge_apf_score_fast_r090/train.py \
+        --task S --resource "$res" --deadline "$ddl" \
+        --episodes 600 --model-seed 1 \
+        --experiment-protocol configs/f22_split_v1.json \
+        --normalization-mode f19_shared_v1 --device cuda \
+        --diagnostics-every 100 --profile-mode sampled --profile-every 100 \
+        > "${prefix}.log" 2>&1 &
+    echo $! > "${prefix}.pid"
+}
+
+# SS：小任务、小资源
+train_mahdrl_as_fast_r090 S Tight
+train_mahdrl_as_fast_r090 S Medium
+train_mahdrl_as_fast_r090 S Loose
+
+# SM：小任务、中资源
+train_mahdrl_as_fast_r090 M Tight
+train_mahdrl_as_fast_r090 M Medium
+train_mahdrl_as_fast_r090 M Loose
+
+# SL：小任务、大资源
+train_mahdrl_as_fast_r090 L Tight
+train_mahdrl_as_fast_r090 L Medium
+train_mahdrl_as_fast_r090 L Loose

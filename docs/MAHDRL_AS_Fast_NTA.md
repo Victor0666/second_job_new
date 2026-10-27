@@ -73,41 +73,70 @@ python launch.py algorithms/mahdrl_oe_ge_apf_score_fast_nta/train.py --task S --
 M/L 任务泛化使用相同资源与截止期下以 S 任务训练的模型，并保持 train-task=S。
 自定义资源评测及预计算参数继承 Fast v2。
 
-Linux Bash 下，可顺序训练九组模型（S 任务 × 三种资源 × 三种截止期）：
+Linux Bash 下，以下命令立即后台并行启动九组训练（S 任务 × 三种资源 ×
+三种截止期），每组独立控制台日志和 PID。`GPU=0` 指定物理 GPU 0，可按
+服务器实际设备调整。同卡并发会叠加显存占用；测量单任务训练成本或推理延迟时
+应独占设备。
 
 ```bash
+GPU=0
+LOG_DIR="outputs/server_console_logs/nta_train_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$LOG_DIR"
 for resource in S M L; do
   for deadline in Tight Medium Loose; do
-    python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast_nta/train.py \
+    CUDA_VISIBLE_DEVICES="$GPU" nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast_nta/train.py \
       --task S --resource "$resource" --deadline "$deadline" \
       --episodes 600 --model-seed 1 \
       --experiment-protocol configs/f22_split_v1.json \
-      --normalization-mode f19_shared_v1 --device cuda || exit $?
+      --normalization-mode f19_shared_v1 --device cuda \
+      > "$LOG_DIR/train_S${resource}_${deadline}.log" 2>&1 < /dev/null &
+    echo $! > "$LOG_DIR/train_S${resource}_${deadline}.pid"
   done
 done
+echo "训练日志：$LOG_DIR"
 ```
 
-训练后顺序评测 27 个场景，每场景 30 个实例，共 810 次测试。每组资源和
-截止期都加载对应 S 任务训练的 best 模型；只评测训练规模时，将 `S M L`
-改为 `S`，即九场景、270 次测试。
+九组训练均完成后，再执行下面的后台并行评测：启动 27 个场景进程，每个
+场景内部评测 30 个实例，共 810 次测试。每组资源和截止期都加载对应 S 任务
+训练的 best 模型；只评测训练规模时，将 `for task in S M L` 改为
+`for task in S`，即九场景、270 次测试。评测前须确认训练正常完成，不能在
+相同保存组仍写入时加载 best 权重。
 
 ```bash
+GPU=0
+LOG_DIR="outputs/server_console_logs/nta_eval_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$LOG_DIR"
 for resource in S M L; do
   for deadline in Tight Medium Loose; do
     for task in S M L; do
-      python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast_nta/evaluate.py \
+      CUDA_VISIBLE_DEVICES="$GPU" nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast_nta/evaluate.py \
         --task "$task" --resource "$resource" --deadline "$deadline" \
         --train-task S --train-resource "$resource" --train-deadline "$deadline" \
         --seeds 700-729 --model-seed 1 \
         --experiment-protocol configs/f22_split_v1.json \
-        --normalization-mode f19_shared_v1 --device cuda || exit $?
+        --normalization-mode f19_shared_v1 --device cuda \
+        > "$LOG_DIR/eval_${task}${resource}_${deadline}.log" 2>&1 < /dev/null &
+      echo $! > "$LOG_DIR/eval_${task}${resource}_${deadline}.pid"
     done
   done
 done
+echo "评测日志：$LOG_DIR"
 ```
 
-上述循环在同一设备上顺序运行；任一场景失败会停止，避免继续运行缺少模型的
-后续场景。正式运行前可用对应单条命令加 `--dry-run` 核对目录。
+每条 `nohup ... &` 都立即启动独立进程，循环不等待前一个场景完成。
+日志按启动批次保存在不同目录；后台进程失败需查看对应日志。正式运行前可用
+对应单条前台命令加 `--dry-run` 核对目录。
+
+单独启动或重跑某一场景时，可只运行一条命令，例如 SS/Tight 训练：
+
+```bash
+mkdir -p outputs/server_console_logs
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast_nta/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > "outputs/server_console_logs/nta_train_SS_Tight_$(date +%Y%m%d_%H%M%S).log" 2>&1 < /dev/null &
+echo "训练 PID：$!"
+```
+
+算法仍拒绝覆盖非空模型/日志/评测目录；更换控制台日志名不会改变实验输出
+目录。重跑前应自行归档该场景已有输出。
 
 `--diagnostics-every`、`--profile-mode`、`--profile-every` 与基线相同。对比时
 固定设备、线程和这些选项，同时报告能耗、工作流成功率、超期及训练/推理费用。

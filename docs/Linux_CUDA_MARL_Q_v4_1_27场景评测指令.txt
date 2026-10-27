@@ -1,0 +1,37 @@
+# MARL-Q marl_q_v4_1: nine source models, 27 target scenarios, seeds 700-729.
+# Run from the project root after the corresponding source models finish training.
+# Each call evaluates target task sizes S, M and L sequentially.
+
+eval_marl_v4_1() {
+    local res="$1" ddl="$2"
+    local prefix="outputs/server_eval_logs/eval_marl_q_v4_1_sourceS${res}_${ddl}_select_sr099_minenergy_v1_model1_seeds700-729"
+    mkdir -p outputs/server_eval_logs || return 1
+    CUDA_VISIBLE_DEVICES=0 python -c \
+        'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; torch.ones(1, device="cuda")' || return 1
+    CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+        for task in S M L; do
+            python -u launch.py algorithms/marl/evaluate.py \
+                --task "$task" --resource "$1" --deadline "$2" \
+                --train-task S --train-resource "$1" --train-deadline "$2" \
+                --seeds 700-729 --model-seed 1 \
+                --experiment-protocol configs/f22_split_v1.json \
+                --normalization-mode f19_shared_v1 --device cuda
+        done
+    ' _ "$res" "$ddl" > "${prefix}.log" 2>&1 &
+    echo $! > "${prefix}.pid"
+}
+
+# Source SS -> target SS, MS, LS
+eval_marl_v4_1 S Tight
+eval_marl_v4_1 S Medium
+eval_marl_v4_1 S Loose
+
+# Source SM -> target SM, MM, LM
+eval_marl_v4_1 M Tight
+eval_marl_v4_1 M Medium
+eval_marl_v4_1 M Loose
+
+# Source SL -> target SL, ML, LL
+eval_marl_v4_1 L Tight
+eval_marl_v4_1 L Medium
+eval_marl_v4_1 L Loose

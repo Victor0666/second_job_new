@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-MARL-Q V4：Host/VM FIFO 排队与精简观测。
+MARL-Q V4.1：有容量限制的 Host/VM FIFO 排队与精简观测。
 
 只调度 Ready 任务，忙 VM 接受非抢占预约，Queued 不计入运行负载。
 复用公共任务、通信、LF 子截止期和 Host 任务窗口能耗定义。
-固定源训练尺度；Global=task4+ready1+host2H，Local=task4+vm3M。
+固定源训练尺度；Global=task4+ready1+host2H，Local=task4+vm5M。
 工作流截止期沿用离线 FCFS 参考缓存及配对混合 alpha，不改奖励公式。
 """
 
@@ -32,6 +32,7 @@ from common.workflow_opt import (
 )
 from common.read_xml_opt_Tsize import validate_cached_instance, load_workflow_from_dax, poisson_arrival_times, dax_template_id
 from common.resource_opt import create_cluster
+from algorithms.marl.identity import QUEUE_CAPACITY
 
 
 class CloudWorkflowEnv_MARL(gym.Env):
@@ -69,8 +70,13 @@ class CloudWorkflowEnv_MARL(gym.Env):
         deadlines_out_dir: Optional[str] = None,
         deadlines_file_prefix: str = "marl",
         normalization_mode='legacy', normalization_config=None, source_train_scene=None,
+        queue_capacity=QUEUE_CAPACITY,
     ):
         super().__init__()
+        if (isinstance(queue_capacity, bool) or not np.isfinite(queue_capacity)
+                or int(queue_capacity) != queue_capacity or queue_capacity < 1):
+            raise ValueError('MARL queue_capacity must be a positive integer')
+        self.queue_capacity = int(queue_capacity)
         self.state_normalizer = load_normalizer(normalization_mode, normalization_config, source_train_scene)
         self.dax_paths = list(dax_paths)
         self.dax_map = {}
@@ -155,7 +161,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         self.block_task_dim = 4
         self.block_queue_dim = 0
         self.block_host_dim = 0
-        self.vm_feat_dim = 3
+        self.vm_feat_dim = 5
         self.local_obs_dim = (
             self.block_task_dim
             + self.block_queue_dim
@@ -433,7 +439,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         mask = np.zeros((self.local_act_dim,), dtype=np.float32)
         for slot, vmg in enumerate(vm_map):
-            if vmg >= 0:
+            if vmg >= 0 and len(self.vm_waiting_tasks[vmg]) < self.queue_capacity:
                 mask[slot] = 1.0
 
         return obs.astype(np.float32), mask.astype(np.float32), vm_map
@@ -527,6 +533,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         self.vm_available_at = np.zeros(self.num_vms, dtype=np.float64)
         # available_at is the reservation tail, not the instantaneous running load.
         self.vm_running_task = np.full(self.num_vms, -1, dtype=np.int64)
+        self.vm_waiting_tasks = [deque() for _ in range(self.num_vms)]
 
         self.completed_workflows = 0
         self.wf_remaining_tasks: Dict[int, int] = {}
@@ -560,7 +567,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
     # decision point
     # =========================================================
     def _has_decision_point(self) -> bool:
-        return len(self.ready_task_ids) > 0
+        return bool(self.ready_task_ids) and any(
+            len(queue) < self.queue_capacity for queue in self.vm_waiting_tasks)
 
     def _vm_idle_mask(self):
         return self.vm_running_task < 0
@@ -569,7 +577,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         mask = np.zeros((self.num_hosts,), dtype=np.float32)
         for hi, h in enumerate(self.host_ids):
             idxs = self.host_vm_indices[h]
-            if idxs:
+            if any(len(self.vm_waiting_tasks[j]) < self.queue_capacity for j in idxs):
                 mask[hi] = 1.0
         return mask
 
@@ -857,9 +865,6 @@ class CloudWorkflowEnv_MARL(gym.Env):
             event_time, etype, gid, vm_index_global = heapq.heappop(self.event_heap)
             vm = self.vms[self.vm_ids[vm_index_global]]
             host_id = int(vm.host_id)
-            if etype == 'start':
-                self._start_task(gid, vm_index_global)
-                continue
             if etype != 'finish' or self.vm_running_task[vm_index_global] != gid:
                 raise RuntimeError('Invalid MARL VM execution event')
             self.task_state[gid] = 'Finished'
@@ -892,15 +897,24 @@ class CloudWorkflowEnv_MARL(gym.Env):
                     self.task_ready_time[c_gid] = self.current_time
                     self.ready_task_ids.append(c_gid)
 
+            if self.vm_waiting_tasks[vm_index_global]:
+                self._start_task(self.vm_waiting_tasks[vm_index_global][0], vm_index_global)
+
         self.ready_task_ids = [x for x in self.ready_task_ids if self.task_state[x] == "Ready"]
 
     def _start_task(self, gid, vm_index):
         if self.vm_running_task[vm_index] != -1 or self.task_state[gid] != 'Queued':
             raise RuntimeError('MARL VM tasks overlap or start twice')
+        queue = self.vm_waiting_tasks[vm_index]
+        if queue:
+            if queue[0] != gid:
+                raise RuntimeError('MARL VM execution violates FIFO order')
+            queue.popleft()
         self.vm_running_task[vm_index] = gid
         self.task_state[gid] = 'Running'
         vm = self.vms[self.vm_ids[vm_index]]
         self._host_running_pc[int(vm.host_id)] += float(vm.pc)
+        heapq.heappush(self.event_heap, (self.task_end_time[gid], 'finish', gid, vm_index))
 
     # =========================================================
     # 分配
@@ -918,6 +932,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
         )[-1])
 
     def _assign_task_to_vm(self, gid: int, vm_index_global: int) -> float:
+        if len(self.vm_waiting_tasks[vm_index_global]) >= self.queue_capacity:
+            raise ValueError('MARL VM waiting queue is full')
         vid = int(self.vm_ids[vm_index_global])
         now = float(self.current_time)
 
@@ -941,12 +957,10 @@ class CloudWorkflowEnv_MARL(gym.Env):
         if gid in self.ready_task_ids:
             self.ready_task_ids.remove(gid)
 
-        heapq.heappush(self.event_heap, (end_time, "finish", gid, vm_index_global))
-        # Tuple ordering processes 'finish' before 'start' at the same timestamp.
         if start_time <= now:
             self._start_task(gid, vm_index_global)
         else:
-            heapq.heappush(self.event_heap, (start_time, 'start', gid, vm_index_global))
+            self.vm_waiting_tasks[vm_index_global].append(gid)
 
         self._records.append(LoadRecord(float(start_time), float(end_time), int(host_id), float(vm.pc)))
 
@@ -1005,6 +1019,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
                     vm.pc / self._obs_ref('vm_pc_ref', 1.),
                     vm.bw / self._obs_ref('vm_bw_ref', 1.),
                     float(self.vm_running_task[vmg] < 0),
+                    max(0., self.vm_available_at[vmg] - self.current_time) / self._obs_ref('T_ref', max(self.horizon, 1.)),
+                    self._task_duration(tid, vmg) / self._obs_ref('T_ref', max(self.horizon, 1.)),
                 ],
                 dtype=np.float32,
             )

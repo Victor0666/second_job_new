@@ -100,27 +100,27 @@ class QueueTests(unittest.TestCase):
         self.assertAlmostEqual(env.total_energy, env.hosts[0].power(1.))
         self.assertAlmostEqual(env.total_energy, energy_from_records(env.records,env.hosts,end_time=1.))
 
-    def test_compact_observations_have_no_prediction_or_other_host_queue(self):
+    def test_compact_observations_have_only_wait_exec_and_no_other_host_queue(self):
         with tempfile.TemporaryDirectory() as directory:
             config = Path(directory)/'scale.json'; fixture_config(config)
             env = queue_fixture(normalization_mode='f19_shared_v1', normalization_config=str(config), source_train_scene='SS_T')
             with patch.object(env, '_task_duration', side_effect=AssertionError('Prediction in observation')):
                 global_obs, _ = env.get_global_state()
-                local, _, _ = env.get_local_state(0)
-                self.assertEqual(global_obs.shape, (9,)); self.assertEqual(local.shape, (10,))
-                np.testing.assert_allclose(local[:4], [2/400,0,0,20/123])
-                np.testing.assert_allclose(local[4:7], [1/8,1000/8000,1])
-                np.testing.assert_array_equal(local[7:], [0,0,0])
-                self.assertAlmostEqual(global_obs[4], 2/3)
-                env.ready_task_ids.append(2)
-                env._host_running_pc[1] = 1.; env.vm_running_task[1] = 99
-                np.testing.assert_array_equal(local, env.get_local_state(0)[0])
-                env.workflows[0].deadline = -1.
-                self.assertLess(env.get_local_state(0)[0][3], 0.)
+            local, _, _ = env.get_local_state(0)
+            self.assertEqual(global_obs.shape, (9,)); self.assertEqual(local.shape, (14,))
+            np.testing.assert_allclose(local[:4], [2/400,0,0,20/123])
+            np.testing.assert_allclose(local[4:9], [1/8,1000/8000,1,0,2/123])
+            np.testing.assert_array_equal(local[9:], [0,0,0,0,0])
+            self.assertAlmostEqual(global_obs[4], 2/3)
+            env.ready_task_ids.append(2)
+            env._host_running_pc[1] = 1.; env.vm_running_task[1] = 99
+            np.testing.assert_array_equal(local, env.get_local_state(0)[0])
+            env.workflows[0].deadline = -1.
+            self.assertLess(env.get_local_state(0)[0][3], 0.)
         for resource, size in [('S',11),('M',17),('L',23)]:
             scene = MARLScenario(resource=resource)
             self.assertEqual(scene.describe()['global_obs_dim'],size)
-            self.assertEqual(scene.describe()['local_obs_dim'],31)
+            self.assertEqual(scene.describe()['local_obs_dim'],49)
 
 
 class SelectionTests(unittest.TestCase):

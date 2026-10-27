@@ -1,10 +1,11 @@
 """Stable experiment identity and isolated outputs for the adapted MARL baseline."""
 from pathlib import Path
 
-MODEL_VERSION = 'marl_q_v4'
-DISPLAY_NAME = 'MARL-Q'
-OBSERVATION_LAYOUT = 'task4_ready1_host2_local_vm3_v1'
-SCHEDULING_POLICY = 'vm_fifo_queue_v1'
+MODEL_VERSION = 'marl_q_v4_1'
+DISPLAY_NAME = 'MARL-Q4.1'
+OBSERVATION_LAYOUT = 'task4_ready1_host2_local_vm5_wait_exec_v1'
+SCHEDULING_POLICY = 'vm_fifo_queue_cap10_v1'
+QUEUE_CAPACITY = 10
 
 
 def evaluation_directory(scenario, project_dir):

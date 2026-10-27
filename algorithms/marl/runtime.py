@@ -5,6 +5,7 @@ import uuid
 import numpy as np
 import torch
 from algorithms.pd3qn_dag_fe.selection import selection_metadata, validation_selection
+from algorithms.marl.identity import OBSERVATION_LAYOUT, SCHEDULING_POLICY, QUEUE_CAPACITY
 
 
 @contextmanager
@@ -29,6 +30,8 @@ def isolated_evaluation(global_agent, locals):
 def selection_record(scenario, episode, candidate, best, rows, role):
     return dict(pair_id=str(uuid.uuid4()), episode=episode, completed_episodes=episode+1, role=role,
         checkpoint_selection=selection_metadata(), protocol=scenario.selection_protocol(),
+        observation_layout=OBSERVATION_LAYOUT, scheduling_policy=SCHEDULING_POLICY,
+        queue_capacity=QUEUE_CAPACITY,
         source_train_scene=scenario.normalization_kwargs()['source_train_scene'],
         model_seed=scenario.model_seed, validation_selection=candidate,
         best_validation_selection=best, validation=rows)
@@ -39,6 +42,8 @@ def validate_pair(global_agent, locals, scenario):
     if not metadata or metadata != getattr(locals, 'training_selection', None):
         raise ValueError('MARL Global/Local checkpoints are not a selected pair')
     expected = dict(role='best', checkpoint_selection=selection_metadata(),
+        observation_layout=OBSERVATION_LAYOUT, scheduling_policy=SCHEDULING_POLICY,
+        queue_capacity=QUEUE_CAPACITY,
         protocol=scenario.selection_protocol(), model_seed=scenario.model_seed,
         source_train_scene=scenario.normalization_kwargs()['source_train_scene'])
     for key, value in expected.items():

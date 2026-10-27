@@ -202,7 +202,7 @@ class MARLQTests(unittest.TestCase):
             self.assertTrue(restored.actor_optim.state); self.assertTrue(restored.critic_optim.state)
             for path, agent in ((gp, restored), (lp, restored_l)):
                 old = torch.load(path, weights_only=True)
-                for version in ('marl_q_v3','marl_q_v2','marl_independent_q_v2','marl_independent_q_v1'):
+                for version in ('marl_q_v4','marl_q_v3','marl_q_v2','marl_independent_q_v2','marl_independent_q_v1'):
                     old['model_version'] = version
                     torch.save(old, path)
                     before = path.read_bytes()
@@ -218,8 +218,8 @@ class MARLQTests(unittest.TestCase):
         self.assertNotEqual(Scenario(model_seed=1).model_name('marl'), Scenario(model_seed=2).model_name('marl'))
 
     def test_output_identity_separates_legacy_models_sources_and_evaluation_scenes(self):
-        self.assertEqual(DISPLAY_NAME, 'MARL-Q')
-        self.assertEqual(MODEL_VERSION, 'marl_q_v4')
+        self.assertEqual(DISPLAY_NAME, 'MARL-Q4.1')
+        self.assertEqual(MODEL_VERSION, 'marl_q_v4_1')
         scene = Scenario()
         root = Path('verification-root').resolve()
         directory = evaluation_directory(scene, root)
@@ -300,7 +300,7 @@ class MARLQTests(unittest.TestCase):
         self.assertFalse(np.array_equal(a[-4:], b[-4:]))
         np.testing.assert_array_equal(ma, mb)
         local, mask, _ = env.get_local_state(env.host_ids[0])
-        self.assertEqual(local.shape, (4+3*2,))
+        self.assertEqual(local.shape, (4+5*2,))
         self.assertEqual(len(local), env.local_obs_dim)
         np.testing.assert_array_equal(local[:4], b[:4])
 
@@ -327,7 +327,7 @@ class MARLQTests(unittest.TestCase):
             np.testing.assert_allclose(marl.get_global_state()[0][:3],ma._build_host_obs_for_task(tid)[0][:3],rtol=1e-6,atol=1e-6)
             # The retained task payload is shared, but V4 no longer copies HA's layout.
             local = marl.get_local_state(marl.host_ids[0])[0]
-            self.assertEqual(local.shape, (31,))
+            self.assertEqual(local.shape, (49,))
             marl.get_global_state()
             np.testing.assert_array_equal(local,marl.get_local_state(marl.host_ids[0])[0])
 

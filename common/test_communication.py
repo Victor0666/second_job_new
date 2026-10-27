@@ -68,8 +68,15 @@ class CommunicationTests(unittest.TestCase):
         return env.vm_assign(slot)[-1]['finish_time']
 
     def prediction(self, env, name, gid, vm):
-        if name in ('pd3qn', 'marl'):
-            return None  # These observations expose resources, not predicted completion.
+        if name == 'pd3qn':
+            return None
+        if name == 'marl':
+            host = env.vms[env.vm_ids[vm]].host_id
+            mapping = list(env.host_vm_indices[host])
+            slot = mapping.index(vm)
+            mapping += [-1] * (env.max_vms_per_host - len(mapping))
+            features = env._build_local_obs(gid, host, mapping)[4:].reshape(-1, 5)
+            return features[slot, 4] * env._obs_ref('T_ref', max(env.horizon, 1.))
         if name == 'irws':
             return env._build_vm_obs_for_task(gid)[7:].reshape(env.num_vms, 6)[vm, 4]
         host = env.vms[vm].host_id

@@ -1,5 +1,7 @@
 # MARL-Q V4
 
+> 本文记录历史版本 `marl_q_v4`。当前入口已升级为 [MARL-Q V4.1](MARL_Q_v4_1_implementation.md)，训练和评测请使用 V4.1 命令文件。
+
 正式版本为 `marl_q_v4`，显示名 MARL-Q。入口仍为 `algorithms/marl/train.py`、`algorithms/marl/evaluate.py`。本次按用户确定的方案修改 MARL；PD3QN-DAG-FE 只提供纯选模函数，其他算法的资源约束、学习机制和选模规则不改。
 
 ## 调度与物理执行

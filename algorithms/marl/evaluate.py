@@ -18,7 +18,7 @@ from common.experiment_measurements import EvaluationRecorder, episode_duration,
 from algorithms.marl.runtime import isolated_evaluation, validate_pair
 from algorithms.pd3qn_dag_fe.selection import selection_metadata
 from common.f18_state_normalization import bind_normalization
-from algorithms.marl.identity import MODEL_VERSION, DISPLAY_NAME, evaluation_directory, evaluation_csv
+from algorithms.marl.identity import MODEL_VERSION, DISPLAY_NAME, QUEUE_CAPACITY, evaluation_directory, evaluation_csv
 
 SCENARIO = Scenario(mode="eval")
 
@@ -114,6 +114,7 @@ def build_env_kwargs(deadline_cache_path: str) -> Dict[str, Any]:
         task_baseline_norm=300.0,
         alpha_delay=0.75,
         max_ready_tasks=64,
+        queue_capacity=QUEUE_CAPACITY,
         deadline_mode="cache_fcfs",
         deadline_cache_path=deadline_cache_path,
         alpha_deadline=1.5,

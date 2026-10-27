@@ -1,0 +1,45 @@
+# 本变体固定超期奖励权重0.9、能耗权重0.1，原FE的0.75版本保留。
+# 在对应9个源模型训练完成后，于仓库根目录执行。
+# 每次调用启动一个后台评测进程，依次评测同一源模型的S/M/L任务规模。
+# 9次调用覆盖27个目标场景；每场景测试种子700-729，模型种子1。
+# 源模型和评测均使用q10、dt5、rollout64、float32、F22/F19。
+mkdir -p outputs/server_console_logs
+
+eval_irws_r_fe_r090() {
+    local res="$1" ddl="$2"
+    local prefix="outputs/server_console_logs/eval_irws_r_fe_r090_sourceS${res}_${ddl}_SML_v3_fe_r090_v1_select_sr099_minenergy_v1_model1_seeds700-729_q10_dt5_n64_float32"
+
+    CUDA_VISIBLE_DEVICES=0 nohup bash -ec '
+res="$1"
+ddl="$2"
+for task in S M L; do
+    echo "[START] IRWS-R-FE_R090 task=${task} resource=${res} deadline=${ddl} source=S${res}/${ddl} seeds=700-729"
+    python -u launch.py algorithms/irws_r_fe_r090/evaluate.py \
+        --task "$task" --resource "$res" --deadline "$ddl" \
+        --train-task S --train-resource "$res" --train-deadline "$ddl" \
+        --seeds 700-729 --model-seed 1 \
+        --experiment-protocol configs/f22_split_v1.json \
+        --normalization-mode f19_shared_v1 \
+        --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 \
+        --device cuda
+    echo "[DONE] IRWS-R-FE_R090 task=${task} resource=${res} deadline=${ddl}"
+done
+echo "[ALL_DONE] IRWS-R-FE_R090 source=S${res}/${ddl} targets=S,M,L seeds=700-729"
+' irws_r_fe_r090_eval "$res" "$ddl" > "${prefix}.log" 2>&1 &
+    echo $! > "${prefix}.pid"
+}
+
+# SS源模型：分别评测S/M/L任务、小资源
+eval_irws_r_fe_r090 S Tight
+eval_irws_r_fe_r090 S Medium
+eval_irws_r_fe_r090 S Loose
+
+# SM源模型：分别评测S/M/L任务、中资源
+eval_irws_r_fe_r090 M Tight
+eval_irws_r_fe_r090 M Medium
+eval_irws_r_fe_r090 M Loose
+
+# SL源模型：分别评测S/M/L任务、大资源
+eval_irws_r_fe_r090 L Tight
+eval_irws_r_fe_r090 L Medium
+eval_irws_r_fe_r090 L Loose

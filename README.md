@@ -1,5 +1,7 @@
 # MAHDRL 实验代码
 
+新增独立消融 `mahdrl_oe_ge_apf_score_fast_nva`（MAHDRL-AS-Fast-V2-NVA）：保留主机 APF，删除 VM APF，在选定主机的全部合法空闲 VM 中等概率随机选择，仅训练 TA/HA，保留 HA GE、OE 奖励和 SR099 选模。模型与结果独立；定义、验证及 Linux/CUDA 后台并行指令见 [AS-Fast-V2-NVA 说明](docs/MAHDRL_AS_Fast_NVA.md)。
+
 新增独立消融 `mahdrl_oe_ge_apf_score_fast_nha`（MAHDRL-AS-Fast-V2-NHA）：关闭主机 APF，从所有至少有一个合法空闲 VM 的主机中等概率随机选择，仅训练 TA/VA，保留 VM APF、VA GE、OE 奖励和 SR099 选模。模型与结果独立；定义、验证及 Linux/CUDA 后台并行指令见 [AS-Fast-V2-NHA 说明](docs/MAHDRL_AS_Fast_NHA.md)。
 
 新增独立消融 `mahdrl_oe_ge_apf_score_fast_nta`（MAHDRL-AS-Fast-V2-NTA）：在 AS-Fast v2 上将 TA 改为随机合法排序权重增量，仅训练 HA/VA，保留 OE/GE/APF、集合打分网络和 SR099 选模规则。训练和评测入口位于同名算法目录；模型与结果独立，详见 [AS-Fast-V2-NTA 说明](docs/MAHDRL_AS_Fast_NTA.md)。

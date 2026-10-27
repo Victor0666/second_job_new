@@ -1,0 +1,47 @@
+# Linux / Bash：PD3QN-FE-R090 27场景评测（9个三合一）
+# 每组加载一个源训练task=S的R090模型，依次评测task=S/M/L，得到原场景1个+泛化2个结果。
+# resource和deadline在组内保持源训练值；各目标30个实例，9组共27场景、810次实例评测。
+# 仅加载best_pd3qn_fe_r090.pth；源模型必须重新训练，不能使用原0.75权重或其他算法模型。
+# 泛化使用源训练场景的f19_shared_v1冻结校准。先完成对应训练，再启动该组评测。
+# 从项目根目录、已激活的Python/CUDA环境运行；CUDA_VISIBLE_DEVICES=0按实际GPU分配调整。
+# 任一目标失败时该组停止；非空结果目录拒绝覆盖，同名控制台日志重跑会覆盖。
+# 如本版本S目标已完成，将对应for task in S M L改为for task in M L，只补两个泛化目标。
+# 主CSV包含场景、模型种子与测试种子，例如eval_pd3qn_fe_r090_taskS_resS_Loose_model1_seeds700-729.csv。
+
+mkdir -p outputs/server_eval_logs
+
+# PD3QN-FE-R090 评测 | 源SS/Tight -> SS、MS、LS / Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSS_Tight_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSS_Tight_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid
+
+# PD3QN-FE-R090 评测 | 源SS/Medium -> SS、MS、LS / Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource S --deadline Medium --train-task S --train-resource S --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSS_Medium_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSS_Medium_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid
+
+# PD3QN-FE-R090 评测 | 源SS/Loose -> SS、MS、LS / Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource S --deadline Loose --train-task S --train-resource S --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSS_Loose_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSS_Loose_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid
+
+# PD3QN-FE-R090 评测 | 源SM/Tight -> SM、MM、LM / Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource M --deadline Tight --train-task S --train-resource M --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSM_Tight_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSM_Tight_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid
+
+# PD3QN-FE-R090 评测 | 源SM/Medium -> SM、MM、LM / Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource M --deadline Medium --train-task S --train-resource M --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSM_Medium_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSM_Medium_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid
+
+# PD3QN-FE-R090 评测 | 源SM/Loose -> SM、MM、LM / Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource M --deadline Loose --train-task S --train-resource M --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSM_Loose_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSM_Loose_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid
+
+# PD3QN-FE-R090 评测 | 源SL/Tight -> SL、ML、LL / Tight
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource L --deadline Tight --train-task S --train-resource L --train-deadline Tight --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSL_Tight_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSL_Tight_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid
+
+# PD3QN-FE-R090 评测 | 源SL/Medium -> SL、ML、LL / Medium
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource L --deadline Medium --train-task S --train-resource L --train-deadline Medium --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSL_Medium_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSL_Medium_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid
+
+# PD3QN-FE-R090 评测 | 源SL/Loose -> SL、ML、LL / Loose
+CUDA_VISIBLE_DEVICES=0 nohup bash -ec 'for task in S M L; do python -u launch.py algorithms/pd3qn_fe_r090/evaluate.py --task "$task" --resource L --deadline Loose --train-task S --train-resource L --train-deadline Loose --seeds 700-729 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda; done' > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSL_Loose_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.log 2>&1 &
+echo $! > outputs/server_eval_logs/eval_pd3qn_fe_r090_sourceSL_Loose_SML_v1_select_sr099_minenergy_v1_model1_seeds700-729.pid

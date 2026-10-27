@@ -1,0 +1,48 @@
+# Linux / Bash：PD3QN-FE-R090 九个源场景600回合训练
+# 从项目根目录、已激活的Python/CUDA环境运行；CUDA_VISIBLE_DEVICES=0按实际GPU分配调整。
+# task=S，resource=S/M/L × deadline=Tight/Medium/Loose，共9个源模型，model-seed=1。
+# 延迟/能耗权重0.9/0.1；总体工作流成功率>=99%后选最低能耗，不计算ESP。
+# 学习配置与PD3QN-FE一致，使用f19_shared_v1源训练场景冻结校准。
+# 每组独立后台启动，请按显存分批执行；非空训练目录拒绝覆盖，同名控制台日志重跑会覆盖。
+
+mkdir -p outputs/server_console_logs
+python launch.py common/f22_cache.py --all
+# 复用MAHDRL/PD3QN-FE相同的冻结校准，默认outputs/f18_normalization_calibration/f18_shared_normalization_v1.json。
+# 如校准尚未完成，先运行：python launch.py common/f18_calibrate_normalization.py --all-nine --seeds 101-130 --resume
+# 已完成的校准直接复用，不用验证或测试实例重新拟合。
+
+# PD3QN-FE-R090 训练 | SS | Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SS_Tight_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SS_Tight_v1_select_sr099_minenergy_v1_ep600_model1.pid
+
+# PD3QN-FE-R090 训练 | SS | Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource S --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SS_Medium_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SS_Medium_v1_select_sr099_minenergy_v1_ep600_model1.pid
+
+# PD3QN-FE-R090 训练 | SS | Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource S --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SS_Loose_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SS_Loose_v1_select_sr099_minenergy_v1_ep600_model1.pid
+
+# PD3QN-FE-R090 训练 | SM | Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource M --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SM_Tight_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SM_Tight_v1_select_sr099_minenergy_v1_ep600_model1.pid
+
+# PD3QN-FE-R090 训练 | SM | Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource M --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SM_Medium_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SM_Medium_v1_select_sr099_minenergy_v1_ep600_model1.pid
+
+# PD3QN-FE-R090 训练 | SM | Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource M --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SM_Loose_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SM_Loose_v1_select_sr099_minenergy_v1_ep600_model1.pid
+
+# PD3QN-FE-R090 训练 | SL | Tight
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource L --deadline Tight --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SL_Tight_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SL_Tight_v1_select_sr099_minenergy_v1_ep600_model1.pid
+
+# PD3QN-FE-R090 训练 | SL | Medium
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource L --deadline Medium --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SL_Medium_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SL_Medium_v1_select_sr099_minenergy_v1_ep600_model1.pid
+
+# PD3QN-FE-R090 训练 | SL | Loose
+CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py algorithms/pd3qn_fe_r090/train.py --task S --resource L --deadline Loose --episodes 600 --model-seed 1 --experiment-protocol configs/f22_split_v1.json --normalization-mode f19_shared_v1 --device cuda > outputs/server_console_logs/pd3qn_fe_r090_SL_Loose_v1_select_sr099_minenergy_v1_ep600_model1.log 2>&1 &
+echo $! > outputs/server_console_logs/pd3qn_fe_r090_SL_Loose_v1_select_sr099_minenergy_v1_ep600_model1.pid

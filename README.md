@@ -1,5 +1,7 @@
 # MAHDRL 实验代码
 
+新增独立消融 `mahdrl_oe_ge_apf_score_fast_nha`（MAHDRL-AS-Fast-V2-NHA）：关闭主机 APF，从所有至少有一个合法空闲 VM 的主机中等概率随机选择，仅训练 TA/VA，保留 VM APF、VA GE、OE 奖励和 SR099 选模。模型与结果独立；定义、验证及 Linux/CUDA 后台并行指令见 [AS-Fast-V2-NHA 说明](docs/MAHDRL_AS_Fast_NHA.md)。
+
 新增独立消融 `mahdrl_oe_ge_apf_score_fast_nta`（MAHDRL-AS-Fast-V2-NTA）：在 AS-Fast v2 上将 TA 改为随机合法排序权重增量，仅训练 HA/VA，保留 OE/GE/APF、集合打分网络和 SR099 选模规则。训练和评测入口位于同名算法目录；模型与结果独立，详见 [AS-Fast-V2-NTA 说明](docs/MAHDRL_AS_Fast_NTA.md)。
 
 新增独立对比算法 `two_stage_gat`（2SD-GAT-Adapted）：保留作者两阶段 GAT–PPO 与忙碌 VM 队尾未来预留，接入共同能耗—截止期问题，使用原 6＋4 维观测的目标适配。当前独立选模 v2 按论文 Gamma=0.92、beta=0.99，在验证经验达标候选中选最低能耗；其他算法的选模保持原样。训练/评测入口为 `algorithms/two_stage_gat/train.py`、`evaluate.py`；选模边界、源码差异和单场景显存测量见 [2SD-GAT 实现说明](docs/Two_stage_GAT_implementation.md)。

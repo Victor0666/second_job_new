@@ -87,7 +87,9 @@ def probe():
     agent=QAgent(len(local),len(mask),cfg)
     tail=None
     if not done:
+        next_host=host
         local2,mask2,_=env.get_local_state(env.host_ids[host])
+        act2=int(np.flatnonzero(mask2>.5)[0])
         tail=agent.successor_q(Decision(local2,mask2,act2))
     losses=agent.update(current_local,rl,tail)
     if not done:

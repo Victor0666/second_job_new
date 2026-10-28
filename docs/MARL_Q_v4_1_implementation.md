@@ -1,5 +1,7 @@
 # MARL-Q V4.1
 
+> 本文记录允许忙 VM 排队的历史版本。当前入口已升级为仅向空闲 VM 分配的 [V4.2](MARL_Q_v4_2_implementation.md)，训练和评测请使用 V4.2 命令文件。
+
 版本为 `marl_q_v4_1`，显示名为 MARL-Q4.1。入口保持 `algorithms/marl/train.py` 和 `algorithms/marl/evaluate.py`。在 V4 上增加每 VM 等待队列容量屏蔽、Local 的可用等待时间和执行时长，保留 Global 基本输入以及现有学习与选模设置。
 
 ## 队列与动作约束

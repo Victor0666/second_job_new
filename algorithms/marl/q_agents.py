@@ -166,9 +166,8 @@ def _load(path, device, normalization):
     if not isinstance(ckpt, dict) or ckpt.get('model_version') != MODEL_VERSION or ckpt.get('learning_model') != LEARNING_MODEL:
         raise ValueError(f'Expected {MODEL_VERSION} (actual-action TD) checkpoint; retrain the new model')
     check_checkpoint(ckpt.get('normalization'), normalization)
-    for key in ('scheduling_policy', 'queue_capacity', 'queue_capacity_counts'):
-        if (ckpt.get('normalization') or {}).get(key) != normalization.get(key):
-            raise ValueError('MARL checkpoint scheduling mismatch: ' + key)
+    if (ckpt.get('normalization') or {}).get('scheduling_policy') != normalization.get('scheduling_policy'):
+        raise ValueError('MARL checkpoint scheduling mismatch: scheduling_policy')
     return ckpt
 
 

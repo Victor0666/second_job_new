@@ -1,6 +1,6 @@
 # MARL：独立 Local 与动作条件 Q-Critic 适配
 
-> 本文保留 v1–v3 历史实现和验收记录。当前正式版本为 `marl_q_v4_1`，见 [V4.1 实现说明](MARL_Q_v4_1_implementation.md)；上一版见 [V4 历史说明](MARL_Q_v4_implementation.md)。
+> 本文保留 v1–v3 历史实现和验收记录。当前正式版本为 `marl_q_v4_2`，见 [V4.2 实现说明](MARL_Q_v4_2_implementation.md)；历史版本见 [V4.1](MARL_Q_v4_1_implementation.md) 和 [V4](MARL_Q_v4_implementation.md)。
 
 2026-10-24 更新。正式入口仍为 `algorithms/marl/train.py` 和 `evaluate.py`，算法版本为 `marl_q_v3`。此次将 Global/Local 后继 Q 从完整策略期望改为单样本估计，Global 仅查询抽中的一个 Local；其他已确定的适配方案保留。
 

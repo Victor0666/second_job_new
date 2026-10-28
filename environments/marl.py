@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-MARL-Q V4.1：有容量限制的 Host/VM FIFO 排队与精简观测。
+MARL-Q V4.2：仅向空闲 VM 分配与精简观测。
 
-只调度 Ready 任务，忙 VM 接受非抢占预约，Queued 不计入运行负载。
+Ready 任务全局 FCFS 等待，选择空闲 VM 后立即开始，无 VM 等待队列。
 复用公共任务、通信、LF 子截止期和 Host 任务窗口能耗定义。
 固定源训练尺度；Global=task4+ready1+host2H，Local=task4+vm5M。
 工作流截止期沿用离线 FCFS 参考缓存及配对混合 alpha，不改奖励公式。
@@ -13,7 +13,6 @@ from common.f18_state_normalization import checked_observation, load_normalizer,
 import os
 import json
 import heapq
-from collections import deque
 from typing import Dict, List, Tuple, Optional
 
 import numpy as np
@@ -32,7 +31,6 @@ from common.workflow_opt import (
 )
 from common.read_xml_opt_Tsize import validate_cached_instance, load_workflow_from_dax, poisson_arrival_times, dax_template_id
 from common.resource_opt import create_cluster
-from algorithms.marl.identity import QUEUE_CAPACITY
 
 
 class CloudWorkflowEnv_MARL(gym.Env):
@@ -70,13 +68,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
         deadlines_out_dir: Optional[str] = None,
         deadlines_file_prefix: str = "marl",
         normalization_mode='legacy', normalization_config=None, source_train_scene=None,
-        queue_capacity=QUEUE_CAPACITY,
     ):
         super().__init__()
-        if (isinstance(queue_capacity, bool) or not np.isfinite(queue_capacity)
-                or int(queue_capacity) != queue_capacity or queue_capacity < 1):
-            raise ValueError('MARL queue_capacity must be a positive integer')
-        self.queue_capacity = int(queue_capacity)
         self.state_normalizer = load_normalizer(normalization_mode, normalization_config, source_train_scene)
         self.dax_paths = list(dax_paths)
         self.dax_map = {}
@@ -302,7 +295,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         """
         一个决策步：
         1) Global：为“当前任务(FCFS)”选择 Host（必须 host_mask=1）
-        2) Local：在该 Host 内选真实 VM，忙 VM 按 FIFO 排队
+        2) Local：在该 Host 内选真实且空闲的 VM
         3) 分配 -> 推进到下一个决策点 -> 计算能耗差分 + 延迟差分奖励
         """
         if self.done_flag:
@@ -341,14 +334,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         vm_index_global = int(vm_map[int(vm_action)])
         vm_id = int(self.vm_ids[vm_index_global])
-        self.host_pending_tasks[host_id].append(tid)
-
         end_time = self._assign_task_to_vm(tid, vm_index_global)
-
-        if len(self.host_pending_tasks[host_id]) > 0 and self.host_pending_tasks[host_id][0] == tid:
-            self.host_pending_tasks[host_id].popleft()
-        else:
-            self.host_pending_tasks[host_id] = deque([x for x in self.host_pending_tasks[host_id] if x != tid])
 
         task_deadline = float(self.task_baseline_finish[tid]) if tid < len(self.task_baseline_finish) else float(end_time)
         lateness = max(0.0, float(end_time) - float(task_deadline))
@@ -401,7 +387,6 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
             "completed_wf": int(self.completed_workflows),
             "wf_target": int(self.workflows_per_episode) if self.workflows_per_episode is not None else None,
-            "host_pending_len": int(len(self.host_pending_tasks[host_id])),
         }
         return {"global_obs": gobs2, "global_mask": gmask2}, float(r_global), float(r_local), done, info
 
@@ -418,17 +403,12 @@ class CloudWorkflowEnv_MARL(gym.Env):
         return obs.astype(np.float32), mask.astype(np.float32)
 
     def get_local_state(self, host_id: int):
-        queue = self.host_pending_tasks[int(host_id)]
-        if queue:
-            tid = int(queue[0])
-        else:
-            # Global has selected a host; expose the real FCFS task before step enqueues it.
-            if self.done_flag or not self._has_decision_point():
-                return (np.zeros(self.local_obs_dim, np.float32),
-                        np.zeros(self.local_act_dim, np.float32), [])
-            if self._cur_task_gid is None:
-                self._update_current_task_fcfs()
-            tid = int(self._cur_task_gid)
+        if self.done_flag or not self._has_decision_point():
+            return (np.zeros(self.local_obs_dim, np.float32),
+                    np.zeros(self.local_act_dim, np.float32), [])
+        if self._cur_task_gid is None:
+            self._update_current_task_fcfs()
+        tid = int(self._cur_task_gid)
 
         vm_indices = list(self.host_vm_indices[int(host_id)])
         vm_map = []
@@ -438,8 +418,9 @@ class CloudWorkflowEnv_MARL(gym.Env):
         obs = self._build_local_obs(tid, int(host_id), vm_map)
 
         mask = np.zeros((self.local_act_dim,), dtype=np.float32)
+        idle = self._vm_idle_mask()
         for slot, vmg in enumerate(vm_map):
-            if vmg >= 0 and len(self.vm_waiting_tasks[vmg]) < self.queue_capacity:
+            if vmg >= 0 and idle[vmg]:
                 mask[slot] = 1.0
 
         return obs.astype(np.float32), mask.astype(np.float32), vm_map
@@ -531,9 +512,8 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         self.event_heap: List[Tuple[float, str, int, int]] = []
         self.vm_available_at = np.zeros(self.num_vms, dtype=np.float64)
-        # available_at is the reservation tail, not the instantaneous running load.
+        # available_at is the current task's finish time; busy VMs cannot accept work.
         self.vm_running_task = np.full(self.num_vms, -1, dtype=np.int64)
-        self.vm_waiting_tasks = [deque() for _ in range(self.num_vms)]
 
         self.completed_workflows = 0
         self.wf_remaining_tasks: Dict[int, int] = {}
@@ -555,7 +535,6 @@ class CloudWorkflowEnv_MARL(gym.Env):
         self._energy_last_busy = {}
 
         self._cur_task_gid = None
-        self.host_pending_tasks = {h: deque() for h in self.host_ids}
 
         self._ddl_txt_path = None
         self._ddl_jsonl_path = None
@@ -567,17 +546,17 @@ class CloudWorkflowEnv_MARL(gym.Env):
     # decision point
     # =========================================================
     def _has_decision_point(self) -> bool:
-        return bool(self.ready_task_ids) and any(
-            len(queue) < self.queue_capacity for queue in self.vm_waiting_tasks)
+        return bool(self.ready_task_ids) and bool(np.any(self._vm_idle_mask()))
 
     def _vm_idle_mask(self):
-        return self.vm_running_task < 0
+        return (self.vm_running_task < 0) & (self.vm_available_at <= self.current_time + 1e-12)
 
     def _global_mask(self):
         mask = np.zeros((self.num_hosts,), dtype=np.float32)
+        idle = self._vm_idle_mask()
         for hi, h in enumerate(self.host_ids):
             idxs = self.host_vm_indices[h]
-            if any(len(self.vm_waiting_tasks[j]) < self.queue_capacity for j in idxs):
+            if any(idle[j] for j in idxs):
                 mask[hi] = 1.0
         return mask
 
@@ -897,24 +876,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
                     self.task_ready_time[c_gid] = self.current_time
                     self.ready_task_ids.append(c_gid)
 
-            if self.vm_waiting_tasks[vm_index_global]:
-                self._start_task(self.vm_waiting_tasks[vm_index_global][0], vm_index_global)
-
         self.ready_task_ids = [x for x in self.ready_task_ids if self.task_state[x] == "Ready"]
-
-    def _start_task(self, gid, vm_index):
-        if self.vm_running_task[vm_index] != -1 or self.task_state[gid] != 'Queued':
-            raise RuntimeError('MARL VM tasks overlap or start twice')
-        queue = self.vm_waiting_tasks[vm_index]
-        if queue:
-            if queue[0] != gid:
-                raise RuntimeError('MARL VM execution violates FIFO order')
-            queue.popleft()
-        self.vm_running_task[vm_index] = gid
-        self.task_state[gid] = 'Running'
-        vm = self.vms[self.vm_ids[vm_index]]
-        self._host_running_pc[int(vm.host_id)] += float(vm.pc)
-        heapq.heappush(self.event_heap, (self.task_end_time[gid], 'finish', gid, vm_index))
 
     # =========================================================
     # 分配
@@ -932,8 +894,10 @@ class CloudWorkflowEnv_MARL(gym.Env):
         )[-1])
 
     def _assign_task_to_vm(self, gid: int, vm_index_global: int) -> float:
-        if len(self.vm_waiting_tasks[vm_index_global]) >= self.queue_capacity:
-            raise ValueError('MARL VM waiting queue is full')
+        if not 0 <= vm_index_global < self.num_vms or not self._vm_idle_mask()[vm_index_global]:
+            raise ValueError('MARL task requires an idle VM')
+        if not 0 <= gid < len(self.task_state) or self.task_state[gid] != 'Ready':
+            raise ValueError('MARL task is not Ready')
         vid = int(self.vm_ids[vm_index_global])
         now = float(self.current_time)
 
@@ -947,20 +911,19 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
         tau_exec = self._task_duration(gid, vm_index_global)
 
-        start_time = max(now, float(self.vm_available_at[vm_index_global]))
+        start_time = now
         end_time = float(start_time + float(tau_exec))
 
-        self.task_state[gid] = 'Queued'
+        self.task_state[gid] = 'Running'
         self.task_end_time[gid] = end_time
         self.vm_available_at[vm_index_global] = end_time
 
         if gid in self.ready_task_ids:
             self.ready_task_ids.remove(gid)
 
-        if start_time <= now:
-            self._start_task(gid, vm_index_global)
-        else:
-            self.vm_waiting_tasks[vm_index_global].append(gid)
+        self.vm_running_task[vm_index_global] = gid
+        self._host_running_pc[host_id] += float(vm.pc)
+        heapq.heappush(self.event_heap, (end_time, 'finish', gid, vm_index_global))
 
         self._records.append(LoadRecord(float(start_time), float(end_time), int(host_id), float(vm.pc)))
 
@@ -1009,6 +972,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
 
     def _build_local_obs(self, tid: int, host_id: int, vm_map):
         vm_block = np.zeros((self.max_vms_per_host, self.vm_feat_dim), dtype=np.float32)
+        idle = self._vm_idle_mask()
         for slot, vmg in enumerate(vm_map):
             if vmg < 0:
                 continue
@@ -1018,7 +982,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
                 [
                     vm.pc / self._obs_ref('vm_pc_ref', 1.),
                     vm.bw / self._obs_ref('vm_bw_ref', 1.),
-                    float(self.vm_running_task[vmg] < 0),
+                    float(idle[vmg]),
                     max(0., self.vm_available_at[vmg] - self.current_time) / self._obs_ref('T_ref', max(self.horizon, 1.)),
                     self._task_duration(tid, vmg) / self._obs_ref('T_ref', max(self.horizon, 1.)),
                 ],

@@ -1,0 +1,51 @@
+# MARL-Q V4.2
+
+正式版本为 `marl_q_v4_2`，显示名 MARL-Q4.2。入口保持 `algorithms/marl/train.py` 和 `algorithms/marl/evaluate.py`。在 V4.1 基础上仅向空闲 VM 分配，保留现有观测、学习设置、奖励公式和选模规则。
+
+## 分配与等待
+
+Global 只能选择至少有一台空闲 VM 的 Host；Local 只能选择该 Host 内真实存在且空闲的 VM。统一空闲条件为当前无运行任务且 `vm_available_at <= now + 1e-12`。实际分配再次检查 VM 空闲和任务 Ready，非法动作报错，不改派到其他资源。
+
+Ready 任务按 Ready 时间、任务 ID 的 FCFS 顺序留在全局集合中等待，等待期间不绑定 Host/VM，不预约完成时间。全部 VM 忙时，处理工作流到达和任务完成事件、推进物理时间并结算能耗，直到有 Ready 任务且至少一台 VM 空闲，再生成决策。分配后立即从 Ready 转为 Running，执行区间从当前时间开始。
+
+删除每 VM FIFO 等待队列、Queued 状态、容量10配置与相关屏蔽逻辑；Host 临时待分配队列也移除，由 Global/Local 共同读取同一当前 Ready 任务。VM 完成事件只登记实际运行任务；零时长任务在下一决策前完成，不重复执行。仍为非抢占执行，无迁移、重排或新增等待动作。
+
+## 观测与学习
+
+Global 仍为任务4项、Ready 数量1项、每 Host 平均 VM 算力和实际利用率2项。S/M/L 资源维度11/17/23保持。Local 仍为任务4项加每 VM 5项，最多9个槽位时49维：
+
+| 字段 | 定义 |
+|---|---|
+| 任务4项 | MI、总输入 bits、输出 bits、工作流截止时间减当前时间 |
+| VM算力/带宽 | 沿用源训练场景冻结尺度 |
+| VM忙闲标志 | 与动作掩码使用相同空闲判定 |
+| VM可用等待时间 | `max(0, vm_available_at - now)`，除以冻结 `T_ref` |
+| 逐VM执行时长 | `_task_duration(task, vm)`，包含通信、不含资源等待，除以 `T_ref` |
+
+被屏蔽的忙 VM 仍显示其状态；可选空闲 VM 的等待时间为0。执行时长继续使用父任务位置、同 VM 输入减免和实际分配的同一物理计算器。不恢复预计完成时间、最佳/平均执行时长、Rank、子节点数、I/O ratio 或额外队列/Host 统计。不存在的 VM 槽位继续结构性 padding。
+
+每 Host 独立 Actor/Critic/优化器、Global Critic 的实际 Local 动作输入、复用实际后继动作的一步 TD、Critic→Actor、固定 F19 归一化不变。隐藏层1024/1024/512/512/256，Adam lr=3e-4，gamma=.95，熵正则和梯度裁剪为0，保持原设置。奖励公式及权重、任务 LF 子截止期、通信和 Host 任务窗口能耗定义保持；分配时点和奖励对应的时间区间随空闲约束自然变化。
+
+选模继续使用 `select_sr099_minenergy_v1`；F22 训练/验证/测试划分、验证随机状态隔离、配对保存和确定性评测保持。
+
+## 版本隔离与运行
+
+观测标签仍为 `task4_ready1_host2_local_vm5_wait_exec_v1`；新调度标识为 `idle_vm_only_v1`。检查点、日志、CSV 和 summary 使用 `marl_q_v4_2` 身份，与 V4/V4.1 隔离。即使观测维度相同，也拒绝加载 V4.1 或更早模型；配对元数据与加载检查核对调度标识，需要重新训练。
+
+训练使用短目录：`outputs/ckpts/marl_q_v4_2/SS_Tight_m1_cXXXXXXXX/` 和 `outputs/logs/marl_q_v4_2/SS_Tight_m1_cXXXXXXXX/`。末尾8位配置标识覆盖协议、选模、观测/调度、归一化、校准文件内容和能耗口径；完整元数据仍写入文件。训练与跨任务评测使用同一源场景目录，训练 CSV 也写入该短日志目录，不再自行拼接旧长路径。
+
+最终评测 CSV 全部平铺到 `outputs/run/marl_q_v4_2/`，例如 `eval_marl_q_v4_2_LS_Tight_fromSS_Tight_m1_s700-729_cXXXXXXXX.csv`。文件名包含版本、目标场景、源训练场景、模型种子、测试种子及配置标识；27个场景无需依靠父文件夹区分。逐种子测量和 summary 独立保存在同目录下的 `_details/<16位文件名哈希>/`，避免同名 seed 明细互相覆盖。CSV已存在或对应明细有残留时继续拒绝覆盖；其他场景的文件不阻止当前评测。
+
+本次路径调整不改变算法或检查点格式。若已训练同版本 V4.2 的旧长目录模型，可在评测时传 `--checkpoint-dir <原检查点目录>`，无需因路径变化重训或移动文件。显式 `--out <CSV路径>` 继续生效，明细随该 CSV 放在其父目录的 `_details/` 下。
+
+运行命令见 [600回合训练](Linux_CUDA_MARL_Q_v4_2_600代训练指令.txt)和[27场景评测](Linux_CUDA_MARL_Q_v4_2_27场景评测指令.txt)。训练自动选择 CUDA，命令文件先检查 CUDA 可用；评测支持 `--device cuda`。旧命令指向同一 Python 入口，实际算法由代码版本决定；请使用新命令以避免控制台日志混用旧版本名称。
+
+验证入口：`python -B -m unittest common.test_marl_v4_2 common.test_marl_v4 common.test_marl_q common.test_communication -q`，覆盖忙 VM/全忙 Host 掩码、无副作用拒绝、全局 FCFS 等待、到达/完成事件推进、零时长任务、截断、保留观测和检查点调度绑定。原 V4.1 容量测试已替换为 V4.2 空闲约束测试。
+
+正式宽度 CPU 烟测记录见 `MARL_Q_v4_2_smoke.json`，覆盖真实训练、验证选模、成套检查点重载、无更新评测、每次实际分配检查 VM 空闲和立即开始，以及重复输出保护。烟测不证明600回合收敛或成功率恢复。
+
+2026-10-29 已通过135项回归测试：MARL-Q/V4/V4.2、通信、F11/F18/F19/F22、能耗、任务子截止期、配对实例、场景和 DAX。正式宽度 CPU 烟测完成59次训练分配，训练/验证/评测合计211次分配均检查空闲且立即开始，Global/Local 后继 Q 读取58/56次、奖励余额均为0。正式宽度有限更新探针通过，记录见 `MARL_Q_v4_2_probe.json`。CLI dry-run 确认训练与跨任务评测源模型目录一致，Global17/Local49、新版本与调度标识正确；两份命令文件通过 Bash 语法检查。未运行600回合正式训练或CUDA实测。
+
+路径验收入口：`python -B -m unittest common.test_marl_paths -q`。检查9个短源训练目录、27个同父目录且下载后可区分的CSV、精确测试种子/配置隔离、校准文件迁移、显式路径覆盖及部分输出保护。端到端烟测的完整评测入口已切换为默认平铺CSV路径。
+
+路径调整后已通过40项 MARL 路径/学习/执行测试、18项场景/F22集成测试，以及正式网络宽度 CPU 端到端烟测。CLI实际预检查示例为 `outputs/ckpts/marl_q_v4_2/SM_Tight_m1_c61f2b4ec/`、`outputs/logs/marl_q_v4_2/SM_Tight_m1_c61f2b4ec/`，对应跨任务评测CSV为 `outputs/run/marl_q_v4_2/eval_marl_q_v4_2_LM_Tight_fromSM_Tight_m1_s700-729_c61f2b4ec.csv`。配置标识随实际协议和校准内容变化，不应写死；新版命令参数不变，控制台日志前缀也已缩短。

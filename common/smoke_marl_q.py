@@ -14,7 +14,7 @@ import torch
 
 from algorithms.marl import train, evaluate
 from algorithms.marl.q_agents import MODEL_VERSION, QAgent, QConfig, QDecisionTrace
-from algorithms.marl.identity import evaluation_directory
+from algorithms.marl.identity import evaluation_directory, evaluation_csv, SCHEDULING_POLICY
 from common.precompute_deadlines import main as precompute
 from common.scenarios import Scenario
 from algorithms.marl.scenario import MARLScenario
@@ -36,6 +36,18 @@ def run_smoke(hidden_dims=(16,8)):
 
         scene = SmokeScenario(mode='train', episodes=1, normalization_config=str(config))
         original = train.CloudWorkflowEnv_MARL
+        assignment_checks = dict(count=0)
+        original_assign = original._assign_task_to_vm
+        def assign(env, gid, vm_index):
+            assert env.task_state[gid] == 'Ready'
+            assert env._vm_idle_mask()[vm_index], 'Policy assigned a busy VM'
+            now = env.current_time
+            result = original_assign(env, gid, vm_index)
+            assert env.records[-1].start_time == now
+            assert env.task_state[gid] == 'Running'
+            assert 'Queued' not in env.task_state
+            assignment_checks['count'] += 1
+            return result
         def environment(**kwargs):
             kwargs.update(workflows_per_episode=2, dump_deadlines=False, print_deadlines=False)
             return original(**kwargs)
@@ -71,7 +83,8 @@ def run_smoke(hidden_dims=(16,8)):
 
         with redirect_stdout(io.StringIO()):
             precompute(Scenario(mode='precompute', seed_spec='0,600,700', cache_output=str(scene.cache_path)))
-            with patch.object(train,'SCENARIO',scene), patch.object(train,'QConfig',side_effect=cfg), \
+            with patch.object(original,'_assign_task_to_vm',assign), \
+                    patch.object(train,'SCENARIO',scene), patch.object(train,'QConfig',side_effect=cfg), \
                     patch.object(train,'CloudWorkflowEnv_MARL',side_effect=environment), \
                     patch.object(QDecisionTrace,'record',record), patch.object(QAgent,'update',update), \
                     patch.object(QAgent,'select_action',select), patch.object(QAgent,'successor_q',target):
@@ -111,7 +124,8 @@ def run_smoke(hidden_dims=(16,8)):
             def evaluation_recorder(*args, **kwargs):
                 kwargs['directory'] = root/'evaluation'
                 return recorder(*args, **kwargs)
-            with patch.object(evaluate,'SCENARIO',eval_scene), patch.object(evaluate,'QConfig',side_effect=cfg), \
+            with patch.object(original,'_assign_task_to_vm',assign), \
+                    patch.object(evaluate,'SCENARIO',eval_scene), patch.object(evaluate,'QConfig',side_effect=cfg), \
                     patch.object(evaluate,'CloudWorkflowEnv_MARL',side_effect=environment), \
                     patch.object(evaluate,'EvaluationRecorder',side_effect=evaluation_recorder), \
                     patch.object(QAgent,'successor_q',side_effect=AssertionError('Evaluation read TD target')):
@@ -128,16 +142,19 @@ def run_smoke(hidden_dims=(16,8)):
                         assert all(torch.equal(v,getattr(agent,name).state_dict()[k]) for k,v in state.items())
                 assert np.isfinite(result['energy']) and result['energy_check_diff'] < 1e-6
             # Exercise the full CSV entry point as well as the direct per-seed API.
-            out = root/f'evaluation_{MODEL_VERSION}.csv'
-            cli_scene = replace(eval_scene, marl_options={'out':str(out),'device':'cpu'})
-            with patch.object(evaluate,'SCENARIO',cli_scene), patch.object(evaluate,'QConfig',side_effect=cfg), \
+            cli_scene = replace(eval_scene, marl_options={'device':'cpu'})
+            out = evaluation_csv(cli_scene, root)
+            with patch.object(original,'_assign_task_to_vm',assign), \
+                    patch.object(evaluate,'SCENARIO',cli_scene), patch.object(evaluate,'QConfig',side_effect=cfg), \
                     patch.object(evaluate,'CloudWorkflowEnv_MARL',side_effect=environment), \
+                    patch.object(evaluate,'evaluation_csv',side_effect=lambda s, _: evaluation_csv(s,root)), \
+                    patch.object(evaluate,'evaluation_directory',side_effect=lambda s, _: evaluation_directory(s,root)), \
                     patch.object(QAgent,'successor_q',side_effect=AssertionError('Evaluation read TD target')):
                 evaluate.main()
                 with out.open(newline='') as stream:
                     rows = list(csv.DictReader(stream))
                 assert len(rows) == 2 and all(row['algorithm'] == MODEL_VERSION for row in rows)
-                artifacts = evaluation_directory(cli_scene, evaluate.PROJECT_DIR)
+                artifacts = evaluation_directory(cli_scene, root)
                 episode = json.loads((artifacts/'measurements'/'episodes'/'seed700.json').read_text())
                 assert episode['algorithm'] == MODEL_VERSION and episode['checkpoints']
                 before = {path:path.read_bytes() for path in artifacts.rglob('*') if path.is_file()}
@@ -150,6 +167,8 @@ def run_smoke(hidden_dims=(16,8)):
                     raise AssertionError('Repeated evaluation did not refuse existing output')
                 assert all(path.read_bytes() == contents for path,contents in before.items())
         return dict(model_version=MODEL_VERSION, hidden_dims=hidden_dims, dims=dims, learners=final['learners'],
+                    scheduling_policy=SCHEDULING_POLICY, idle_assignment_checks=assignment_checks['count'],
+                    evaluation_csv_name=out.name, evaluation_csv_flat=out.parent.name == MODEL_VERSION,
                     target_estimator='actual_successor_action_q', target_q_calls=target_calls,
                     numerics=final['numerics'],
                     reward_balances=dict(global_balance=final['global_reward_balance'],local_balance=final['local_reward_balance']),

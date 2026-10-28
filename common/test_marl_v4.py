@@ -1,4 +1,4 @@
-"""V4 FIFO execution, compact observations, paired SR-gated selection and isolation."""
+"""MARL physical execution, compact observations, paired SR-gated selection and isolation."""
 from dataclasses import replace
 from pathlib import Path
 from contextlib import redirect_stdout
@@ -46,42 +46,44 @@ def queue_fixture(**kwargs):
     return env
 
 
-class QueueTests(unittest.TestCase):
-    def test_busy_vm_accepts_fifo_reservations_without_double_load(self):
+class ExecutionTests(unittest.TestCase):
+    def test_idle_assignment_and_dependency_release_preserve_real_load(self):
         env = queue_fixture()
         _, _, _, done, first = env.step(0,0)
         self.assertFalse(done)
         self.assertEqual(env.current_time, 0.)
-        self.assertEqual(env.get_local_state(0)[1].tolist(), [1.,0.])
-        self.assertEqual(env.get_global_state()[1].tolist(), [1.,1.])
+        self.assertEqual(env.get_local_state(0)[1].tolist(), [0.,0.])
+        self.assertEqual(env.get_global_state()[1].tolist(), [0.,1.])
         self.assertEqual(first['task_end_time'], 2.)
-        self.assertEqual(env._assign_task_to_vm(1,0), 5.)
-        self.assertEqual(env.task_state, ['Running','Queued','unReady'])
+        with self.assertRaisesRegex(ValueError, 'idle'):
+            env._assign_task_to_vm(1,0)
+        self.assertEqual(env._assign_task_to_vm(1,1), 3.)
+        self.assertEqual(env.task_state, ['Running','Running','unReady'])
         self.assertEqual(env.vm_running_task[0], 0)
         self.assertEqual(env._host_running_pc[0], 1.)
-        self.assertEqual(env.vm_available_at[0], 5.)
+        self.assertEqual(env.vm_available_at[0], 2.)
         env._advance_until_decision()
         self.assertEqual(env.current_time, 2.)
         self.assertEqual(env.task_state, ['Finished','Running','Ready'])
-        self.assertEqual(env.vm_running_task[0], 1)
-        self.assertEqual(env._host_running_pc[0], 1.)
-        self.assertEqual(env._assign_task_to_vm(2,0), 6.)
+        self.assertEqual(env.vm_running_task[0], -1)
+        self.assertEqual(env._host_running_pc[0], 0.)
+        self.assertEqual(env._assign_task_to_vm(2,0), 3.)
         env._advance_until_decision()
         self.assertTrue(env.done_flag)
-        self.assertEqual(env.current_time, 6.)
+        self.assertEqual(env.current_time, 3.)
         self.assertEqual(env.task_state, ['Finished']*3)
         self.assertEqual(env._host_running_pc[0], 0.)
-        self.assertEqual([(r.start_time,r.end_time) for r in env.records], [(0.,2.),(2.,5.),(5.,6.)])
-        self.assertAlmostEqual(env.total_energy, 6*env.hosts[0].power(1.))
+        self.assertEqual([(r.start_time,r.end_time) for r in env.records], [(0.,2.),(0.,3.),(2.,3.)])
         self.assertAlmostEqual(env.total_energy, energy_from_records(env.records,env.hosts))
 
-    def test_step_accounts_wait_in_lateness_and_does_not_replace_actions(self):
-        env = queue_fixture(); env.task_baseline_finish[1] = 3.
+    def test_step_accounts_lateness_and_does_not_replace_actions(self):
+        env = queue_fixture(); env.task_baseline_finish[1] = 1.
         env.step(0,0)
-        _, rg, rl, _, info = env.step(0,0)
+        with self.assertRaises(ValueError): env.step(0,0)
+        _, rg, rl, _, info = env.step(1,0)
         self.assertEqual(info['assigned_task_id'], 1)
-        self.assertEqual(info['vm_id'], 0)
-        self.assertEqual(info['task_end_time'], 5.)
+        self.assertEqual(info['vm_id'], 1)
+        self.assertEqual(info['task_end_time'], 3.)
         self.assertEqual(info['lateness'], 2.)
         self.assertAlmostEqual(rg, .75*(-2/300)+.25*info['r_energy_total'])
         self.assertAlmostEqual(rl, .75*(-2/300)+.25*info['r_energy_host'])
@@ -89,15 +91,14 @@ class QueueTests(unittest.TestCase):
         with self.assertRaises(ValueError): fresh.step(0,1)  # Padded VM remains illegal.
         self.assertEqual(fresh.ready_task_ids, [0,1])
 
-    def test_truncation_does_not_execute_queued_work_or_claim_success(self):
+    def test_truncation_does_not_finish_running_work_or_claim_success(self):
         env = queue_fixture(horizon=1.)
         env.step(0,0)
-        _, _, _, done, info = env.step(0,0)
+        _, _, _, done, info = env.step(1,0)
         self.assertTrue(done); self.assertTrue(info['truncated'])
         self.assertEqual(env.current_time, 1.)
-        self.assertEqual(env.task_state[:2], ['Running','Queued'])
+        self.assertEqual(env.task_state[:2], ['Running','Running'])
         self.assertEqual(episode_metrics(env)['wf_success_count'], 0)
-        self.assertAlmostEqual(env.total_energy, env.hosts[0].power(1.))
         self.assertAlmostEqual(env.total_energy, energy_from_records(env.records,env.hosts,end_time=1.))
 
     def test_compact_observations_have_only_wait_exec_and_no_other_host_queue(self):
@@ -178,7 +179,7 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(scene.selection_protocol()['selection'], SELECTION_TAG)
         self.assertEqual(scene.protocol().selection,'minimum_validation_total_energy')
         self.assertEqual(Scenario().protocol().selection,'minimum_validation_total_energy')
-        self.assertIn(SELECTION_TAG,scene.model_name())
+        self.assertIn(SELECTION_TAG,scene.output_version)
         self.assertEqual(scene.normalization_metadata()['experiment_protocol']['selection'],SELECTION_TAG)
 
     def test_paired_checkpoint_selection_rejects_mismatched_episode_and_metrics(self):

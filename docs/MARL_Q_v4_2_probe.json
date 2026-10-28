@@ -1,0 +1,110 @@
+{
+  "description": "Production widths; real decision observations repeated only to form one update batch. Not a convergence run.",
+  "learners": {
+    "MAHDRL_VA_D3QN": {
+      "loss": 64071.19140625,
+      "parameters": 2308874,
+      "diagnostics": {
+        "transitions": 256,
+        "nonterminal": 256,
+        "nonterminal_ratio": 1.0,
+        "gradient_updates": 1,
+        "sampled_targets": 256,
+        "last_loss": 64071.19140625,
+        "max_abs_loss": 64071.19140625,
+        "bootstrap_nonzero_ratio": 1.0,
+        "future_abs_mean": 72601.234375,
+        "target_mean": 72601.234375,
+        "last_rollout_value": null,
+        "nonterminal_rollouts": 0,
+        "last_nonterminal_rollout_value": null,
+        "truncation_cutoffs": 0,
+        "terminal_transitions": 0
+      }
+    },
+    "PD3QN-DAG": {
+      "loss": 13476.4052734375,
+      "parameters": 2222362,
+      "diagnostics": {
+        "transitions": 128,
+        "nonterminal": 128,
+        "nonterminal_ratio": 1.0,
+        "gradient_updates": 1,
+        "sampled_targets": 128,
+        "last_loss": 13476.4052734375,
+        "max_abs_loss": 13476.4052734375,
+        "bootstrap_nonzero_ratio": 1.0,
+        "future_abs_mean": 365.72601318359375,
+        "target_mean": 365.30706787109375,
+        "last_rollout_value": null,
+        "nonterminal_rollouts": 0,
+        "last_nonterminal_rollout_value": null,
+        "truncation_cutoffs": 0,
+        "terminal_transitions": 0
+      }
+    },
+    "MARL_Global": {
+      "loss": 1.9911703930119984e-05,
+      "parameters": 3974660,
+      "diagnostics": {
+        "transitions": 1,
+        "nonterminal": 1,
+        "nonterminal_ratio": 1.0,
+        "gradient_updates": 1,
+        "sampled_targets": 1,
+        "last_loss": -0.00248700357042253,
+        "max_abs_loss": 0.00248700357042253,
+        "bootstrap_nonzero_ratio": 1.0,
+        "future_abs_mean": 0.030787181109189987,
+        "target_mean": 0.030787181109189987,
+        "last_rollout_value": null,
+        "nonterminal_rollouts": 0,
+        "last_nonterminal_rollout_value": null,
+        "truncation_cutoffs": 0,
+        "terminal_transitions": 0
+      }
+    },
+    "MARL_Local": {
+      "loss": 2.084831521642627e-06,
+      "parameters": 4050954,
+      "diagnostics": {
+        "transitions": 1,
+        "nonterminal": 1,
+        "nonterminal_ratio": 1.0,
+        "gradient_updates": 1,
+        "sampled_targets": 1,
+        "last_loss": 0.09041418135166168,
+        "max_abs_loss": 0.09041418135166168,
+        "bootstrap_nonzero_ratio": 1.0,
+        "future_abs_mean": 0.005019260570406914,
+        "target_mean": 0.005019260570406914,
+        "last_rollout_value": null,
+        "nonterminal_rollouts": 0,
+        "last_nonterminal_rollout_value": null,
+        "truncation_cutoffs": 0,
+        "terminal_transitions": 0
+      }
+    },
+    "IRWS_VM_PPO": {
+      "loss": 65946285.28027344,
+      "parameters": 2136858,
+      "diagnostics": {
+        "transitions": 256,
+        "nonterminal": 256,
+        "nonterminal_ratio": 1.0,
+        "gradient_updates": 4,
+        "sampled_targets": 256,
+        "last_loss": 875798.6875,
+        "max_abs_loss": 213698784.0,
+        "bootstrap_nonzero_ratio": 1.0,
+        "future_abs_mean": 2028.0997314453125,
+        "target_mean": -1727.5311279296875,
+        "last_rollout_value": -2048.586181640625,
+        "nonterminal_rollouts": 1,
+        "last_nonterminal_rollout_value": -2048.586181640625,
+        "truncation_cutoffs": 0,
+        "terminal_transitions": 0
+      }
+    }
+  }
+}

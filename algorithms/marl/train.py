@@ -21,7 +21,7 @@ from algorithms.marl.runtime import isolated_evaluation, selection_record
 from algorithms.pd3qn_dag_fe.selection import selection_metadata, selection_key, validation_selection
 from common.workflow_opt import energy_from_records
 from algorithms.marl.q_agents import MODEL_VERSION, QAgent, QConfig, IndependentLocalAgents, Decision, QDecisionTrace, learner_map
-from algorithms.marl.identity import DISPLAY_NAME, QUEUE_CAPACITY
+from algorithms.marl.identity import DISPLAY_NAME
 from environments.marl import CloudWorkflowEnv_MARL
 
 
@@ -175,7 +175,6 @@ def _train(resources):
         task_baseline_norm=300.0,
         alpha_delay=0.75,
         max_ready_tasks=64,
-        queue_capacity=QUEUE_CAPACITY,
         deadline_mode="cache_fcfs",
         deadline_cache_path=deadline_cache_path,
         alpha_deadline=1.5,
@@ -241,7 +240,7 @@ def _train(resources):
 
     save_dir = str(SCENARIO.checkpoint_dir("marl"))
     log_path = os.path.join(
-        ROOT_DIR, "outputs", "logs", SCENARIO.model_name("marl"), f"train_metrics_{MODEL_VERSION}.csv"
+        str(SCENARIO.log_dir("marl")), f"train_metrics_{MODEL_VERSION}.csv"
     )
     os.makedirs(save_dir, exist_ok=True)
     os.makedirs(os.path.dirname(log_path), exist_ok=True)

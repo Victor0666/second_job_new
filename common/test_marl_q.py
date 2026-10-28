@@ -202,7 +202,7 @@ class MARLQTests(unittest.TestCase):
             self.assertTrue(restored.actor_optim.state); self.assertTrue(restored.critic_optim.state)
             for path, agent in ((gp, restored), (lp, restored_l)):
                 old = torch.load(path, weights_only=True)
-                for version in ('marl_q_v4','marl_q_v3','marl_q_v2','marl_independent_q_v2','marl_independent_q_v1'):
+                for version in ('marl_q_v4_1','marl_q_v4','marl_q_v3','marl_q_v2','marl_independent_q_v2','marl_independent_q_v1'):
                     old['model_version'] = version
                     torch.save(old, path)
                     before = path.read_bytes()
@@ -218,8 +218,8 @@ class MARLQTests(unittest.TestCase):
         self.assertNotEqual(Scenario(model_seed=1).model_name('marl'), Scenario(model_seed=2).model_name('marl'))
 
     def test_output_identity_separates_legacy_models_sources_and_evaluation_scenes(self):
-        self.assertEqual(DISPLAY_NAME, 'MARL-Q4.1')
-        self.assertEqual(MODEL_VERSION, 'marl_q_v4_1')
+        self.assertEqual(DISPLAY_NAME, 'MARL-Q4.2')
+        self.assertEqual(MODEL_VERSION, 'marl_q_v4_2')
         scene = Scenario()
         root = Path('verification-root').resolve()
         directory = evaluation_directory(scene, root)

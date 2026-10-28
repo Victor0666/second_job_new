@@ -1,0 +1,35 @@
+# Linux / Bash: run from the project root with matching F22 cache and F19 calibration.
+# R010 delay/energy weights: 0.1/0.9. One invocation starts one background process.
+# Run the nine source scenes in batches according to GPU capacity.
+train_mahdrl_as_fast_r010_nopf() {
+    local res="$1" ddl="$2"
+    local prefix="outputs/server_console_logs/train_mahdrl_r010_nopf_S${res}_${ddl}_m1"
+
+    mkdir -p outputs/server_console_logs
+
+    CUDA_VISIBLE_DEVICES=0 nohup python -u launch.py \
+        algorithms/mahdrl_oe_ge_score_fast_r010_nopf/train.py \
+        --task S --resource "$res" --deadline "$ddl" \
+        --episodes 600 --model-seed 1 \
+        --experiment-protocol configs/f22_split_v1.json \
+        --normalization-mode f19_shared_v1 --device cuda \
+        --diagnostics-every 100 --profile-mode sampled --profile-every 100 \
+        > "${prefix}.log" 2>&1 &
+
+    echo $! > "${prefix}.pid"
+}
+
+# SS source
+train_mahdrl_as_fast_r010_nopf S Tight
+train_mahdrl_as_fast_r010_nopf S Medium
+train_mahdrl_as_fast_r010_nopf S Loose
+
+# SM source
+train_mahdrl_as_fast_r010_nopf M Tight
+train_mahdrl_as_fast_r010_nopf M Medium
+train_mahdrl_as_fast_r010_nopf M Loose
+
+# SL source
+train_mahdrl_as_fast_r010_nopf L Tight
+train_mahdrl_as_fast_r010_nopf L Medium
+train_mahdrl_as_fast_r010_nopf L Loose

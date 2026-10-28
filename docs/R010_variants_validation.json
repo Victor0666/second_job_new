@@ -1,0 +1,79 @@
+{
+  "algorithms": [
+    "pd3qn_fe_r010",
+    "irws_r_fe_r010",
+    "mahdrl_oe_ge_score_fast_r010_nopf"
+  ],
+  "delay_weight": 0.1,
+  "energy_weight": 0.9,
+  "mahdrl_host_pf": false,
+  "mahdrl_vm_pf": false,
+  "mahdrl_ge_retained": true,
+  "tests": {
+    "command": "python -X utf8 -B -m unittest common.test_pd3qn_fe_r010 common.test_irws_r_fe_r010 common.test_mahdrl_as_fast_r010_nopf common.test_pd3qn_fe_r090 common.test_irws_r_fe_r090 common.test_mahdrl_as_fast_r090 -v",
+    "run": 48,
+    "passed": 48,
+    "skipped": 0,
+    "seconds": 112.66
+  },
+  "existing_source_config_document_files_verified": 654,
+  "changed_existing_files": [],
+  "actual_launch_dry_runs_passed": 6,
+  "new_python_files_syntax_checked": 30,
+  "bash_command_files_syntax_checked": 6,
+  "new_files_whitespace_checked": 41,
+  "formal_600_episode_experiments_started": false,
+  "output_paths_revision": {
+    "date": "2026-10-29",
+    "tests_run": 28,
+    "tests_passed": 28,
+    "tests_seconds": 88.298,
+    "command": "python -X utf8 -B -m unittest common.test_r010_paths common.test_pd3qn_fe_r010 common.test_irws_r_fe_r010 common.test_mahdrl_as_fast_r010_nopf -v",
+    "training_leaf_length_limit": 40,
+    "csvs_per_algorithm": 27,
+    "all_scene_csvs_share_one_parent": true,
+    "csv_fields": [
+      "algorithm",
+      "target_scene",
+      "source_scene",
+      "model_seed",
+      "test_seeds",
+      "config_fingerprint"
+    ],
+    "actual_launch_dry_runs_passed": 6,
+    "bash_command_files_syntax_checked": 6,
+    "examples": [
+      {
+        "algorithm": "pd3qn_fe_r010",
+        "checkpoint_dir": "outputs\\ckpts\\pd3qn_fe_r010\\SS_Tight_m1_c8121d8c8",
+        "training_leaf_length": 21,
+        "evaluation_csv": "outputs\\run\\pd3qn_fe_r010\\eval_pd3qn_fe_r010_SS_Tight_fromSS_Tight_m1_s700-729_c8121d8c8.csv"
+      },
+      {
+        "algorithm": "irws_r_fe_r010",
+        "checkpoint_dir": "outputs\\ckpts\\irws_r_fe_r010\\SS_Tight_m1_c80b98142",
+        "training_leaf_length": 21,
+        "evaluation_csv": "outputs\\run\\irws_r_fe_r010\\eval_irws_r_fe_r010_SS_Tight_fromSS_Tight_m1_s700-729_c80b98142.csv"
+      },
+      {
+        "algorithm": "mahdrl_oe_ge_score_fast_r010_nopf",
+        "checkpoint_dir": "outputs\\ckpts\\mahdrl_r010_nopf\\SS_Tight_m1_cf8f15e56",
+        "training_leaf_length": 21,
+        "evaluation_csv": "outputs\\run\\mahdrl_r010_nopf\\eval_mahdrl_r010_nopf_SS_Tight_fromSS_Tight_m1_s700-729_cf8f15e56.csv"
+      }
+    ]
+  },
+  "publication": {
+    "remote": "origin",
+    "branch": "codex/f11-real-transitions",
+    "scope": "three R010 variants, output naming, tests and six Bash command files"
+  },
+  "function_command_validation": {
+    "bash_files": 6,
+    "training_commands": 27,
+    "evaluation_commands": 81,
+    "actual_cli_parser_checks": 108,
+    "status": "passed",
+    "formal_training_started": false
+  }
+}

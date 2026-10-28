@@ -1,0 +1,54 @@
+# Linux / Bash: run after the matching R010 source model has finished training.
+# Each invocation evaluates S/M/L sequentially using one fixed source best model.
+# Final CSVs share outputs/run/irws_r_fe_r010/ and carry scenes in their file names.
+# Optional third argument "M L" evaluates only the two generalization targets.
+eval_irws_r_fe_r010_all() {
+    local res="$1" ddl="$2"
+    local targets="${3:-S M L}"
+    local prefix="outputs/server_eval_logs/eval_irws_r_fe_r010_fromS${res}_${ddl}_targets${targets// /}_m1_s700-729"
+
+    mkdir -p outputs/server_eval_logs
+
+    CUDA_VISIBLE_DEVICES=0 nohup bash -c '
+        res="$1"
+        ddl="$2"
+        targets="$3"
+
+        for task in $targets; do
+            echo "[START] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+
+            python -u launch.py \
+                algorithms/irws_r_fe_r010/evaluate.py \
+                --task "$task" --resource "$res" --deadline "$ddl" \
+                --train-task S --train-resource "$res" \
+                --train-deadline "$ddl" \
+                --seeds 700-729 --model-seed 1 \
+                --experiment-protocol configs/f22_split_v1.json \
+                --normalization-mode f19_shared_v1 --device cuda \
+                --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 \
+                || exit 1
+
+            echo "[DONE] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+        done
+
+        echo "[ALL_DONE] source=S${res}/${ddl} targets=${targets}"
+    ' irws_r_fe_r010_eval "$res" "$ddl" "$targets" \
+        > "${prefix}.log" 2>&1 &
+
+    echo $! > "${prefix}.pid"
+}
+
+# SS source: SS, MS, LS
+eval_irws_r_fe_r010_all S Tight
+eval_irws_r_fe_r010_all S Medium
+eval_irws_r_fe_r010_all S Loose
+
+# SM source: SM, MM, LM
+eval_irws_r_fe_r010_all M Tight
+eval_irws_r_fe_r010_all M Medium
+eval_irws_r_fe_r010_all M Loose
+
+# SL source: SL, ML, LL
+eval_irws_r_fe_r010_all L Tight
+eval_irws_r_fe_r010_all L Medium
+eval_irws_r_fe_r010_all L Loose

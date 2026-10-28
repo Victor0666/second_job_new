@@ -18,7 +18,7 @@ from common.r010_paths import training_name, evaluation_stem
 from .config import ALGORITHM,DISPLAY_NAME,MODEL_VERSION,IMPLEMENTATION,BEST_CHECKPOINT,FINAL_CHECKPOINT,REWARD_PROTOCOL,COMMON_REWARD,PaperConfig,SCHEDULING_PROTOCOL
 from .environment import PaperCloudEnv
 from .learner import PaperLearner
-from .selection import SELECTION_TAG, selection_metadata, selection_protocol, validation_selection, selection_key
+from .selection import SELECTION_TAG, WORKFLOW_SUCCESS_THRESHOLD, selection_metadata, selection_protocol, validation_selection, selection_key
 
 
 def seed_everything(seed):
@@ -292,7 +292,7 @@ def train(scenario,config=None,kwargs=None,out=None,resume=None):
     print(f'训练日志: {log.resolve()}',flush=True)
     print(f'模型保存目录: {directory.resolve()}',flush=True)
     print(f'调度: {SCHEDULING_PROTOCOL}; slot_duration={queue_settings(scenario)["slot_duration"]}; VM waiting disabled',flush=True)
-    print(f'选模规则: {SELECTION_TAG}; workflow success >= 0.99, then minimum validation energy',flush=True)
+    print(f'选模规则: {SELECTION_TAG}; workflow success >= {WORKFLOW_SUCCESS_THRESHOLD}, then minimum validation energy',flush=True)
     recorder=TrainingRecorder(directory/'logs',scenario,ALGORITHM,env,{DISPLAY_NAME:learner})
     recorder.index=start
     try:

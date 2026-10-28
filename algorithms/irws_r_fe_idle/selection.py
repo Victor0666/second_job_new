@@ -1,8 +1,8 @@
 """One aggregate workflow-success threshold, then minimum validation energy."""
 import math
 
-SELECTION_TAG = 'select_sr099_minenergy_v1'
-WORKFLOW_SUCCESS_THRESHOLD = .99
+SELECTION_TAG = 'select_sr092_minenergy_v1'
+WORKFLOW_SUCCESS_THRESHOLD = .92
 
 
 def selection_metadata():

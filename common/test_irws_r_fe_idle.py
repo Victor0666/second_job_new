@@ -185,18 +185,46 @@ class IdleIRWSTests(unittest.TestCase):
                 self.assertTrue(all(env.task_end_time[a]<=env.task_start_time[b]+1e-12 for a,b in zip(gids,gids[1:])))
             self.assertAlmostEqual(env.total_energy,energy_from_records(env.records,env.hosts),places=8)
 
-    def test_base_learning_reward_selector_and_core_files_remain_unchanged(self):
+    def test_base_learning_reward_and_core_files_remain_unchanged(self):
         root=Path(__file__).resolve().parents[1]/'algorithms'
-        for name in ('learner.py','networks.py','numerics.py','selection.py'):
+        for name in ('learner.py','networks.py','numerics.py'):
             self.assertEqual((root/'irws_r_fe'/name).read_bytes(),(root/'irws_r_fe_idle'/name).read_bytes())
         self.assertEqual(PaperConfig().as_dict(),baseline.PaperConfig().as_dict())
         self.assertEqual(COMMON_REWARD,baseline.COMMON_REWARD)
         self.assertEqual(COMMON_REWARD['alpha_delay_vm'],.75)
         self.assertNotEqual(COMMON_REWARD,r090_idle.COMMON_REWARD)
-        self.assertEqual(selection.selection_metadata(),baseline.selection_metadata())
+        expected=dict(baseline.selection_metadata(),version='select_sr092_minenergy_v1',workflow_success_threshold=.92)
+        self.assertEqual(selection.selection_metadata(),expected)
         extra=dict(runner.IMPLEMENTATION);self.assertEqual(extra.pop('scheduling'),SCHEDULING_PROTOCOL)
         self.assertEqual(extra,baseline.IMPLEMENTATION)
         self.assertNotEqual(getattr(baseline.PaperCloudEnv,'scheduling_protocol',None),SCHEDULING_PROTOCOL)
+
+    def test_sr092_boundary_aggregate_counts_and_energy_priority(self):
+        def row(success,count=1000,energy=100.):
+            return dict(wf_count=count,wf_success_count=success,wf_success_rate=success/count,total_energy=energy)
+        choose=lambda success,energy:selection.validation_selection([row(success,energy=energy)])
+        self.assertFalse(choose(919,1.)['feasible'])
+        self.assertTrue(choose(920,100.)['feasible'])
+        self.assertTrue(choose(921,100.)['feasible'])
+        # Aggregate success counts: 1/1 and 91/99 together meet 92/100.
+        aggregate=selection.validation_selection([row(1,1),row(91,99)])
+        self.assertTrue(aggregate['feasible']);self.assertEqual(aggregate['workflow_success_rate'],.92)
+        key=selection.selection_key
+        self.assertLess(key(choose(920,100.)),key(choose(919,1.)))
+        self.assertLess(key(choose(920,10.)),key(choose(1000,11.)))
+        self.assertLess(key(choose(921,10.)),key(choose(920,10.)))
+        self.assertLess(key(choose(919,100.)),key(choose(918,1.)))
+        self.assertLess(key(choose(919,10.)),key(choose(919,11.)))
+        self.assertEqual(key(choose(920,10.)),key(choose(920,10.)))
+
+    def test_sr092_protocol_and_output_paths_are_isolated_from_sr099(self):
+        current=(selection.selection_protocol(self.scene),runner.output_dir(self.scene,'ckpts'),
+                 runner.artifact_name(replace(self.scene,mode='eval',seed_spec='2'),'eval'))
+        with patch.object(selection,'SELECTION_TAG','select_sr099_minenergy_v1'),patch.object(
+                selection,'WORKFLOW_SUCCESS_THRESHOLD',.99):
+            previous=(selection.selection_protocol(self.scene),runner.output_dir(self.scene,'ckpts'),
+                      runner.artifact_name(replace(self.scene,mode='eval',seed_spec='2'),'eval'))
+        for new,old in zip(current,previous):self.assertNotEqual(new,old)
 
     def test_actual_dispatch_reward_keeps_original_fe_weights(self):
         with self.environment(count=1,vms=(1,),workflows=1,arrivals=[0.]) as env:
@@ -222,7 +250,15 @@ class IdleIRWSTests(unittest.TestCase):
             self.assertEqual(obj['scheduling_protocol'],SCHEDULING_PROTOCOL)
             self.assertEqual(obj['display_name'],DISPLAY_NAME)
             self.assertEqual(obj['reward_settings'],COMMON_REWARD)
+            self.assertEqual(obj['checkpoint_selection']['workflow_success_threshold'],.92)
             wrong=self.root/'wrong.pth'
+            with patch.object(selection,'SELECTION_TAG','select_sr099_minenergy_v1'),patch.object(
+                    selection,'WORKFLOW_SUCCESS_THRESHOLD',.99):
+                old=dict(obj,checkpoint_selection=selection.selection_metadata(),
+                         protocol=selection.selection_protocol(self.scene),normalization=self.scene.normalization_metadata())
+            torch.save(old,wrong)
+            with self.assertRaisesRegex(ValueError,'protocol mismatch'):
+                runner.load_checkpoint(wrong,self.scene)
             torch.save(dict(obj,scheduling_protocol='queue_periodic'),wrong)
             with self.assertRaisesRegex(ValueError,'scheduling protocol mismatch'):runner.load_checkpoint(wrong,self.scene)
             torch.save(dict(obj,algorithm=baseline.ALGORITHM,model_version=baseline.MODEL_VERSION),wrong)

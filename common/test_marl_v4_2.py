@@ -12,7 +12,7 @@ from algorithms.marl.identity import MODEL_VERSION, OBSERVATION_LAYOUT, SCHEDULI
 from algorithms.marl.q_agents import QAgent, QConfig, IndependentLocalAgents
 from algorithms.marl.runtime import selection_record, validate_pair
 from algorithms.marl.scenario import MARLScenario
-from algorithms.pd3qn_dag_fe.selection import validation_selection
+from algorithms.marl.selection import validation_selection
 from common.read_xml_opt_Tsize import Task
 from common.f18_state_normalization import bind_normalization
 from common.test_f18 import fixture_config

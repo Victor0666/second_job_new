@@ -16,7 +16,7 @@ if PROJECT_DIR not in sys.path:
 from algorithms.marl.scenario import MARLScenario as Scenario, parse_scenario
 from common.experiment_measurements import EvaluationRecorder, episode_duration, episode_metrics
 from algorithms.marl.runtime import isolated_evaluation, validate_pair
-from algorithms.pd3qn_dag_fe.selection import selection_metadata
+from algorithms.marl.selection import selection_metadata
 from common.f18_state_normalization import bind_normalization
 from algorithms.marl.identity import MODEL_VERSION, DISPLAY_NAME, evaluation_directory, evaluation_csv
 

@@ -4,7 +4,7 @@ import random
 import uuid
 import numpy as np
 import torch
-from algorithms.pd3qn_dag_fe.selection import selection_metadata, validation_selection
+from algorithms.marl.selection import selection_metadata, validation_selection
 from algorithms.marl.identity import OBSERVATION_LAYOUT, SCHEDULING_POLICY
 
 

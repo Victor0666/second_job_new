@@ -1,9 +1,9 @@
-# MARL-Q marl_q_v4_2: 600 episodes, nine source training scenarios.
+# MARL-Q marl_q_v4_2: 600 episodes, nine source training scenarios, SR >= 92% selection.
 # Run from the project root in Bash with the Python environment activated.
 
 train_marl_v4_2() {
     local res="$1" ddl="$2"
-    local prefix="outputs/server_console_logs/marl_q_v4_2_S${res}_${ddl}_ep600_m1"
+    local prefix="outputs/server_console_logs/marl_q_v4_2_S${res}_${ddl}_sr092_ep600_m1"
     mkdir -p outputs/server_console_logs || return 1
     CUDA_VISIBLE_DEVICES=0 python -c \
         'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; torch.ones(1, device="cuda")' || return 1

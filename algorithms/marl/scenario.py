@@ -1,7 +1,7 @@
 """MARL-only effective selection policy; shared split/calibration bindings stay frozen."""
 from common.scenarios import Scenario, ROOT, parse_scenario as shared_parse
 from algorithms.marl.identity import MODEL_VERSION, OBSERVATION_LAYOUT, SCHEDULING_POLICY, training_run_name
-from algorithms.pd3qn_dag_fe.selection import SELECTION_TAG, selection_metadata
+from algorithms.marl.selection import SELECTION_TAG, selection_metadata
 
 
 class MARLScenario(Scenario):

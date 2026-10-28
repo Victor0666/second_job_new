@@ -1,11 +1,11 @@
-# MARL-Q marl_q_v4_2: nine source models, 27 target scenarios, seeds 700-729.
+# MARL-Q marl_q_v4_2: nine source models, 27 target scenarios, seeds 700-729, SR >= 92% selection.
 # Run from the project root after the corresponding source models finish training.
 # Optional third argument: target task sizes, for example "M L".
 
 eval_marl_v4_2_all() {
     local res="$1" ddl="$2"
     local targets="${3:-S M L}"
-    local prefix="outputs/server_eval_logs/eval_marl_q_v4_2_fromS${res}_${ddl}_targets${targets// /}_m1_s700-729"
+    local prefix="outputs/server_eval_logs/eval_marl_q_v4_2_fromS${res}_${ddl}_targets${targets// /}_sr092_m1_s700-729"
 
     mkdir -p outputs/server_eval_logs || return 1
     CUDA_VISIBLE_DEVICES=0 python -c \

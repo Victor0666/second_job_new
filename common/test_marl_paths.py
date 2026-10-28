@@ -3,14 +3,23 @@ from dataclasses import replace
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from algorithms.marl.evaluate import protect_evaluation_outputs
 from algorithms.marl.identity import MODEL_VERSION, evaluation_csv, evaluation_directory
 from algorithms.marl.scenario import MARLScenario
+from algorithms.pd3qn_dag_fe.selection import selection_metadata as previous_selection_metadata
 from common.scenarios import ROOT, Scenario
 
 
 class MARLPathTests(unittest.TestCase):
+    def test_new_selection_gate_isolates_training_and_evaluation_outputs(self):
+        scene = MARLScenario(mode='eval', task='L')
+        current = scene.checkpoint_dir(), scene.log_dir(), evaluation_csv(scene, ROOT)
+        with patch('algorithms.marl.identity.selection_metadata', previous_selection_metadata):
+            previous = scene.checkpoint_dir(), scene.log_dir(), evaluation_csv(scene, ROOT)
+        self.assertTrue(all(new != old for new, old in zip(current, previous)))
+
     def test_nine_short_training_paths_and_27_distinct_csvs_in_one_folder(self):
         files = []
         checkpoints = []

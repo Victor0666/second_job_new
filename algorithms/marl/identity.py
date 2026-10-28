@@ -3,7 +3,7 @@ from pathlib import Path
 import hashlib
 
 from common.r010_paths import training_name, evaluation_stem
-from algorithms.pd3qn_dag_fe.selection import selection_metadata
+from algorithms.marl.selection import selection_metadata
 
 MODEL_VERSION = 'marl_q_v4_2'
 DISPLAY_NAME = 'MARL-Q4.2'

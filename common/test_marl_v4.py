@@ -16,7 +16,8 @@ import torch
 from algorithms.marl.q_agents import QAgent, QConfig, IndependentLocalAgents
 from algorithms.marl.runtime import isolated_evaluation, selection_record, validate_pair
 from algorithms.marl.scenario import MARLScenario
-from algorithms.pd3qn_dag_fe.selection import validation_selection, selection_key, SELECTION_TAG
+from algorithms.marl.selection import validation_selection, selection_key, selection_metadata, SELECTION_TAG
+from algorithms.pd3qn_dag_fe import selection as pd3qn_selection
 from common.experiment_measurements import episode_metrics
 from common.read_xml_opt_Tsize import Task
 from common.scenarios import Scenario
@@ -143,13 +144,13 @@ class SelectionTests(unittest.TestCase):
             def config(**kwargs):
                 return QConfig(**dict(kwargs,hidden_dims=(4,),device='cpu'))
             def validation(success, energy):
-                return dict(rows=[dict(seed=1,wf_count=1,wf_success_count=success,
-                    wf_success_rate=float(success),total_energy=energy)],
+                return dict(rows=[dict(seed=1,wf_count=50,wf_success_count=success,
+                    wf_success_rate=success/50,total_energy=energy)],
                     ret_g=0.,ret_l=0.,energy=energy,total_late=0.,avg_late=0.,wf_avg_late=0.)
             with patch.object(train,'SCENARIO',scene), patch.object(train,'QConfig',side_effect=config), \
                     patch.object(train,'CloudWorkflowEnv_MARL',side_effect=environment), \
                     patch.object(train,'_load_cache_seeds',return_value=[1,2,3]), \
-                    patch.object(train,'evaluate_marl',side_effect=[validation(0,1.),validation(1,100.),validation(0,.01)]), \
+                    patch.object(train,'evaluate_marl',side_effect=[validation(45,1.),validation(46,100.),validation(45,.01)]), \
                     patch.dict('os.environ',{'EXPERIMENT_METRICS':'0'}), redirect_stdout(io.StringIO()):
                 train.train()
             best_g=torch.load(root/'ckpts'/'best_global.pth',weights_only=True)['training_selection']
@@ -157,21 +158,24 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(best_g,best_l)
             self.assertEqual(best_g['episode'],1)
             self.assertTrue(best_g['validation_selection']['feasible'])
+            self.assertEqual(best_g['validation_selection']['workflow_success_rate'],.92)
+            self.assertEqual(best_g['checkpoint_selection'],selection_metadata())
             self.assertEqual(best_g['validation_selection']['mean_total_energy'],100.)
             records=[json.loads(line) for line in (root/'logs'/'validation_selection.jsonl').read_text().splitlines()]
             self.assertEqual([row['selected_as_best'] for row in records],[True,True,False])
             summary=json.loads((root/'logs'/'training_summary.json').read_text())
             self.assertTrue(summary['feasible_model_found'])
 
-    def test_shared_selector_boundaries_ranking_fallback_and_ties(self):
+    def test_marl_selector_boundaries_ranking_fallback_and_ties(self):
         def candidate(success, energy, count=100):
             return validation_selection([dict(wf_count=count,wf_success_count=success,
                 wf_success_rate=success/count,total_energy=energy)])
-        self.assertTrue(candidate(99,1)['feasible'])
-        self.assertFalse(candidate(49,1,50)['feasible'])
-        self.assertTrue(candidate(50,1,50)['feasible'])
-        ordered = [candidate(100,10),candidate(99,10),candidate(100,11),candidate(98,1),candidate(97,.1)]
-        self.assertEqual(sorted(ordered,key=selection_key),ordered)
+        self.assertTrue(candidate(92,1)['feasible'])
+        self.assertFalse(candidate(91,1)['feasible'])
+        self.assertFalse(candidate(45,1,50)['feasible'])
+        self.assertTrue(candidate(46,1,50)['feasible'])
+        ordered = [candidate(100,10),candidate(92,10),candidate(100,11),candidate(91,1),candidate(90,.1)]
+        self.assertEqual(sorted(reversed(ordered),key=selection_key),ordered)
         self.assertEqual(selection_key(ordered[0]),selection_key(candidate(100,10)))
 
     def test_effective_metadata_changes_only_marl_not_frozen_protocol(self):
@@ -181,6 +185,10 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(Scenario().protocol().selection,'minimum_validation_total_energy')
         self.assertIn(SELECTION_TAG,scene.output_version)
         self.assertEqual(scene.normalization_metadata()['experiment_protocol']['selection'],SELECTION_TAG)
+        self.assertEqual(selection_metadata()['workflow_success_threshold'],.92)
+        self.assertEqual(pd3qn_selection.selection_metadata()['workflow_success_threshold'],.99)
+        self.assertFalse(pd3qn_selection.validation_selection([dict(wf_count=50,
+            wf_success_count=46,wf_success_rate=.92,total_energy=1.)])['feasible'])
 
     def test_paired_checkpoint_selection_rejects_mismatched_episode_and_metrics(self):
         scene = MARLScenario()
@@ -192,6 +200,10 @@ class SelectionTests(unittest.TestCase):
         info = selection_record(scene,3,candidate,dict(candidate,episode=3),rows,'best')
         g.training_selection = locals.training_selection = info
         self.assertEqual(validate_pair(g,locals,scene),info)
+        g.training_selection = locals.training_selection = dict(info,
+            checkpoint_selection=pd3qn_selection.selection_metadata())
+        with self.assertRaisesRegex(ValueError,'checkpoint_selection'): validate_pair(g,locals,scene)
+        g.training_selection = locals.training_selection = info
         locals.training_selection = dict(info,episode=4)
         with self.assertRaisesRegex(ValueError,'pair'): validate_pair(g,locals,scene)
         locals.training_selection = g.training_selection = dict(info,validation_selection=dict(candidate,mean_total_energy=1.))

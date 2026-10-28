@@ -18,7 +18,7 @@ SCENARIO = Scenario(mode="train")
 from common.metrics_logger import CSVLogger
 from common.experiment_measurements import TrainingRecorder, collect_validation, episode_metrics
 from algorithms.marl.runtime import isolated_evaluation, selection_record
-from algorithms.pd3qn_dag_fe.selection import selection_metadata, selection_key, validation_selection
+from algorithms.marl.selection import selection_metadata, selection_key, validation_selection
 from common.workflow_opt import energy_from_records
 from algorithms.marl.q_agents import MODEL_VERSION, QAgent, QConfig, IndependentLocalAgents, Decision, QDecisionTrace, learner_map
 from algorithms.marl.identity import DISPLAY_NAME

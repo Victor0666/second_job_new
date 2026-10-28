@@ -1,5 +1,5 @@
-"""Keep the unchanged AS-Fast v2 workflow-SR099 selection and evidence rule."""
-from algorithms.mahdrl_oe_ge_apf_score_fast.selection import (
+"""Keep the unchanged ablation workflow-SR>092 selection and evidence rule."""
+from common.mahdrl_ablation import (
     SELECTION_TAG, WORKFLOW_SUCCESS_THRESHOLD, selection_metadata,
     validation_selection, selection_key, validate_checkpoint_selection,
 )

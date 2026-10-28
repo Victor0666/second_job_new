@@ -1,0 +1,10 @@
+{
+  "source": "Git staged tree exported into an independent directory",
+  "code_tree": "a68cb35e1c094f2c8b4360acfccd6591c5b90d71",
+  "base_commit": "08085ff46548300a989d7cc41a955358c3304397",
+  "files": 96,
+  "return_code": 0,
+  "success": true,
+  "seconds": 162.668,
+  "log": "docs/MAHDRL_AS_Fast_ablation_staged_tests_2026-10-29.txt"
+}

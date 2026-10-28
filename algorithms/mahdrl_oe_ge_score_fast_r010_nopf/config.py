@@ -1,4 +1,5 @@
 """AS-Fast with delay weight 0.1 and physical-legality-only HA/VA candidates."""
+from common.mahdrl_ablation import no_apf_metadata, selection_metadata
 from algorithms.mahdrl_oe_ge_apf_score_fast.config import (
     APF, TRUNK, ENTITY, TA_HIDDEN, learning_kwargs,
     variant_metadata as base_variant_metadata,
@@ -7,7 +8,7 @@ from algorithms.mahdrl_oe_ge_apf_score_fast.config import (
 
 ALGORITHM = 'mahdrl_oe_ge_score_fast_r010_nopf'
 DISPLAY_NAME = 'MAHDRL-AS-Fast-R010-NoPF'
-MODEL_VERSION = 'mahdrl_as_fast_r010_nopf_v1'
+MODEL_VERSION = 'mahdrl_as_fast_r010_nopf_srgt092_v2'
 REWARD_PROTOCOL = 'mahdrl_as_three_layer_delay010_energy090_nopf_v1'
 CHECKPOINT_METADATA_KEY = 'mahdrl_as_fast_r010_nopf'
 
@@ -34,7 +35,7 @@ def variant_metadata():
                     performance_action_filter=False, candidate_filter='physical_legality_only',
                     host_summary_scope='all_physically_legal_idle_vms',
                     guided_probability=APF.guided_probability)
-    return metadata
+    return no_apf_metadata(metadata)
 
 
 def implementation_metadata():
@@ -43,4 +44,5 @@ def implementation_metadata():
                     scientific_variant=variant_metadata(), reward_protocol=REWARD_PROTOCOL,
                     reward_settings=reward_settings())
     metadata['environment'] = 'one_decision_cache_raw_legal_float64'
+    metadata.update(checkpoint_selection=selection_metadata(), environment="one_decision_cache_raw_legal_noapf_float64")
     return metadata

@@ -1,21 +1,24 @@
 """Local scenario paths/parser, without registering or modifying older algorithms."""
+from common.mahdrl_ablation_paths import AblationPaths
 import argparse
 from dataclasses import dataclass, field
 import hashlib
 import json
 from pathlib import Path
 from common.scenarios import Scenario, ROOT
-from common.experiment_protocol import DEFAULT_PROTOCOL, protocol_hash
+from common.experiment_protocol import DEFAULT_PROTOCOL
 from common.f18_state_normalization import CURRENT_VERSION, DEFAULT_CONFIG, SHARED_VERSIONS
-from common.f11 import LEARNING_MODEL
-from common.ta_weights import TA_WEIGHT_MODEL
-from common.workflow_opt import ENERGY_ACCOUNTING
 from .config import ALGORITHM, DISPLAY_NAME, MODEL_VERSION, variant_metadata, implementation_metadata, REWARD_PROTOCOL, reward_settings
 from .selection import SELECTION_TAG, selection_metadata
 
 
 @dataclass(frozen=True)
-class ScoreScenario(Scenario):
+class ScoreScenario(AblationPaths, Scenario):
+    output_tag = "mahdrl_r090"
+
+    def path_settings(self):
+        return MODEL_VERSION, variant_metadata()
+
     resource_config: str | None = None
     cache_file: str | None = None
     output_root: str = str(ROOT)
@@ -56,29 +59,6 @@ class ScoreScenario(Scenario):
     def cache_path(self):
         return Path(self.cache_file).resolve() if self.cache_file else super().cache_path
 
-    def model_name(self, algorithm=ALGORITHM):
-        task = self.task if self.mode == "train" else self.train_task
-        resource = self.resource if self.mode == "train" else self.train_resource or self.resource
-        deadline = self.deadline if self.mode == "train" else self.train_deadline or self.deadline
-        protocol = "protocol_"+protocol_hash(self.experiment_protocol)[:12] if self.protocol() else "legacy"
-        return (f"{MODEL_VERSION}_task{task}_res{resource}_{deadline}_model{self.model_seed}_"
-                f"{LEARNING_MODEL}_{TA_WEIGHT_MODEL}_{self.normalization_mode}_{protocol}_{ENERGY_ACCOUNTING}")
-
-    def checkpoint_dir(self, algorithm=ALGORITHM):
-        if self.mode == "eval" and self.checkpoint_override:
-            return Path(self.checkpoint_override).resolve()
-        return Path(self.output_root)/"outputs/ckpts"/self.model_name()
-
-    def log_dir(self, algorithm=ALGORITHM):
-        return Path(self.output_root)/"outputs/logs"/self.model_name()
-
-    def evaluation_dir(self):
-        # Keep paths below Windows MAX_PATH in the user's deep workspace.
-        version = MODEL_VERSION+"_"+hashlib.sha256(self.output_version.encode()).hexdigest()[:12]
-        source = (f"from_task{self.train_task}_res{self.train_resource or self.resource}_"
-                  f"{self.train_deadline or self.deadline}_model{self.model_seed}")
-        return (Path(self.output_root)/"outputs/run"/ALGORITHM/version/source/
-                f"eval_task{self.task}_res{self.resource}_{self.deadline}")
 
     @property
     def output_version(self):
@@ -111,7 +91,7 @@ class ScoreScenario(Scenario):
                       checkpoint_selection=selection_metadata(),
                       experiment_protocol=self.selection_protocol(),
                       checkpoint_dir=str(self.checkpoint_dir()), log_dir=str(self.log_dir()),
-                      evaluation_dir=str(self.evaluation_dir()), device=self.device or "auto")
+                      evaluation_dir=str(self.evaluation_dir()), evaluation_csv=str(self.evaluation_csv()), device=self.device or "auto")
         return result
 
 

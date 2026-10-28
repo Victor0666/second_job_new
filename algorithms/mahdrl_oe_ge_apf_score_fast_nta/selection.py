@@ -1,5 +1,5 @@
-"""Use exactly AS-Fast v2's SR099 selector and evidence verification."""
-from algorithms.mahdrl_oe_ge_apf_score_fast.selection import (
+"""Use exactly ablation SR>092 selector and evidence verification."""
+from common.mahdrl_ablation import (
     SELECTION_TAG, WORKFLOW_SUCCESS_THRESHOLD, selection_metadata,
     validation_selection, selection_key, validate_checkpoint_selection,
 )

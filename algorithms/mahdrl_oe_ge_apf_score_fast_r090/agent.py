@@ -18,7 +18,7 @@ class R090Identity:
         self.normalization_metadata.update(algorithm_variant=deepcopy(self.identity),
             implementation=implementation_metadata(), reward_protocol=REWARD_PROTOCOL,
             reward_settings=reward_settings())
-        self.selection_expectation.update(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+        self.selection_expectation.update(checkpoint_selection=selection_metadata(), algorithm=ALGORITHM, model_version=MODEL_VERSION,
             reward_protocol=REWARD_PROTOCOL, reward_settings=reward_settings())
         return self
 

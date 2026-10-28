@@ -1,0 +1,180 @@
+{
+  "syntax_checked": [
+    "docs/mahdrl_as_fast_ablations_train.sh",
+    "docs/mahdrl_as_fast_ablations_evaluate.sh"
+  ],
+  "checks": [
+    {
+      "function": "train_mahdrl_as_fast_nta",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_nta_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_nha",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_nha_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_nva",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_nva_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_tl",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_tl_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_sync_task",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_sync_task_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_sync_phase",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_sync_phase_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_ertf",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_ertf_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_edf",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_edf_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_cp",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_cp_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_r090",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_r090_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "train_mahdrl_as_fast_r010_nopf",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 1,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_r010_nopf_all",
+      "target_override": null,
+      "fails_fast": false,
+      "calls": 3,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_r090_all",
+      "target_override": "M L",
+      "fails_fast": false,
+      "calls": 2,
+      "success": true
+    },
+    {
+      "function": "eval_mahdrl_as_fast_r090_all",
+      "target_override": null,
+      "fails_fast": true,
+      "calls": 1,
+      "success": true
+    }
+  ],
+  "invalid_target_rejected": true,
+  "source_does_not_launch_jobs": true,
+  "real_training_launched": false,
+  "success": true
+}

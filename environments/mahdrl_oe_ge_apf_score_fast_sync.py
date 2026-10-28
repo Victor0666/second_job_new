@@ -1,7 +1,7 @@
-"""Instrument sorting while preserving physical phases, APFs and OE rewards."""
+"""Fast ablation scheduling with no host or VM APF and original OE accounting."""
 import time
 import numpy as np
-from environments.mahdrl_oe_ge_apf_score_fast import CloudWorkflowEnv_VMAgents as FastEnv
+from environments.mahdrl_as_fast_noapf import CloudWorkflowEnv_VMAgents as FastEnv
 from environments.mahdrl_fcfs import MANAGER_ACTION_TABLE
 from algorithms.mahdrl_oe_ge_apf_score_fast_sync.config import get_config
 

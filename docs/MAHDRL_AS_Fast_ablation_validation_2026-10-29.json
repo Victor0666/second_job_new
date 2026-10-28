@@ -1,0 +1,236 @@
+{
+  "version": "noapf_srgt092_2026-10-29",
+  "public_entrypoints": [
+    {
+      "variant": "nta",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "nta",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "nha",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "nha",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "nva",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "nva",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "tl",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "tl",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "sync_task",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "sync_task",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "sync_phase",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "sync_phase",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "ertf",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "ertf",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "edf",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "edf",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "cp",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "cp",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "r090",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "r090",
+      "mode": "eval",
+      "success": true
+    },
+    {
+      "variant": "r010_nopf",
+      "mode": "train",
+      "success": true
+    },
+    {
+      "variant": "r010_nopf",
+      "mode": "eval",
+      "success": true
+    }
+  ],
+  "variants": [
+    {
+      "variant": "nta",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 145,
+      "maximum_measurement_full_path_length": 135,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_nta\\SS_L_m1_cc8387f9a",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_nta\\eval_mahdrl_nta_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_cc8387f9a.csv"
+    },
+    {
+      "variant": "nha",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 145,
+      "maximum_measurement_full_path_length": 135,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_nha\\SS_L_m1_c232349dc",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_nha\\eval_mahdrl_nha_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_c232349dc.csv"
+    },
+    {
+      "variant": "nva",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 145,
+      "maximum_measurement_full_path_length": 135,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_nva\\SS_L_m1_cacd35c54",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_nva\\eval_mahdrl_nva_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_cacd35c54.csv"
+    },
+    {
+      "variant": "tl",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 143,
+      "maximum_measurement_full_path_length": 134,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_tl\\SS_L_m1_cf4bc533c",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_tl\\eval_mahdrl_tl_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_cf4bc533c.csv"
+    },
+    {
+      "variant": "sync_task",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 157,
+      "maximum_measurement_full_path_length": 141,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_sync_task\\SS_L_m1_cda9e9543",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_sync_task\\eval_mahdrl_sync_task_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_cda9e9543.csv"
+    },
+    {
+      "variant": "sync_phase",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 159,
+      "maximum_measurement_full_path_length": 142,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_sync_phase\\SS_L_m1_cd7cbe6b3",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_sync_phase\\eval_mahdrl_sync_phase_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_cd7cbe6b3.csv"
+    },
+    {
+      "variant": "ertf",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 147,
+      "maximum_measurement_full_path_length": 136,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_ertf\\SS_L_m1_c9624a19e",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_ertf\\eval_mahdrl_ertf_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_c9624a19e.csv"
+    },
+    {
+      "variant": "edf",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 145,
+      "maximum_measurement_full_path_length": 135,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_edf\\SS_L_m1_cac1a61d1",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_edf\\eval_mahdrl_edf_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_cac1a61d1.csv"
+    },
+    {
+      "variant": "cp",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 143,
+      "maximum_measurement_full_path_length": 134,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_cp\\SS_L_m1_c1fee50ae",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_cp\\eval_mahdrl_cp_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_c1fee50ae.csv"
+    },
+    {
+      "variant": "r090",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 147,
+      "maximum_measurement_full_path_length": 136,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_r090\\SS_L_m1_cbacf63d7",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_r090\\eval_mahdrl_r090_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_cbacf63d7.csv"
+    },
+    {
+      "variant": "r010_nopf",
+      "unique_source_models": 9,
+      "unique_CSV_names": 27,
+      "maximum_training_directory_name_length": 17,
+      "maximum_CSV_full_path_length": 157,
+      "maximum_measurement_full_path_length": 141,
+      "example_checkpoint": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_r010_nopf\\SS_L_m1_c814f6c3a",
+      "example_CSV": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_r010_nopf\\eval_mahdrl_r010_nopf_noapf_srgt092_SS_L_from_SS_L_m1_s700-729_c814f6c3a.csv"
+    }
+  ],
+  "tests": {
+    "count": 133,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "successful": true,
+    "seconds": 151.246,
+    "log": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\docs\\MAHDRL_AS_Fast_ablation_tests_2026-10-29.txt"
+  }
+}

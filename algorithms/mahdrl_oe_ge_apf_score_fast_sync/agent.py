@@ -3,7 +3,7 @@ from copy import deepcopy
 import torch
 from algorithms.mahdrl_oe_ge_apf_score.agent import CheckpointIdentity
 from algorithms.mahdrl_oe_ge_apf_score_fast.agent import TAAgent as BaseTA, SetD3QNAgent as BaseSet
-from algorithms.mahdrl_oe_ge_apf_score_fast.selection import selection_metadata, validate_checkpoint_selection
+from common.mahdrl_ablation import selection_metadata, validate_checkpoint_selection
 from .config import get_config
 
 
@@ -20,7 +20,7 @@ class SyncIdentity:
             parameter_shapes={key: list(value.shape) for key, value in self.online.state_dict().items()})
         self.normalization_metadata.update(algorithm_variant=deepcopy(self.identity),
             implementation=cfg.implementation_metadata(), synchronization=cfg.synchronization_metadata())
-        self.selection_expectation.update(algorithm=cfg.algorithm, model_version=cfg.model_version,
+        self.selection_expectation.update(checkpoint_selection=selection_metadata(), algorithm=cfg.algorithm, model_version=cfg.model_version,
             synchronization=cfg.synchronization_metadata())
         return self
 

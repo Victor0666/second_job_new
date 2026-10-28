@@ -1,4 +1,5 @@
 """R010 reward/physics parity, exact learner reuse, provenance and real lifecycle."""
+from common.test_mahdrl_ablation_settings import raw_physics, assert_flat_csv
 from contextlib import redirect_stdout
 from copy import deepcopy
 from dataclasses import replace
@@ -246,10 +247,10 @@ class R010Tests(unittest.TestCase):
         self.compare_learning('cuda')
 
     def test_selector_is_v2_rule_and_reward_settings_are_independent(self):
-        self.assertIs(selection.selection_key, base_runtime.selection_key)
-        self.assertIs(selection.validation_selection, base_runtime.validation_selection)
-        self.assertFalse(selection.validation_selection([validation_row(49)])['feasible'])
-        self.assertTrue(selection.validation_selection([validation_row(50)])['feasible'])
+        self.assertIsNot(selection.validation_selection, base_runtime.validation_selection)
+        self.assertIsNot(selection.validation_selection, base_runtime.validation_selection)
+        self.assertFalse(selection.validation_selection([validation_row(46)])['feasible'])
+        self.assertTrue(selection.validation_selection([validation_row(47)])['feasible'])
         settings = config.reward_settings()
         settings['alpha_delay_vm'] = .75
         self.assertEqual(config.reward_settings()['alpha_delay_vm'], .1)
@@ -343,6 +344,7 @@ class R010Tests(unittest.TestCase):
                     self.assertEqual(parameter_hash(loaded), before)
                     self.assertEqual({r: a._updates for r, a in loaded.items()}, updates)
                     with self.assertRaises(FileExistsError): runtime.train(scene)
+                    assert_flat_csv(self, target)
                     with self.assertRaises(FileExistsError): runtime.evaluate(target)
             self.assertEqual(seen, [True, False, True, False, False])
             rows = [json.loads(line) for line in (scene.log_dir()/'validation_selection.jsonl').read_text().splitlines()]
@@ -354,12 +356,12 @@ class R010Tests(unittest.TestCase):
             summary = json.loads((scene.log_dir()/'training_summary.json').read_text())
             self.assertEqual(summary['reward_settings'], config.reward_settings())
             self.assertEqual(summary['selected_episode'], expected)
-            self.assertEqual(summary['checkpoint_selection']['workflow_success_threshold'], .99)
+            self.assertEqual(summary['checkpoint_selection']['workflow_success_threshold'], .92)
             measurements = [json.loads(line) for line in (scene.log_dir()/'training_measurements.jsonl').read_text().splitlines()]
             self.assertEqual(len(measurements), 2)
             self.assertTrue(all(v > 0 for row in measurements for v in row['optimizer_steps'].values()))
             self.assertTrue((scene.log_dir()/'stage_timings.jsonl').exists())
-            self.assertTrue(target.evaluation_csv.exists())
+            self.assertTrue(target.evaluation_csv().exists())
             self.assertTrue((target.evaluation_dir()/'measurements/episodes/seed700.json').exists())
             self.assertEqual(sentinel.read_text(encoding='utf-8'), 'original R075 output')
 

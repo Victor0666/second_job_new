@@ -15,7 +15,7 @@ from common.experiment_measurements import (
 from algorithms.mahdrl_oe_ge_apf_score_fast.runtime import (
     build_env_kwargs, validate_inputs, set_seed, write_json, append_json,
 )
-from algorithms.mahdrl_oe_ge_apf_score_fast.selection import (
+from common.mahdrl_ablation import (
     selection_metadata, validation_selection, selection_key, validate_checkpoint_selection,
 )
 from environments.mahdrl_oe_ge_apf_score_fast_sync import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
@@ -203,13 +203,16 @@ def train(scene):
 def evaluate(scene):
     cfg = scene.sync_config
     ALGORITHM, DISPLAY_NAME, MODEL_VERSION = cfg.algorithm, cfg.display_name, cfg.model_version
-    directory = scene.evaluation_dir()
+    directory = scene.evaluation_details_dir()
+    csv_path = scene.evaluation_csv()
+    if csv_path.exists():
+        raise FileExistsError(f"Refusing to overwrite evaluation CSV: {csv_path}")
     if directory.exists() and any(directory.iterdir()):
         raise FileExistsError(f"Refusing to overwrite evaluation artifacts: {directory}")
     validate_inputs(scene)
     set_seed(scene.model_seed)
     agents = load_agents(scene)
-    directory.mkdir(parents=True, exist_ok=True)
+    directory.mkdir(parents=True, exist_ok=False)
     write_json(directory/"algorithm_variant.json", cfg.variant_metadata())
     write_json(directory/"implementation.json", cfg.implementation_metadata())
     write_run_metadata(directory, scene)
@@ -227,9 +230,8 @@ def evaluate(scene):
         append_json(directory/"stage_timings.jsonl", dict(seed=seed, scope="evaluation", environment=env.profiler.report()))
         write_json(directory/f"apf_seed{seed}.json", apf_report(env))
         append_json(directory/"evaluation.jsonl", dict(seed=seed, **result))
-        csv_path = directory/f"evaluation_mahdrl_as_fast_sync_{scene.sync_mode}.csv"
-        row = dict(seed=seed, model_seed=scene.model_seed, **episode_metrics(env))
-        with csv_path.open("a", encoding="utf-8", newline="") as f:
+        row = dict(**scene.evaluation_identity(), seed=seed, model_seed=scene.model_seed, **episode_metrics(env))
+        with csv_path.open("a" if values else "x", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(row))
             if f.tell() == 0:
                 writer.writeheader()
@@ -247,5 +249,5 @@ def evaluate(scene):
         best_validation_selection=agents['TA'].loaded_selection['best_validation_selection'],
         seeds=list(scene.seeds), metrics=summary, sorting=sorting,
         synchronization=cfg.synchronization_metadata()))
-    print(f"[{DISPLAY_NAME} eval completed] results={directory.resolve()}")
+    print(f"[{DISPLAY_NAME} eval completed] csv={csv_path.resolve()} details={directory.resolve()}")
     return summary

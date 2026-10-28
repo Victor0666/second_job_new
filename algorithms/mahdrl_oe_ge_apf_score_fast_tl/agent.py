@@ -21,7 +21,7 @@ class TLIdentity:
             parameter_shapes={key: list(value.shape) for key, value in self.online.state_dict().items()})
         self.normalization_metadata.update(algorithm_variant=deepcopy(self.identity),
             implementation=implementation_metadata(), tl_policy=tl_policy_metadata())
-        self.selection_expectation.update(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+        self.selection_expectation.update(checkpoint_selection=selection_metadata(), algorithm=ALGORITHM, model_version=MODEL_VERSION,
                                           tl_policy=tl_policy_metadata())
         return self
 

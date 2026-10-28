@@ -17,7 +17,7 @@ class OutputPathTests(unittest.TestCase):
             return (irws.output_dir(scene, 'ckpts'), irws.evaluation_directory(scene),
                     irws.output_dir(scene, 'run') / irws.artifact_name(scene, 'eval'))
         directory = scene.evaluation_dir() if isinstance(scene, ScoreScenario) else scene.evaluation_dir
-        return scene.checkpoint_dir(), directory, scene.evaluation_csv
+        return scene.checkpoint_dir(), directory, scene.evaluation_csv() if isinstance(scene, ScoreScenario) else scene.evaluation_csv
 
     def test_27_csvs_per_algorithm_share_a_parent_and_have_unique_scene_names(self):
         for klass in (R010Scenario, FEScenario, ScoreScenario):
@@ -33,7 +33,9 @@ class OutputPathTests(unittest.TestCase):
                                          train_resource=resource, train_deadline=deadline)
                         checkpoint, details, csv = self.paths(target)
                         self.assertEqual(checkpoint, source_checkpoint)
-                        self.assertIn(f'_{task}{resource}_{deadline}_fromS{resource}_{deadline}_', csv.name)
+                        expected = (f'_{target.target_tag}_from_{target.source_tag}_' if isinstance(target, ScoreScenario)
+                                    else f'_{task}{resource}_{deadline}_fromS{resource}_{deadline}_')
+                        self.assertIn(expected, csv.name)
                         self.assertIn('_m1_s700-729_c', csv.name)
                         self.assertEqual(csv.suffix, '.csv')
                         self.assertEqual(details.parent.name, '_details')
@@ -50,7 +52,7 @@ class OutputPathTests(unittest.TestCase):
             files = [self.paths(scene)[2] for scene in variants]
             self.assertEqual(len({p.name for p in files}), len(variants))
             self.assertTrue(all(p.parent == files[0].parent for p in files))
-            self.assertIn('_s700+702+704_', files[-1].name)
+            self.assertIn('_s700-704_' if klass is ScoreScenario else '_s700+702+704_', files[-1].name)
 
     def test_configuration_fingerprints_are_portable_and_keep_runs_separate(self):
         with tempfile.TemporaryDirectory() as directory:

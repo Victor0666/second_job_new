@@ -1,4 +1,5 @@
-"""Two explicit update clocks; all AS-Fast v2 scientific settings are retained."""
+"""Two update clocks over the same unfiltered Fast action space."""
+from common.mahdrl_ablation import no_apf_metadata, selection_metadata
 from dataclasses import dataclass
 from algorithms.mahdrl_oe_ge_apf_score_fast.config import (
     APF, TRUNK, ENTITY, TA_HIDDEN, learning_kwargs,
@@ -21,7 +22,7 @@ class SyncConfig:
 
     @property
     def model_version(self):
-        return "mahdrl_as_fast_v2_sync_" + self.mode + "_v1"
+        return "mahdrl_as_fast_v2_sync_" + self.mode + "_noapf_srgt092_v2"
 
     @property
     def display_name(self):
@@ -33,7 +34,7 @@ class SyncConfig:
 
     def synchronization_metadata(self):
         return dict(version="synchronization_clock_v1", mode=self.mode,
-            learned_roles=["TA", "HA", "VA"], host_apf="enabled", vm_apf="enabled",
+            learned_roles=["TA", "HA", "VA"], host_apf="disabled", vm_apf="disabled",
             ta_decision_clock="assignment" if self.mode == "task" else "phase",
             optimizer_clock="assignment_end" if self.mode == "task" else "phase_end",
             optimizer_budget=("one_per_eligible_role_per_assignment" if self.mode == "task"
@@ -51,13 +52,14 @@ class SyncConfig:
         result.update(algorithm=self.algorithm, scheme=self.model_version,
             model_version=self.model_version, base_implementation="mahdrl_as_fast_v2",
             synchronization=self.synchronization_metadata())
-        return result
+        return no_apf_metadata(result)
 
     def implementation_metadata(self):
         result = base_implementation_metadata()
         result.update(algorithm=self.algorithm, implementation_version=self.model_version,
             scientific_variant=self.variant_metadata(), synchronization=self.synchronization_metadata(),
-            environment="physical_phase_preserved_instrumented_resequencing")
+            environment="one_decision_cache_raw_legal_noapf_float64")
+        result.update(checkpoint_selection=selection_metadata(), environment="one_decision_cache_raw_legal_noapf_float64")
         return result
 
 

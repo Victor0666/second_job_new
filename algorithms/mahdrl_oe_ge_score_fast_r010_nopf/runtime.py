@@ -279,16 +279,16 @@ def train(scene):
 
 
 def evaluate(scene):
-    directory = scene.evaluation_dir()
-    csv_path = scene.evaluation_csv
+    directory = scene.evaluation_details_dir()
+    csv_path = scene.evaluation_csv()
     if csv_path.exists():
-        raise FileExistsError(f'Refusing to overwrite evaluation CSV: {csv_path}')
+        raise FileExistsError(f"Refusing to overwrite evaluation CSV: {csv_path}")
     if directory.exists() and any(directory.iterdir()):
         raise FileExistsError(f"Refusing to overwrite evaluation artifacts: {directory}")
     validate_inputs(scene)
     set_seed(scene.model_seed)
     agents = load_agents(scene)
-    directory.mkdir(parents=True, exist_ok=True)
+    directory.mkdir(parents=True, exist_ok=False)
     write_json(directory/"algorithm_variant.json", variant_metadata())
     write_json(directory/"implementation.json", implementation_metadata())
     write_json(directory/"reward_settings.json", dict(reward_protocol=REWARD_PROTOCOL, **reward_settings()))
@@ -307,7 +307,7 @@ def evaluate(scene):
         append_json(directory/"stage_timings.jsonl", dict(seed=seed, scope="evaluation", environment=env.profiler.report()))
         write_json(directory/f"candidates_seed{seed}.json", candidate_report(env))
         append_json(directory/"evaluation.jsonl", dict(seed=seed, **result))
-        row = dict(seed=seed, model_seed=scene.model_seed, **episode_metrics(env))
+        row = dict(**scene.evaluation_identity(), seed=seed, model_seed=scene.model_seed, **episode_metrics(env))
         with csv_path.open("a" if values else "x", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(row))
             if f.tell() == 0:

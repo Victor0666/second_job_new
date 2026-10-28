@@ -274,13 +274,16 @@ def train(scene):
 
 
 def evaluate(scene):
-    directory = scene.evaluation_dir()
+    directory = scene.evaluation_details_dir()
+    csv_path = scene.evaluation_csv()
+    if csv_path.exists():
+        raise FileExistsError(f"Refusing to overwrite evaluation CSV: {csv_path}")
     if directory.exists() and any(directory.iterdir()):
         raise FileExistsError(f"Refusing to overwrite evaluation artifacts: {directory}")
     validate_inputs(scene)
     set_seed(scene.model_seed)
     agents = load_agents(scene)
-    directory.mkdir(parents=True, exist_ok=True)
+    directory.mkdir(parents=True, exist_ok=False)
     write_json(directory/"algorithm_variant.json", variant_metadata())
     write_json(directory/"implementation.json", implementation_metadata())
     write_run_metadata(directory, scene)
@@ -298,9 +301,8 @@ def evaluate(scene):
         append_json(directory/"stage_timings.jsonl", dict(seed=seed, scope="evaluation", environment=env.profiler.report()))
         write_json(directory/f"apf_seed{seed}.json", apf_report(env))
         append_json(directory/"evaluation.jsonl", dict(seed=seed, **result))
-        csv_path = directory/"evaluation_mahdrl_as_fast_tl.csv"
-        row = dict(seed=seed, model_seed=scene.model_seed, **episode_metrics(env))
-        with csv_path.open("a", encoding="utf-8", newline="") as f:
+        row = dict(**scene.evaluation_identity(), seed=seed, model_seed=scene.model_seed, **episode_metrics(env))
+        with csv_path.open("a" if values else "x", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(row))
             if f.tell() == 0:
                 writer.writeheader()
@@ -313,5 +315,5 @@ def evaluate(scene):
         checkpoint_selection=selection_metadata(), selected_episode=agents['TA'].loaded_selection['selected_episode'],
         best_validation_selection=agents['TA'].loaded_selection['best_validation_selection'],
         seeds=list(scene.seeds), metrics=summary))
-    print(f"[MAHDRL-AS-Fast-V2-TL eval completed] results={directory.resolve()}")
+    print(f"[MAHDRL-AS-Fast-V2-TL eval completed] csv={csv_path.resolve()} details={directory.resolve()}")
     return summary

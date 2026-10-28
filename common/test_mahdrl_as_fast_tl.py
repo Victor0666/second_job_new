@@ -1,4 +1,5 @@
 """Global learned VM routing without HA/host APF, physics and model lifecycle."""
+from common.test_mahdrl_ablation_settings import raw_physics, assert_flat_csv
 from contextlib import redirect_stdout
 from copy import deepcopy
 from dataclasses import replace
@@ -100,7 +101,7 @@ class TLTests(unittest.TestCase):
                 self.assertEqual(snapshot["hosts"], set(env.host_ids))
                 self.assertIsNone(snapshot["r_H"])
                 self.assertEqual(snapshot["energy_hosts"], set())
-                self.assertLess(len(expected), env.num_vms)
+                self.assertEqual(len(expected), env.num_vms)
                 for hid in env.host_ids:
                     self.assertGreater(vm["mask"][env.host_to_vm_indices[hid]].sum(), 0)
                 self.assertIs(vm, env._build_global_vm_state_for_task(env._cur_tid))
@@ -112,14 +113,14 @@ class TLTests(unittest.TestCase):
                 self.assertEqual(info["host_id"], env.host_ids[-1])
                 row = env.apf_decisions[-1]
                 self.assertFalse(row["host_apf_enabled"])
-                self.assertTrue(row["vm_apf_enabled"])
+                self.assertFalse(row["vm_apf_enabled"])
                 self.assertEqual(row["raw_host_count"], row["retained_host_count"])
                 self.assertEqual(row["global_retained_vm_count"], len(expected))
                 self.assertEqual(row["vm_selection_scope"], "global")
                 self.assertIsNone(env._fast_key)
 
     def test_same_actions_preserve_all_VA_information_physics_and_OE_rewards(self):
-        old, env = self.env(base_runtime), self.env()
+        old, env = raw_physics(self.env(base_runtime)), self.env()
         assignments = 0
         with redirect_stdout(io.StringIO()):
             while not old.done_flag:
@@ -217,7 +218,7 @@ class TLTests(unittest.TestCase):
             self.assertEqual(len(rows), result["task_count"])
             self.assertEqual(result["wf_completed_count"], 2)
             self.assertTrue(all(r["legal_vm_count"] >= 1 for r in rows))
-            self.assertTrue(all(not r["host_apf_enabled"] and r["vm_apf_enabled"] for r in env.apf_decisions))
+            self.assertTrue(all(not r["host_apf_enabled"] and not r["vm_apf_enabled"] for r in env.apf_decisions))
             results.append(result); choices.append(rows)
         self.assertEqual(results[0], results[1]); self.assertEqual(choices[0], choices[1])
         self.assertEqual(parameter_hash(learners), before)
@@ -367,6 +368,7 @@ class TLTests(unittest.TestCase):
                     with redirect_stdout(io.StringIO()), patch.object(runtime, "load_agents", return_value=loaded): runtime.evaluate(target)
                     self.assertEqual(parameter_hash(loaded), before)
                     with self.assertRaises(FileExistsError): runtime.train(scene)
+                    assert_flat_csv(self, target)
                     with self.assertRaises(FileExistsError): runtime.evaluate(target)
                 summary = json.loads((scene.log_dir()/"training_summary.json").read_text())
                 self.assertEqual(summary["selected_episode"], 0); self.assertTrue(summary["feasible_model_found"])
@@ -405,12 +407,12 @@ class TLTests(unittest.TestCase):
             self.assertEqual(row["algorithm"], config.ALGORITHM)
             self.assertEqual(row["model_version"], config.MODEL_VERSION)
             self.assertEqual(row["tl_policy"]["host_apf"], "disabled")
-            self.assertEqual(row["tl_policy"]["vm_apf"], "enabled")
+            self.assertEqual(row["tl_policy"]["vm_apf"], "disabled")
             self.assertEqual(row["checkpoint_selection"], selection.selection_metadata())
-        self.assertIs(selection.selection_key, base_runtime.selection_key)
-        self.assertIs(selection.validation_selection, base_runtime.validation_selection)
-        self.assertFalse(selection.validation_selection([validation_row(49)])["feasible"])
-        self.assertTrue(selection.validation_selection([validation_row(50)])["feasible"])
+        self.assertIsNot(selection.selection_key, base_runtime.selection_key)
+        self.assertIsNot(selection.validation_selection, base_runtime.validation_selection)
+        self.assertFalse(selection.validation_selection([validation_row(46)])["feasible"])
+        self.assertTrue(selection.validation_selection([validation_row(47)])["feasible"])
         self.assertEqual(registry, MODEL_NAMES)
         baseline, tl = BaseScenario(), ScoreScenario()
         self.assertEqual(baseline.normalization_kwargs(), tl.normalization_kwargs())

@@ -1,4 +1,5 @@
 """Real-decision clocks, physical invariants, update budgets and isolated models."""
+from common.test_mahdrl_ablation_settings import raw_physics, assert_flat_csv
 from contextlib import ExitStack, redirect_stdout
 from copy import deepcopy
 from dataclasses import replace
@@ -158,6 +159,11 @@ class SyncTests(unittest.TestCase):
         records, apfs, results = [], [], []
         for klass in (BaseScenario, TaskScenario, PhaseScenario):
             env = self.env(klass)
+            if klass is BaseScenario:
+                from environments.mahdrl_as_fast_noapf import CloudWorkflowEnv_VMAgents as RawEnv
+                from types import MethodType
+                for name in ("_apf_snapshot", "host_select", "vm_assign"):
+                    setattr(env, name, MethodType(getattr(RawEnv, name), env))
             env.set_manager_combo([1., 0., 0., 0., 0.])
             learners = base_tiny_agents(self.scene(klass)) if klass is BaseScenario else tiny_agents(self.scene(klass))
             module = base_runtime if klass is BaseScenario else runtime
@@ -305,8 +311,8 @@ class SyncTests(unittest.TestCase):
                 self.assertEqual(stopped.exception.code, 0)
                 value = json.loads(out.getvalue())
                 self.assertEqual(value["synchronization"]["mode"], klass.sync_mode)
-                self.assertEqual(value["synchronization"]["host_apf"], "enabled")
-                self.assertEqual(value["synchronization"]["vm_apf"], "enabled")
+                self.assertEqual(value["synchronization"]["host_apf"], "disabled")
+                self.assertEqual(value["synchronization"]["vm_apf"], "disabled")
             scene = klass()
             self.assertEqual(scene.normalization_kwargs(), BaseScenario().normalization_kwargs())
             self.assertEqual(scene.cache_path, BaseScenario().cache_path)
@@ -322,7 +328,7 @@ class SyncTests(unittest.TestCase):
         self.assertEqual(registry, MODEL_NAMES)
 
     def test_stability_uses_raw_validation_metrics_and_counts_drop_events(self):
-        success = [.98, 1., 1., 1., 1., 1., .98, .96, 1., .98]
+        success = [.92, 1., 1., 1., 1., 1., .92, .90, 1., .92]
         rows = [dict(episode=i, validation_success_rate=sr, validation_energy=100.+i) for i, sr in enumerate(success)]
         stats = training_stability(rows, tail_window=3)
         self.assertEqual(stats["first_sustained_feasible_completed_episode"], 6)

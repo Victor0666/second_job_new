@@ -1,4 +1,4 @@
-"""Compact, portable output names shared only by the three R010 variants."""
+"""Compact, portable output names for experiment variants."""
 import hashlib
 import json
 from pathlib import Path

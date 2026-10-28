@@ -1,5 +1,5 @@
 """Unchanged AS-Fast observations/physics, with fixed R090 rewards at all levels."""
-from environments.mahdrl_oe_ge_apf_score_fast import CloudWorkflowEnv_VMAgents as BaseEnv
+from environments.mahdrl_as_fast_noapf import CloudWorkflowEnv_VMAgents as BaseEnv
 from environments.mahdrl_fcfs import MANAGER_ACTION_TABLE
 from algorithms.mahdrl_oe_ge_apf_score_fast_r090.config import (
     ALGORITHM, reward_settings, check_reward_environment, variant_metadata,

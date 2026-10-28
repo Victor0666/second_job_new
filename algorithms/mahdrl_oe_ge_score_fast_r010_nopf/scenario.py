@@ -1,4 +1,5 @@
 """Local scenario paths/parser, without registering or modifying older algorithms."""
+from common.mahdrl_ablation_paths import AblationPaths
 import argparse
 from dataclasses import dataclass, field
 import hashlib
@@ -7,17 +8,19 @@ from pathlib import Path
 from common.scenarios import Scenario, ROOT
 from common.experiment_protocol import DEFAULT_PROTOCOL
 from common.f18_state_normalization import CURRENT_VERSION, DEFAULT_CONFIG, SHARED_VERSIONS
-from common.f11 import LEARNING_MODEL
-from common.ta_weights import TA_WEIGHT_MODEL
 from .config import ALGORITHM, DISPLAY_NAME, MODEL_VERSION, variant_metadata, implementation_metadata, REWARD_PROTOCOL, reward_settings
 from .selection import SELECTION_TAG, selection_metadata
-from common.r010_paths import training_name, evaluation_stem
 
 OUTPUT_TAG = 'mahdrl_r010_nopf'
 
 
 @dataclass(frozen=True)
-class ScoreScenario(Scenario):
+class ScoreScenario(AblationPaths, Scenario):
+    output_tag = "mahdrl_r010_nopf"
+
+    def path_settings(self):
+        return MODEL_VERSION, variant_metadata()
+
     resource_config: str | None = None
     cache_file: str | None = None
     output_root: str = str(ROOT)
@@ -58,33 +61,6 @@ class ScoreScenario(Scenario):
     def cache_path(self):
         return Path(self.cache_file).resolve() if self.cache_file else super().cache_path
 
-    def model_name(self, algorithm=ALGORITHM):
-        return training_name(self, MODEL_VERSION,
-            dict(protocol=self.selection_protocol(), variant=variant_metadata(),
-                 learning_model=LEARNING_MODEL, ta_weight_model=TA_WEIGHT_MODEL))
-
-    def checkpoint_dir(self, algorithm=ALGORITHM):
-        if self.mode == "eval" and self.checkpoint_override:
-            return Path(self.checkpoint_override).resolve()
-        return Path(self.output_root)/"outputs/ckpts"/OUTPUT_TAG/self.model_name()
-
-    def log_dir(self, algorithm=ALGORITHM):
-        return Path(self.output_root)/"outputs/logs"/OUTPUT_TAG/self.model_name()
-
-    @property
-    def evaluation_root(self):
-        return Path(self.output_root)/'outputs/run'/OUTPUT_TAG
-
-    @property
-    def evaluation_stem(self):
-        return evaluation_stem(self, OUTPUT_TAG, self.model_name())
-
-    @property
-    def evaluation_csv(self):
-        return self.evaluation_root/(self.evaluation_stem + '.csv')
-
-    def evaluation_dir(self):
-        return self.evaluation_root/'_details'/self.evaluation_stem
 
     @property
     def output_version(self):
@@ -117,7 +93,7 @@ class ScoreScenario(Scenario):
                       checkpoint_selection=selection_metadata(),
                       experiment_protocol=self.selection_protocol(),
                       checkpoint_dir=str(self.checkpoint_dir()), log_dir=str(self.log_dir()),
-                      evaluation_dir=str(self.evaluation_dir()), evaluation_csv=str(self.evaluation_csv),
+                      evaluation_dir=str(self.evaluation_dir()), evaluation_csv=str(self.evaluation_csv()),
                       device=self.device or "auto")
         return result
 

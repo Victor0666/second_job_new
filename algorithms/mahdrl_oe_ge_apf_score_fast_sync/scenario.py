@@ -1,63 +1,63 @@
 """Independent source paths and metadata, sharing the validated Fast scenario rules."""
+from common.mahdrl_ablation import SELECTION_TAG, selection_metadata
+from common.mahdrl_ablation_paths import AblationPaths
 import argparse
-import hashlib
 import json
 from pathlib import Path
 from common.experiment_protocol import DEFAULT_PROTOCOL
 from common.f18_state_normalization import CURRENT_VERSION, DEFAULT_CONFIG, SHARED_VERSIONS
 from algorithms.mahdrl_oe_ge_apf_score_fast.scenario import ScoreScenario as BaseScenario
-from algorithms.mahdrl_oe_ge_apf_score_fast.config import MODEL_VERSION as BASE_VERSION
 from .config import get_config
 
 
-class SyncScenario(BaseScenario):
+class SyncScenario(AblationPaths, BaseScenario):
+    @property
+    def output_tag(self):
+        return "mahdrl_sync_"+self.sync_mode
+
+    def path_settings(self):
+        cfg = self.sync_config
+        return cfg.model_version, cfg.variant_metadata()
+
     sync_mode = None
 
     @property
     def sync_config(self):
         return get_config(self.sync_mode)
 
-    def model_name(self, algorithm=None):
-        return super().model_name().replace(BASE_VERSION, self.sync_config.model_version, 1)
 
     @property
     def output_version(self):
-        return self.sync_config.model_version + "_" + super().output_version
+        return self.sync_config.model_version + "_" + super().output_version.replace("select_sr099_minenergy_v1", SELECTION_TAG)
 
-    def evaluation_dir(self):
-        # Compact folder tag preserves Windows path headroom for both variants.
-        version = "sync_"+self.sync_mode+"_v1_"+hashlib.sha256(self.output_version.encode()).hexdigest()[:12]
-        source = (f"from_task{self.train_task}_res{self.train_resource or self.resource}_"
-                  f"{self.train_deadline or self.deadline}_model{self.model_seed}")
-        return (Path(self.output_root)/"outputs/run"/self.sync_config.algorithm/version/source/
-                f"eval_task{self.task}_res{self.resource}_{self.deadline}")
 
     def selection_protocol(self):
         metadata = super().selection_protocol()
+        metadata.update(selection=SELECTION_TAG, checkpoint_selection=selection_metadata())
         metadata["synchronization"] = self.sync_config.synchronization_metadata()
         return metadata
 
     def reproducibility_metadata(self):
         metadata = super().reproducibility_metadata()
         cfg = self.sync_config
-        metadata.update(algorithm=cfg.algorithm, model_version=cfg.model_version,
+        metadata.update(algorithm=cfg.algorithm, model_version=cfg.model_version, checkpoint_selection=selection_metadata(),
             data_split=self.selection_protocol(), synchronization=cfg.synchronization_metadata())
         return metadata
 
     def normalization_metadata(self):
         metadata = super().normalization_metadata()
         cfg = self.sync_config
-        metadata.update(model_version=cfg.model_version, experiment_protocol=self.selection_protocol(),
+        metadata.update(model_version=cfg.model_version, checkpoint_selection=selection_metadata(), experiment_protocol=self.selection_protocol(),
             synchronization=cfg.synchronization_metadata())
         return metadata
 
     def describe(self, algorithm=None):
         result = super().describe()
         cfg = self.sync_config
-        result.update(algorithm=cfg.algorithm, display_name=cfg.display_name, model_version=cfg.model_version,
+        result.update(checkpoint_selection=selection_metadata(), experiment_protocol=self.selection_protocol(), algorithm=cfg.algorithm, display_name=cfg.display_name, model_version=cfg.model_version,
             variant=cfg.variant_metadata(), implementation=cfg.implementation_metadata(),
             synchronization=cfg.synchronization_metadata(), checkpoint_dir=str(self.checkpoint_dir()),
-            log_dir=str(self.log_dir()), evaluation_dir=str(self.evaluation_dir()))
+            log_dir=str(self.log_dir()), evaluation_dir=str(self.evaluation_dir()), evaluation_csv=str(self.evaluation_csv()))
         return result
 
 

@@ -1,4 +1,5 @@
 """NTA policy isolation, retained learners, provenance and real train/eval flow."""
+from common.test_mahdrl_ablation_settings import raw_physics, assert_flat_csv
 from contextlib import redirect_stdout
 from copy import deepcopy
 from dataclasses import replace
@@ -143,13 +144,13 @@ class NTATests(unittest.TestCase):
         self.assertEqual(logs[0], logs[1])
         self.assertEqual(parameter_hash(learners), weights)
 
-    def test_SR099_selector_is_exact_v2_rule(self):
-        self.assertIs(selection.selection_key, base_runtime.selection_key)
-        self.assertIs(selection.validation_selection, base_runtime.validation_selection)
-        self.assertFalse(selection.validation_selection([validation_row(49)])["feasible"])
-        self.assertTrue(selection.validation_selection([validation_row(50)])["feasible"])
-        low = selection.validation_selection([validation_row(49, 1.)])
-        high = selection.validation_selection([validation_row(50, 100.)])
+    def test_SR092_selector_is_strict_and_does_not_change_full_model(self):
+        self.assertIsNot(selection.validation_selection, base_runtime.validation_selection)
+        self.assertFalse(selection.validation_selection([validation_row(46)])["feasible"])
+        self.assertTrue(selection.validation_selection([validation_row(47)])["feasible"])
+        self.assertFalse(base_runtime.validation_selection([validation_row(47)])["feasible"])
+        low = selection.validation_selection([validation_row(46, 1.)])
+        high = selection.validation_selection([validation_row(47, 100.)])
         self.assertLess(selection.selection_key(high), selection.selection_key(low))
 
     @unittest.skipUnless(torch.cuda.is_available(), "CUDA unavailable")
@@ -255,6 +256,7 @@ class NTATests(unittest.TestCase):
                     self.assertEqual(parameter_hash(loaded), before)
                     self.assertIn("total_energy", summary)
                     with self.assertRaises(FileExistsError): runtime.train(scene)
+                    assert_flat_csv(self, target)
                     with self.assertRaises(FileExistsError): runtime.evaluate(target)
                 selection_log = [json.loads(line) for line in (scene.log_dir()/"validation_selection.jsonl").read_text().splitlines()]
                 training = json.loads((scene.log_dir()/"training_summary.json").read_text())

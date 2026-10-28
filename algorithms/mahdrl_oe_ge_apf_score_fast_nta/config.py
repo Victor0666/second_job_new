@@ -1,4 +1,5 @@
-"""Keep AS-Fast v2 settings; replace only the learned sequencing policy."""
+"""Random TA increments with learned HA/VA and no host or VM APF."""
+from common.mahdrl_ablation import no_apf_metadata, selection_metadata
 from algorithms.mahdrl_oe_ge_apf_score_fast.config import (
     APF, TRUNK, ENTITY, TA_HIDDEN, learning_kwargs,
     variant_metadata as base_variant_metadata,
@@ -7,7 +8,7 @@ from algorithms.mahdrl_oe_ge_apf_score_fast.config import (
 
 ALGORITHM = "mahdrl_oe_ge_apf_score_fast_nta"
 DISPLAY_NAME = "MAHDRL-AS-Fast-V2-NTA"
-MODEL_VERSION = "mahdrl_as_fast_v2_nta_v1"
+MODEL_VERSION = 'mahdrl_as_fast_v2_nta_noapf_srgt092_v2'
 CHECKPOINT_METADATA_KEY = "mahdrl_as_fast_nta"
 
 
@@ -23,11 +24,12 @@ def variant_metadata():
     metadata = base_variant_metadata()
     metadata.update(algorithm=ALGORITHM, scheme=MODEL_VERSION, model_version=MODEL_VERSION,
                     base_implementation="mahdrl_as_fast_v2", ta_policy=ta_policy_metadata())
-    return metadata
+    return no_apf_metadata(metadata)
 
 
 def implementation_metadata():
     metadata = base_implementation_metadata()
     metadata.update(algorithm=ALGORITHM, implementation_version=MODEL_VERSION,
                     scientific_variant=variant_metadata(), ta_policy=ta_policy_metadata())
+    metadata.update(checkpoint_selection=selection_metadata(), environment="one_decision_cache_raw_legal_noapf_float64")
     return metadata

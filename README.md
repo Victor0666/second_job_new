@@ -1,3 +1,5 @@
+**2026-10-29：AS-Fast 的 11 个消融/奖励变体已统一关闭两级 APF、严格按 `SR > 0.92` 选模，训练目录采用短配置名，最终评测 CSV 在文件名中包含目标/源场景并平铺保存。当前规则与运行说明见[消融统一配置](docs/MAHDRL_AS_Fast_消融统一配置_2026-10-29.md)；下文早期新增记录中的 APF/选模设置以该说明为准。
+
 # MAHDRL 实验代码
 
 新增独立消融 `mahdrl_oe_ge_apf_score_fast_nva`（MAHDRL-AS-Fast-V2-NVA）：保留主机 APF，删除 VM APF，在选定主机的全部合法空闲 VM 中等概率随机选择，仅训练 TA/HA，保留 HA GE、OE 奖励和 SR099 选模。模型与结果独立；定义、验证及 Linux/CUDA 后台并行指令见 [AS-Fast-V2-NVA 说明](docs/MAHDRL_AS_Fast_NVA.md)。

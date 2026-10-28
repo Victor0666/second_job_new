@@ -2,14 +2,14 @@
 import numpy as np
 
 
-def training_stability(rows, *, threshold=.99, consecutive=5, tail_window=100):
+def training_stability(rows, *, threshold=.92, consecutive=5, tail_window=100):
     if consecutive < 1 or tail_window < 1 or not 0 <= threshold <= 1 or not rows:
         raise ValueError("Invalid stability window, threshold or empty learning curve")
     energy = np.asarray([row["validation_energy"] for row in rows], dtype=np.float64)
     success = np.asarray([row["validation_success_rate"] for row in rows], dtype=np.float64)
     if not np.isfinite(energy).all() or not np.isfinite(success).all() or np.any(energy < 0) or np.any((success < 0) | (success > 1)):
         raise ValueError("Invalid validation metrics in learning curve")
-    feasible = success >= threshold
+    feasible = success > threshold
     streak, reached = 0, None
     for i, value in enumerate(feasible):
         streak = streak+1 if value else 0

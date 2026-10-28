@@ -1,4 +1,5 @@
 """All-idle-host routing, retained VM APF, OE settlement and model lifecycle."""
+from common.test_mahdrl_ablation_settings import raw_physics, assert_flat_csv
 from contextlib import redirect_stdout
 from copy import deepcopy
 from dataclasses import replace
@@ -30,7 +31,6 @@ from algorithms.mahdrl_oe_ge_apf_score_fast_nha.policy import RandomHostPolicy, 
 from algorithms.mahdrl_oe_ge_apf_score_fast_nha.reward import finish_lower_phase
 from algorithms.mahdrl_oe_ge_apf_score_fast_nha.scenario import ScoreScenario, parse_scenario
 from environments.mahdrl_oe_ge_apf_score_fast import apf_candidates as base_apf
-from environments.mahdrl_oe_ge_apf_score_fast_nha import vm_apf_candidates
 
 
 def tiny_agents(scene):
@@ -92,31 +92,18 @@ class NHATests(unittest.TestCase):
         for bad in (np.zeros(3), np.zeros(0), np.ones((2, 1)), np.array([np.nan]), np.array([2])):
             with self.assertRaises(ValueError): a.select_action(bad)
 
-    def test_VM_APF_matches_baseline_for_all_hosts_but_host_APF_is_absent(self):
-        rng = np.random.RandomState(19)
-        ownership = {11: [0, 1, 2], 25: [3, 4], 90: [5, 6, 7], 121: [8]}
-        fixtures = [{0: (1., 1., 0.), 3: (10., 10., 0.), 5: (20., 20., 0.)},
-                    {0: (1., 5., 0.), 1: (2., 1., 0.), 2: (2., 1., 0.), 5: (20., 20., 0.)}]
-        for _ in range(100):
-            fixtures.append({j: (float(rng.randint(1, 50)), float(rng.randint(1, 20)), 0.)
-                             for j in range(9) if rng.rand() < .8})
-        for rows in fixtures:
-            for deadline in (0., 3., 100.):
-                old = base_apf(rows, ownership, 4, 0., deadline)
-                new = vm_apf_candidates(rows, ownership, 4, 0., deadline)
-                self.assertEqual(new["hosts"], {h for h, ids in ownership.items() if set(ids).intersection(rows)})
-                self.assertEqual(new["vms"], old["vms"])
-                self.assertEqual(new["energy_vms"], old["energy_vms"])
-                for key in ("g", "u", "r_V", "raw_count"): self.assertEqual(new[key], old[key])
-                self.assertIsNone(new["r_H"])
-                self.assertEqual(new["energy_hosts"], set())
-                self.assertTrue(all(new["vms"][h] for h in new["hosts"]))
-        old = base_apf(fixtures[0], ownership, 4, 0., 100.)
-        new = vm_apf_candidates(fixtures[0], ownership, 4, 0., 100.)
-        self.assertEqual(old["hosts"], {11})
-        self.assertEqual(new["hosts"], {11, 25, 90})
-        self.assertEqual(vm_apf_candidates(fixtures[1], ownership, 4, 0., 100.)["vms"][11], {0, 1, 2})
-        with self.assertRaises(ValueError): vm_apf_candidates({0: (np.nan, 1., 0.)}, ownership, 4, 0., 100.)
+    def test_both_APFs_are_absent_and_snapshot_keeps_all_legal_VMs(self):
+        env = self.env()
+        with patch("environments.mahdrl_oe_ge_apf_score_fast.apf_candidates", side_effect=AssertionError("APF executed")):
+            host, ok = env.get_host_state_for_next_assignment()
+            self.assertTrue(ok)
+            snapshot = env._apf_snapshot(env._cur_tid)
+            self.assertEqual(snapshot["hosts"], set(env.host_ids))
+            self.assertEqual(set().union(*snapshot["vms"].values()), set(range(env.num_vms)))
+            self.assertIsNone(snapshot["r_H"])
+            self.assertIsNone(snapshot["r_V"])
+            self.assertFalse(snapshot["host_apf_enabled"])
+            self.assertFalse(snapshot["vm_apf_enabled"])
 
     def test_formerly_excluded_slow_host_is_selectable_with_nonempty_VM_APF(self):
         environments = [self.env(base_runtime), self.env()]
@@ -133,7 +120,7 @@ class NHATests(unittest.TestCase):
                     env.host_select(2)
                     vm, ok = env.get_vm_state_for_current_task()
                     self.assertTrue(ok); self.assertGreater(vm["mask"].sum(), 0)
-                    self.assertLess(vm["mask"].sum(), len(vm["mask"]))
+                    self.assertEqual(vm["mask"].sum(), len(env.host_to_vm_indices[env.host_ids[2]]))
                     env.vm_assign(int(np.flatnonzero(vm["mask"])[0]))
                     row = env.apf_decisions[-1]
                     self.assertFalse(row["host_apf_enabled"])
@@ -151,14 +138,14 @@ class NHATests(unittest.TestCase):
             host, ok = env.get_host_state_for_next_assignment()
             self.assertTrue(ok)
             self.assertEqual(host["mask"][0], 0.)
-            with self.assertRaisesRegex(ValueError, "no legal idle VM"): env.host_select(0)
+            with self.assertRaisesRegex(ValueError, "no physically legal idle VM"): env.host_select(0)
             for hi in np.flatnonzero(host["mask"]):
                 env.host_select(int(hi))
                 vm, legal = env.get_vm_state_for_current_task()
                 self.assertTrue(legal); self.assertGreater(vm["mask"].sum(), 0)
 
     def test_same_actions_preserve_VM_observations_physics_rewards_and_ledger(self):
-        old, new = self.env(base_runtime), self.env()
+        old, new = raw_physics(self.env(base_runtime)), self.env()
         assignments = 0
         with redirect_stdout(io.StringIO()):
             while not old.done_flag:
@@ -344,6 +331,7 @@ class NHATests(unittest.TestCase):
                     with redirect_stdout(io.StringIO()), patch.object(runtime, "load_agents", return_value=loaded): runtime.evaluate(target)
                     self.assertEqual(parameter_hash(loaded), before)
                     with self.assertRaises(FileExistsError): runtime.train(scene)
+                    assert_flat_csv(self, target)
                     with self.assertRaises(FileExistsError): runtime.evaluate(target)
                 summary = json.loads((scene.log_dir()/"training_summary.json").read_text())
                 self.assertEqual(summary["selected_episode"], 0); self.assertTrue(summary["feasible_model_found"])
@@ -382,12 +370,12 @@ class NHATests(unittest.TestCase):
             self.assertEqual(row["algorithm"], config.ALGORITHM)
             self.assertEqual(row["model_version"], config.MODEL_VERSION)
             self.assertEqual(row["ha_policy"]["host_apf"], "disabled")
-            self.assertEqual(row["ha_policy"]["vm_apf"], "enabled")
+            self.assertEqual(row["ha_policy"]["vm_apf"], "disabled")
             self.assertEqual(row["checkpoint_selection"], selection.selection_metadata())
-        self.assertIs(selection.selection_key, base_runtime.selection_key)
-        self.assertIs(selection.validation_selection, base_runtime.validation_selection)
-        self.assertFalse(selection.validation_selection([validation_row(49)])["feasible"])
-        self.assertTrue(selection.validation_selection([validation_row(50)])["feasible"])
+        self.assertIsNot(selection.selection_key, base_runtime.selection_key)
+        self.assertIsNot(selection.validation_selection, base_runtime.validation_selection)
+        self.assertFalse(selection.validation_selection([validation_row(46)])["feasible"])
+        self.assertTrue(selection.validation_selection([validation_row(47)])["feasible"])
         self.assertEqual(registry, MODEL_NAMES)
         baseline, nha = BaseScenario(), ScoreScenario()
         self.assertEqual(baseline.normalization_kwargs(), nha.normalization_kwargs())

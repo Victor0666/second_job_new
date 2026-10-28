@@ -1,4 +1,4 @@
-"""TA orders tasks; VA selects globally from the union of per-host VM APFs."""
+"""Fast ablation scheduling with no host or VM APF and original OE accounting."""
 import numpy as np
 from environments.mahdrl_oe_ge_apf_score_fast_nha import CloudWorkflowEnv_VMAgents as AllIdleHostsEnv
 from environments.mahdrl_oe_ge_apf_score import VariableArraySpace
@@ -95,7 +95,7 @@ class CloudWorkflowEnv_VMAgents(AllIdleHostsEnv):
         state = self._build_global_vm_state_for_task(self._cur_tid)
         if (isinstance(action_index, (bool, np.bool_)) or not isinstance(action_index, (int, np.integer))
                 or not 0 <= int(action_index) < self.num_vms or state["mask"][int(action_index)] <= .5):
-            raise ValueError("Illegal global VM action or VM excluded by VM APF")
+            raise ValueError("Illegal or physically unavailable global VM action")
         j = int(action_index)
         hid = self.vms[self.vm_ids[j]].host_id
         slot = self.host_to_vm_indices[hid].index(j)
@@ -107,5 +107,5 @@ class CloudWorkflowEnv_VMAgents(AllIdleHostsEnv):
         info.update(vm_id=int(self.vm_ids[j]), global_action_index=j,
                     legal_vm_count=legal_vm_count, legal_host_count=legal_host_count)
         self.apf_decisions[-1].update(global_action_index=j, vm_selection_scope="global",
-            vm_apf_scope="per_host", global_retained_vm_count=legal_vm_count)
+            vm_apf_scope="disabled", global_retained_vm_count=legal_vm_count)
         return reward, info

@@ -1,0 +1,57 @@
+# 方案A：只分配空闲VM，保留5秒调度tick；q10仅兼容观测布局，不启用VM等待队列。
+# 本变体固定超期奖励权重0.9、能耗权重0.1，原FE的0.75版本保留。
+# 在对应9个源模型训练完成后，于仓库根目录执行。
+# 每次调用启动一个后台评测进程，默认依次评测同一源模型的S/M/L任务规模；第三参数可选目标列表。
+# 9次调用覆盖27个目标场景；每场景测试种子700-729，模型种子1。
+# 源模型和评测均使用q10、dt5、rollout64、float32、F22/F19。
+eval_irws_r_fe_r090_idle_all() {
+    local res="$1" ddl="$2"
+    local targets="${3:-S M L}"
+    local prefix="outputs/server_eval_logs/eval_irws_r_fe_r090_idle_fromS${res}_${ddl}_${targets// /}_m1_s700-729"
+
+    mkdir -p outputs/server_eval_logs
+
+    CUDA_VISIBLE_DEVICES=0 nohup bash -c '
+        res="$1"
+        ddl="$2"
+        targets="$3"
+
+        for task in $targets; do
+            echo "[START] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+
+            python -u launch.py algorithms/irws_r_fe_r090_idle/evaluate.py \
+                --task "$task" --resource "$res" --deadline "$ddl" \
+                --train-task S --train-resource "$res" --train-deadline "$ddl" \
+                --seeds 700-729 --model-seed 1 \
+                --experiment-protocol configs/f22_split_v1.json \
+                --normalization-mode f19_shared_v1 \
+                --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 \
+                --device cuda \
+                || exit 1
+
+            echo "[DONE] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+        done
+
+        echo "[ALL_DONE] source=S${res}/${ddl} targets=${targets}"
+    ' irws_r_fe_r090_idle_eval "$res" "$ddl" "$targets" > "${prefix}.log" 2>&1 &
+
+    echo $! > "${prefix}.pid"
+}
+
+# SS源模型：分别评测S/M/L任务、小资源
+eval_irws_r_fe_r090_idle_all S Tight
+eval_irws_r_fe_r090_idle_all S Medium
+eval_irws_r_fe_r090_idle_all S Loose
+
+# SM源模型：分别评测S/M/L任务、中资源
+eval_irws_r_fe_r090_idle_all M Tight
+eval_irws_r_fe_r090_idle_all M Medium
+eval_irws_r_fe_r090_idle_all M Loose
+
+# SL源模型：分别评测S/M/L任务、大资源
+eval_irws_r_fe_r090_idle_all L Tight
+eval_irws_r_fe_r090_idle_all L Medium
+eval_irws_r_fe_r090_idle_all L Loose
+
+# 仅评测指定任务规模时，例如（不要与已运行的相同场景重复启动）：
+# eval_irws_r_fe_r090_idle_all S Tight "M L"

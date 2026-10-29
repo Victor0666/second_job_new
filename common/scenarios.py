@@ -38,7 +38,7 @@ DAX_GROUPS = (
     ),
 )
 MODEL_NAMES = {
-    "two_stage_gat": "two_stage_gat_source_aae1397_task{task}_res{resource}_model1_{deadline}",
+    "two_stage_gat": "two_stage_gat_paper_v4_task{task}_res{resource}_model1_{deadline}",
     "drl_gnn": "drl_gnn_source_be67762_task{task}_res{resource}_seed1_{deadline}",
     "mahdrl": "mahdrl_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
     "mahdrl_oe": "mahdrl_oe_task{task}_res{resource}_seed1_r075_ddlMix_hv_{deadline}",
@@ -275,12 +275,8 @@ class Scenario:
             name = f'{PD3QN_DAG}_task{task}_res{resource}_model{self.model_seed}_{deadline}_{LEARNING_MODEL}_{PD3QN_UNITS}'
             return name + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING
         if algorithm == 'two_stage_gat':
-            from algorithms.two_stage_gat.config import SELECTION_TAG
-            name = MODEL_NAMES[algorithm].format(task=task,
-                resource=(self.train_resource or self.resource) if self.mode == 'eval' else self.resource,
-                deadline=(self.train_deadline or self.deadline) if self.mode == 'eval' else self.deadline)
-            name = name.replace('_model1_', '_model' + str(self.model_seed) + '_')
-            return name + '_task6_vm4_signed_slack_shared_v1_' + self.normalization_mode + '_protocol_' + protocol_hash(self.experiment_protocol)[:12] + '_' + ENERGY_ACCOUNTING + '_' + SELECTION_TAG
+            from algorithms.two_stage_gat.paths import training_name
+            return training_name(self)
         if algorithm == 'drl_gnn':
             from algorithms.drl_gnn.config import INPUT_ENCODING, SCHEDULING_PROTOCOL
             name = MODEL_NAMES[algorithm].format(task=task,
@@ -305,11 +301,17 @@ class Scenario:
         return encoding + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING + self.workload_suffix
 
     def checkpoint_dir(self, algorithm):
+        if algorithm == 'two_stage_gat':
+            from algorithms.two_stage_gat.paths import checkpoint_directory
+            return checkpoint_directory(self)
         if self.mode == "eval" and self.checkpoint_override:
             return Path(self.checkpoint_override).resolve()
         return ROOT / "outputs" / "ckpts" / self.model_name(algorithm)
 
     def log_dir(self, algorithm):
+        if algorithm == 'two_stage_gat':
+            from algorithms.two_stage_gat.paths import log_directory
+            return log_directory(self)
         return ROOT / "outputs" / "logs" / self.model_name(algorithm)
 
     def describe(self, algorithm=None):
@@ -341,7 +343,14 @@ class Scenario:
             result["checkpoint_dir"] = str(self.checkpoint_dir(algorithm))
             result["model_training_task"] = self.task if self.mode == "train" else self.train_task
         if algorithm == 'two_stage_gat':
+            from algorithms.two_stage_gat.config import MODEL_VERSION, INPUT_ENCODING
+            from algorithms.two_stage_gat.paths import evaluation_csv, evaluation_directory
             from algorithms.two_stage_gat.selection import selection_metadata, selection_protocol
+            result.update(model_version=MODEL_VERSION, policy_input=INPUT_ENCODING,
+                training_log_dir=str(self.log_dir(algorithm)))
+            if self.mode == 'eval':
+                result.update(evaluation_csv=str(evaluation_csv(self)),
+                    evaluation_directory=str(evaluation_directory(self)))
             result['checkpoint_selection'] = selection_metadata()
             if self.protocol():
                 result['experiment_protocol'] = selection_protocol(self)

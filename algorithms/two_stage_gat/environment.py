@@ -1,4 +1,4 @@
-"""Author task6/VM4 observations and VM-tail reservations over public physics."""
+"""Task6/VM4 observations with normalized VM-tail times and tail reservations."""
 import math
 from operator import index
 

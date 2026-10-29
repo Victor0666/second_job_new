@@ -1,4 +1,4 @@
-"""Author GAT/MLP architecture; variable real-node graphs replace fixed padding."""
+"""Paper two-hidden-layer MLPs and shared Actor decoder over task6/VM4 inputs."""
 from dataclasses import dataclass
 
 import numpy as np
@@ -27,7 +27,7 @@ class GraphState:
 
 def _mlp(input_dim, hidden, output_dim):
     return nn.Sequential(nn.Linear(input_dim, hidden), nn.ReLU(),
-        nn.Linear(hidden, hidden), nn.ReLU(), nn.Linear(hidden, hidden), nn.ReLU(),
+        nn.Linear(hidden, hidden), nn.ReLU(),
         nn.Linear(hidden, output_dim))
 
 
@@ -80,14 +80,13 @@ class Encoders(nn.Module):
 class TaskVMActor(Encoders):
     def __init__(self, cfg):
         super().__init__(cfg)
-        self.task_decoder = _mlp(3 * cfg.embedding_dim, cfg.hidden_dim, 1)
-        self.vm_decoder = _mlp(3 * cfg.embedding_dim, cfg.hidden_dim, 1)
+        self.decoder = _mlp(3 * cfg.embedding_dim, cfg.hidden_dim, 1)
 
     def forward(self, data, actions=None, deterministic=False):
         _, _, batch, vm_features, task_masks, vm_masks, sizes = data
         h, task_pool, avg_vm_pool = self.contexts(data)
         # Index by each node's graph, rather than repeating pools across samples.
-        scores = self.task_decoder(torch.cat((h, task_pool[batch], avg_vm_pool[batch]), dim=-1)).flatten()
+        scores = self.decoder(torch.cat((h, task_pool[batch], avg_vm_pool[batch]), dim=-1)).flatten()
         task_scores = scores.split(sizes)
         if actions is not None and len(actions) != len(sizes):
             raise ValueError('One stored joint action is required per graph')
@@ -112,7 +111,7 @@ class TaskVMActor(Encoders):
         vm_batch = torch.repeat_interleave(torch.arange(len(sizes), device=h.device),
             torch.tensor(vm_sizes, device=h.device))
         selected_pool = global_mean_pool(encoded, vm_batch, size=len(sizes))
-        vm_scores = self.vm_decoder(torch.cat((encoded, task_pool[vm_batch], selected_pool[vm_batch]), dim=-1)).flatten().split(vm_sizes)
+        vm_scores = self.decoder(torch.cat((encoded, task_pool[vm_batch], selected_pool[vm_batch]), dim=-1)).flatten().split(vm_sizes)
         joint_actions, logps, entropies = [], [], []
         for i, logits in enumerate(vm_scores):
             mask = vm_masks[i][chosen_tasks[i]]

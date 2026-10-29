@@ -2,6 +2,12 @@
 
 算法 ID：`two_stage_gat`，论文展示名：**2SD-GAT-Adapted**。实现位于 `algorithms/two_stage_gat/`。原版 MAHDRL、已有 DRL-GNN/IRWS 及其输出独立保留。
 
+当前模型身份为 `two_stage_gat_paper_v4`，输入版本为 `task6_vm4_signed_slack_shared_v3`。按用户要求恢复原论文表2中的 VM 队尾完成时间/T_ref 直接输入，恢复任务6维/VM4维。保留论文表6的两个64宽MLP隐藏层，以及正文所述的两阶段共享Decoder；Critic仍与Actor独立。环境未来预约、父任务实际完成后Ready、能耗代理、公共奖励和选模规则均保持。v3的VM3权重和v1/v2的三隐藏层/独立Decoder权重均不兼容，必须重训；旧模型和结果不覆盖。
+
+本次v4验证：专项与场景回归共22项通过，覆盖非单位T_ref下的VM队尾缩放、输入列顺序、共享Decoder两阶段反传和旧权重拒绝。真实DAX短程训练/保存重载/确定性评测、训练与跨规模评测路径对应、RTX4060Ti CUDA更新均通过。物理重放59次分配中58次未来预约，VM无重叠、能耗重积分差为0。当前参数为63,522；未执行正式600回合训练或完整显存复测。
+
+历史v3（VM3）验证：`common.test_two_stage_gat` 与 `common.test_scenarios` 共22项通过；真实DAX短程训练/重载/确定性评测和RTX4060Ti CUDA更新通过。物理重放59次分配中58次为未来预约，父任务均在派发前实际完成，VM无重叠，能耗重积分差为0。历史v3可训练参数为63,394。未执行正式600回合训练、30实例性能评测或完整显存复测。
+
 ## 固定来源与范围
 
 来源为 [2sd-gat-cloud-scheduler](https://github.com/kdsuneraavinash/2sd-gat-cloud-scheduler/tree/aae1397f11e8e75d5dcb70c9b38608dcf05ef773)，固定提交 `aae1397f11e8e75d5dcb70c9b38608dcf05ef773`。本版本保留两阶段任务选择/全局 VM 选择、GAT、任务相关 VM 编码和联合 PPO；没有 Host Actor、排序权重学习、内在奖励、偏好搜索或额外状态字段。
@@ -33,7 +39,7 @@ MAHDRL 保留空闲 VM 即时分配，2SD-GAT 保留未来预留；这属于方�
 
 | 任务–VM 槽位 | 定义 |
 |---|---|
-| 1 | VM 已排定队尾完成时刻 / T_ref |
+| 1 | VM 已排定队尾完成时刻 / 源训练场景冻结 T_ref |
 | 2 | 兼容性，当前没有内存/核数限制，真实 VM 为 1 |
 | 3 | 公共完整执行时长 / T_ref |
 | 4 | 原主动能耗代理乘 0.001 |
@@ -49,10 +55,10 @@ F5 替换、优先级统一、时间/能耗输入缩放均为适配改动。F5 �
 | 项目 | 固定设置 |
 |---|---|
 | Task GAT | 6→64→64→8，3 层、4 heads、concat=False、自环、ReLU、dropout=0、无 norm/residual |
-| VM encoder | 4→64→64→64→8 |
-| Task/VM decoder | 各自 24→64→64→64→1 |
-| Critic | 独立 GAT/VM encoder，16→64→64→64→1 |
-| 共享 | 两阶段共用 Actor 编码器，两个 decoder 独立；Critic 与 Actor 不共享参数 |
+| VM encoder | 4→64→64→8，两个隐藏层 |
+| Task/VM decoder | 两阶段调用同一个 24→64→64→1 Decoder |
+| Critic | 独立 GAT/VM encoder，16→64→64→1 |
+| 共享 | 两阶段共用 Actor 编码器及同一个 Decoder；Critic 与 Actor 不共享参数 |
 | 池化 | 真实已到达任务/真实 VM 的 Mean Pooling；批状态之间不混合上下文 |
 | 初始化/精度 | PyTorch/PyG 默认初始化、网络 float32，公共物理计算保留原精度 |
 | 优化器 | 单 Adam，lr=2.5e-4，eps=1e-5，默认 betas |
@@ -64,7 +70,7 @@ F5 替换、优先级统一、时间/能耗输入缩放均为适配改动。F5 �
 | Value loss | clipped，范围 .2；内部 .5×MSE，再乘 vf_coef=.5 |
 | 其他 | minibatch advantage 标准化，梯度总范数 clip=.5；不做 KL 早停或额外 reward/return 标准化 |
 
-原论文表 6 的 MLP 两层、正文 Decoder 共享与发布代码不一致；本版本采用固定源码实际的三隐藏层、独立 Decoder。GAT heads、联合 logprob 等由源码补全。论文写评测取最高概率，但源码评测采样；本版本遵循论文及公共评测的**两阶段依次 argmax**。
+原论文表6的 MLP 两个隐藏层、正文 Decoder 共享与发布代码不一致；v3/v4选择遵从论文这两项描述，历史v1/v2则采用源码的三隐藏层、独立Decoder。GAT heads、联合 logprob 等仍沿用源码。论文写评测取最高概率，但源码评测采样；本版本遵循论文及公共评测的**两阶段依次 argmax**。
 
 源码固定 1000/50 容量 padding 的直接均值改为真实元素均值，保持论文按真实节点数量定义的池化；稀疏批图排除 padding。源码 Decoder 的跨批池复制索引按所属 graph 修正，确保同状态单独/批量推理一致。这些是明确披露的实现差异，不引入新学习模块。
 
@@ -83,7 +89,7 @@ Rollout 的 GAE 按环境和真实终止边界隔离。末批实际有多少条�
 
 每个 Episode 实际完成即验证当时参数，不等待后续采样/PPO 更新。若恰好到正常完整 Rollout 或全训练预算终点，先进行该次正常更新，再验证；不会为中间 Episode 强制增加更新。最终预算更新后保存 final；没有额外最终选模机会。验证不进入缓存、不更新参数/计数，并恢复训练 RNG。相同参数版本重复验证不会增加模型候选。
 
-相同实例及物理分配预算不等于相同计算量；日志记录真实分配、optimizer step、样本呈现量和同步耗时。原 MAHDRL 的层级信用分配、状态和更新机制保留。其他算法仍使用原最低验证能耗选模；本算法从 2026-10-25 起采用下述独立选模规则，比较时须披露这一差别。
+相同实例及物理分配预算不等于相同计算量；日志记录真实分配、optimizer step、样本呈现量和同步耗时。其他算法采用各自版本的选模协议；本算法从2026-10-25起采用下述规则，并在当前v4继续沿用。最新VAAWARE采用SR>=0.92后最小能耗，与本算法在公共单验证实例协议下排序等价。
 
 ### 2SD-GAT 独立选模 v2（2026-10-25）
 
@@ -112,11 +118,44 @@ Rollout 的 GAE 按环境和真实终止边界隔离。末批实际有多少条�
 
 Linux 使用 `python -m algorithms.two_stage_gat.train ...` 和 `python -m algorithms.two_stage_gat.evaluate ...`。正式场景及源模型映射应与本轮 MAHDRL 完全对应，不单独增加训练场景。
 
-模型/日志分别位于 `outputs/ckpts`、`outputs/logs` 下独立 `two_stage_gat_source_aae1397_..._select_sr092_esp099_v2` 目录，包含输入版本、模型 seed、归一化、数据协议哈希、能耗和选模标识。非空训练输出目录拒绝覆盖。本版本不提供续训，best/final 均可独立评测。
+模型和日志使用短路径：
 
-评测输出位于 `outputs/run/two_stage_gat_source_aae1397_selection_v2/`，主 CSV/JSON 文件名包含任务、资源、截止期、模型种子、测试实例数量及必要的源场景后缀；测量目录包含逐实例、逐工作流和分配时延。Checkpoint 检查算法来源、状态/调度/奖励版本、选模政策、协议、源场景和冻结尺度，不回退其他方法/旧目标模型。
+```text
+outputs/ckpts/2sd_gat_v4/SS_L_m1_cXXXXXXXX/best.pth
+outputs/ckpts/2sd_gat_v4/SS_L_m1_cXXXXXXXX/final.pth
+outputs/logs/2sd_gat_v4/SS_L_m1_cXXXXXXXX/train.jsonl
+```
 
-### 单场景显存测量
+截止期缩写T/M/L分别为Tight/Medium/Loose；默认模型seed=1时末级目录17字符。`cXXXXXXXX`为科学配置摘要，绑定模型/输入/奖励/调度、PPO设置、选模协议和归一化标定内容；完整配置仍保存于checkpoint与元数据中。CPU/CUDA选择不影响源模型路径。非空训练目录拒绝覆盖，不提供断点续训。
+
+最终评测CSV与汇总JSON直接平铺在 `outputs/run/2sd_gat_v4/`，不再通过场景子目录区分最终结果：
+
+```text
+eval_2sd_gat_v4_SS_Loose_fromSS_Loose_m1_s700-729_cXXXXXXXX.csv
+eval_2sd_gat_v4_MS_Loose_fromSS_Loose_m1_s700-729_cXXXXXXXX.csv
+eval_2sd_gat_v4_LS_Loose_fromSS_Loose_m1_s700-729_cXXXXXXXX.csv
+eval_2sd_gat_v4_SS_Medium_fromSS_Medium_m1_s700-729_cXXXXXXXX.csv
+```
+
+文件名包含算法版本、目标场景、源场景、模型种子、实际测试种子集合和配置摘要；非连续种子集合也能区分。CSV行另外记录目标/源场景字段。逐实例/工作流/分配时延记录放在 `_details/<运行摘要>/measurements/`，只有诊断明细使用子目录。已有最终CSV、汇总或诊断目录拒绝覆盖。Checkpoint仍检查算法来源、架构、状态/调度/奖励版本、选模政策、协议、源场景和冻结尺度。路径调整本身不改变v4模型；已有同版本长目录模型可用 `--checkpoint-dir` 显式指定，不自动搬动旧文件。
+
+后台函数文件为 `docs/two_stage_gat_v4_commands.sh`，从仓库根目录执行：
+
+```bash
+source docs/two_stage_gat_v4_commands.sh
+train_two_stage_gat S Tight
+eval_two_stage_gat_all S Tight
+# 第三个参数可以只选择部分目标任务规模，第四个参数指定模型种子。
+eval_two_stage_gat_all S Tight "M L" 1
+```
+
+source只定义函数，不启动实验。默认GPU=0、模型种子1，训练600回合，评测700-729；可用 `GPU=1` 选择另一张卡。日志/PID使用时间与随机后缀区分，评测任一目标失败即停止后续目标，最后输出ALL_DONE。该算法没有MAHDRL的diagnostics/profile命令参数，不传入这些不支持的选项。
+
+本次路径回归：专项和公共场景共25项通过，覆盖9个训练源路径、27个唯一平铺CSV、源模型映射、非连续测试种子、CPU/CUDA路径一致、CSV场景列和防覆盖；真实DAX短程训练/重载/确定性评测及CUDA更新通过。Bash语法和41次替身调用通过，覆盖9组默认源场景、27个默认评测目标、自定义模型种子/目标及失败停止。没有启动正式600回合训练。
+
+### v2 单场景显存测量（历史记录）
+
+以下为修改前6+4/三隐藏层/独立Decoder模型的历史测量，不是当前v4的实测峰值。当前显存探针自动使用v4结构并记录模型身份，默认输出 `docs/Two_stage_GAT_paper_v4_memory_profile.json`；本次未重跑完整显存探针。
 
 报告为 `docs/Two_stage_GAT_memory_profile.json`。本机 RTX4060Ti 8GiB、PyTorch 2.5.1+cu121、PyG 2.6.1，使用真实50工作流的末期图，训练 seed551 的1431个任务节点，分别25/50/75个VM。重复真实状态构造完整128图 minibatch，执行两次前向/反向/Adam更新，以包含优化器状态；只将探针的 epochs/minibatches 设为1，不改变网络宽度，不执行正式600回合训练。
 
@@ -140,13 +179,13 @@ python -m common.profile_two_stage_gat_memory --out outputs/two_stage_gat_memory
 
 ```powershell
 .\.venv\Scripts\python.exe -X utf8 -B -m unittest common.test_two_stage_gat -v
-.\.venv\Scripts\python.exe -X utf8 -B -m common.smoke_two_stage_gat --out docs/Two_stage_GAT_smoke.json
+.\.venv\Scripts\python.exe -X utf8 -B -m common.smoke_two_stage_gat --out docs/Two_stage_GAT_paper_v4_smoke.json
 .\.venv\Scripts\python.exe -X utf8 -B -m unittest discover -s common -p "test_*.py" -q
 ```
 
 专项测试覆盖未来预留/父依赖/中途到达、非法动作原子性、执行和能耗守恒、与 MAHDRL 相同空闲分配的物理重放、公共实例一致、全 512 条 Rollout 与末批、联合概率/GAE、拓扑敏感性、真实梯度更新、单状态/批状态一致、验证隔离、保存加载及旧协议拒绝。
 
-独立 smoke 使用真实 DAX、原网络宽度、4 个逻辑环境，仅 1 个训练 Episode、2 个工作流及临时模型目录。另运行 CUDA 小批更新。若 `tmp/two_stage_gat_source/models_gnn_agent.py` 中存在已审核固定源码，先严格检查固定 SHA256，再复制原权重对照单/批网络输出；仅修正已披露的池复制索引，不联网自动执行来源代码。报告记录源码 SHA256 和实际差值；源码不存在时明确记录该项未执行。
+独立 smoke 使用真实 DAX、v4网络、4个逻辑环境，仅1个训练 Episode、2个工作流及临时模型目录，另运行CUDA小批更新。专项测试验证VM4队尾输入及非单位T_ref缩放、两隐藏层、同一个Decoder确实被两阶段调用且均能反传、Critic独立、单/批状态一致和旧权重拒绝。当前v4与作者三隐藏层/独立Decoder架构不同，不再进行复制作者权重的输出等价比较；历史报告保留，smoke明确记录该项不适用。
 
 这些验证不能替代正式 600 回合训练与 30 实例性能比较。本次没有运行正式性能实验。
 

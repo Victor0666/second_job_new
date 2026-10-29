@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 import numpy as np
 import torch
-from algorithms.two_stage_gat.config import TwoStageGATConfig
+from algorithms.two_stage_gat.config import ARCHITECTURE, INPUT_ENCODING, MODEL_VERSION, TwoStageGATConfig
 from algorithms.two_stage_gat.environment import TwoStageGATEnv
 from algorithms.two_stage_gat.ppo import PPOAgent, Transition
 from algorithms.two_stage_gat.runner import env_kwargs, seed_everything
@@ -78,7 +78,7 @@ def probe(state, batch, mode):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--out', default='docs/Two_stage_GAT_memory_profile.json')
+    parser.add_argument('--out', default='docs/Two_stage_GAT_paper_v4_memory_profile.json')
     args = parser.parse_args()
     torch.set_num_threads(1)
     if not torch.cuda.is_available():
@@ -86,7 +86,8 @@ if __name__ == '__main__':
     fraction = .80  # Full 128-row probe while retaining space for the display/context.
     torch.cuda.set_per_process_memory_fraction(fraction)
     free, total = torch.cuda.mem_get_info()
-    result = dict(gpu=torch.cuda.get_device_name(0), torch=torch.__version__,
+    result = dict(model_version=MODEL_VERSION, architecture=ARCHITECTURE, policy_input=INPUT_ENCODING,
+        gpu=torch.cuda.get_device_name(0), torch=torch.__version__,
         gpu_total_mib=total/2**20, free_at_start_mib=free/2**20,
         allocator_fraction_cap=fraction, production_minibatch=128,
         method='real late-episode graphs repeated across a minibatch; two Adam backward/update passes',

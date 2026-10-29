@@ -1,22 +1,26 @@
 """Reservation physics, graph/gradient correctness and paired GAT-PPO integration."""
 from copy import deepcopy
 from dataclasses import replace
+import csv
 import json
 from pathlib import Path
 import random
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 import numpy as np
 import torch
 
-from algorithms.two_stage_gat.config import TwoStageGATConfig, SOURCE_COMMIT, SELECTION_TAG
+from algorithms.two_stage_gat.config import (ARCHITECTURE, INPUT_ENCODING, MODEL_VERSION,
+    TwoStageGATConfig, SOURCE_COMMIT, SELECTION_TAG)
 from algorithms.two_stage_gat.environment import TwoStageGATEnv
 from algorithms.two_stage_gat.networks import GraphState, TwoStageActorCritic
 from algorithms.two_stage_gat.ppo import PPOAgent, Transition, compute_gae
 from algorithms.two_stage_gat.runner import (env_kwargs, evaluate, load_checkpoint,
-    objective_metadata, run_episode, seed_everything, train, artifact_name)
+    objective_metadata, run_episode, seed_everything, train, artifact_name, evaluate_main)
+from algorithms.two_stage_gat.paths import evaluation_csv, evaluation_directory
 from algorithms.two_stage_gat.selection import (selection_key, selection_metadata,
     selection_protocol, selection_scenario, validation_selection)
 from common.experiment_measurements import episode_metrics
@@ -83,13 +87,77 @@ class SelectionTests(unittest.TestCase):
         for key in ('train','validation','test','episodes'):
             self.assertEqual(protocol[key], scene.protocol().metadata()[key])
         self.assertEqual(protocol['selection'], SELECTION_TAG)
-        self.assertIn(SELECTION_TAG, scene.model_name('two_stage_gat'))
+        self.assertRegex(scene.model_name('two_stage_gat'), r'^SS_T_m1_c[0-9a-f]{8}$')
         self.assertNotIn(SELECTION_TAG, scene.model_name('mahdrl'))
         self.assertEqual(scene.describe('two_stage_gat')['checkpoint_selection'], selection_metadata())
         adapted = selection_scenario(scene)
         self.assertEqual(adapted.reproducibility_metadata()['data_split']['selection'], SELECTION_TAG)
         self.assertEqual(scene.reproducibility_metadata()['data_split']['selection'],
                          'minimum_validation_total_energy')
+
+
+class OutputPathTests(unittest.TestCase):
+    def test_short_training_and_flat_unique_csv_paths_for_all_27_scenes(self):
+        training_paths, csv_paths = set(), set()
+        for resource in 'SML':
+            for deadline in ('Tight','Medium','Loose'):
+                training = Scenario(mode='train', resource=resource, deadline=deadline)
+                checkpoint = training.checkpoint_dir('two_stage_gat')
+                training_paths.add(checkpoint)
+                self.assertEqual(len(checkpoint.name),17)
+                self.assertEqual(checkpoint.parent.name,'2sd_gat_v4')
+                self.assertEqual(training.log_dir('two_stage_gat').name,checkpoint.name)
+                for task in 'SML':
+                    scene = Scenario(mode='eval', task=task, resource=resource, deadline=deadline,
+                        train_task='S',train_resource=resource,train_deadline=deadline)
+                    self.assertEqual(scene.checkpoint_dir('two_stage_gat'),checkpoint)
+                    path = evaluation_csv(scene)
+                    csv_paths.add(path)
+                    self.assertEqual(path.parent.name,'2sd_gat_v4')
+                    self.assertEqual(path.parent.parent.name,'run')
+                    self.assertIn(f'_{task}{resource}_{deadline}_fromS{resource}_{deadline}_',path.name)
+                    self.assertIn('_m1_s700-729_',path.name)
+                    self.assertLess(len(path.name),120)
+                    self.assertEqual(scene.describe('two_stage_gat')['evaluation_csv'],str(path))
+        self.assertEqual(len(training_paths),9)
+        self.assertEqual(len(csv_paths),27)
+        self.assertEqual(len({p.parent for p in csv_paths}),1)
+
+    def test_paths_distinguish_source_seed_set_model_seed_and_configuration(self):
+        scene = Scenario(task='M',deadline='Loose')
+        alternatives = [scene, replace(scene,train_task='M'),replace(scene,model_seed=2),
+            replace(scene,seed_spec='700,702,704'),replace(scene,seed_spec='701,703,705'),
+            replace(scene,normalization_mode='f18_shared_v1')]
+        self.assertEqual(len({evaluation_csv(s) for s in alternatives}),len(alternatives))
+        self.assertEqual(evaluation_csv(scene),evaluation_csv(replace(scene,paper_options={'device':'cpu'})))
+        self.assertEqual(evaluation_csv(scene),evaluation_csv(replace(scene,paper_options={'device':'cuda'})))
+        with TemporaryDirectory(prefix='two_stage_gat_override_') as directory:
+            override = replace(scene,checkpoint_override=directory)
+            self.assertEqual(override.checkpoint_dir('two_stage_gat'),Path(directory).resolve())
+
+    def test_evaluation_entry_writes_scene_columns_and_refuses_overwrite(self):
+        scene = Scenario(task='M',deadline='Loose',seed_spec='700')
+        row = dict(validation_fixture(50,123.),seed=700)
+        candidate = validation_selection([row])
+        with TemporaryDirectory(prefix='two_stage_gat_flat_') as directory:
+            with patch('algorithms.two_stage_gat.paths.ROOT',Path(directory)), \
+                 patch('algorithms.two_stage_gat.runner.parse_scenario',return_value=scene), \
+                 patch('algorithms.two_stage_gat.runner.load_checkpoint',
+                       return_value=(object(),dict(validation_selection=candidate))), \
+                 patch('algorithms.two_stage_gat.runner.evaluate',
+                       return_value=([row],{'total_energy':{'mean':123.}})) as evaluator:
+                evaluate_main()
+                path = evaluation_csv(scene)
+                with path.open(encoding='utf-8',newline='') as stream:
+                    saved = list(csv.DictReader(stream))
+                self.assertEqual(saved[0]['target_scene'],'MS_Loose')
+                self.assertEqual(saved[0]['source_scene'],'SS_Loose')
+                self.assertEqual(saved[0]['model_version'],MODEL_VERSION)
+                self.assertEqual(saved[0]['seed'],'700')
+                self.assertEqual(evaluator.call_args.kwargs['directory'],evaluation_directory(scene)/'measurements')
+                self.assertTrue((path.parent/(artifact_name(scene,'summary')+'.json')).is_file())
+                with self.assertRaises(FileExistsError): evaluate_main()
+                self.assertEqual(evaluator.call_count,1)
 
 
 class ReservationTests(unittest.TestCase):
@@ -197,23 +265,35 @@ class ReservationTests(unittest.TestCase):
 
     def test_original_proxy_and_all_vm_forecast_with_signed_deadline_slot(self):
         env = TwoStageGATEnv(**self.kwargs()); env.reset(seed=2)
+        t_ref = 10.
+        env.state_normalizer = SimpleNamespace(scales={'T_ref':t_ref})
+        before = env.graph_state()
         env.vm_available_at[:] = env.current_time + np.array([1000., 1., 100.])
         state = env.graph_state()
+        self.assertEqual(state.vm_features.shape, (4, 3, 4))
+        np.testing.assert_array_equal(state.vm_features[:, :, 1:], before.vm_features[:, :, 1:])
+        np.testing.assert_allclose(state.vm_features[:, :, 0],
+            np.broadcast_to(env.vm_available_at/t_ref, (4,3)),rtol=1e-6,atol=1e-6)
+        np.testing.assert_array_equal(state.vm_features[:, :, 1], 1.)
+        self.assertGreater(state.task_features[0, 2], before.task_features[0, 2])
         self.assertTrue(state.action_mask[0].all())
         expected = min(max(env.current_time, env.vm_available_at[j]) + exec_time_components(
             env._task_obj_from_gid(0), v.pc, v.bw, parents_loc={}, child_vm_id=j,
             child_host_id=v.host_id)[-1] for j,v in env.vms.items())
-        self.assertAlmostEqual(state.task_features[0, 2], expected, places=3)
+        self.assertAlmostEqual(state.task_features[0, 2], expected/t_ref, places=3)
         self.assertTrue((state.task_features[:, 5] == 1).all())
         vm = env.vms[0]; host = env.hosts[vm.host_id]
         expected_proxy = env.task_mi[0] * (host.power(1)-host.power(0)) / host.total_pc * .001
         self.assertAlmostEqual(state.vm_features[0, 0, 3], expected_proxy, places=5)
+        expected_duration = exec_time_components(env._task_obj_from_gid(0), vm.pc, vm.bw,
+            parents_loc={}, child_vm_id=0, child_host_id=vm.host_id)[-1]
+        self.assertAlmostEqual(state.vm_features[0, 0, 2], expected_duration/t_ref, places=3)
         env.deadline_mode = 'cache_fcfs'  # Only exercise encoding with explicit finite fixture deadlines.
         env.task_baseline_finish[0] = expected + 10
         a = env.graph_state().task_features[0, 4]
         env.task_baseline_finish[0] = expected - 10
         b = env.graph_state().task_features[0, 4]
-        self.assertAlmostEqual(a, 10., places=4); self.assertAlmostEqual(b, -10., places=4)
+        self.assertAlmostEqual(a, 10./t_ref, places=4); self.assertAlmostEqual(b, -10./t_ref, places=4)
 
 
 class NetworkPPOTests(unittest.TestCase):
@@ -242,21 +322,44 @@ class NetworkPPOTests(unittest.TestCase):
         self.assertFalse(torch.allclose(a[3], b[3], rtol=1e-6, atol=1e-8))
         actor_ids = {id(p) for p in model.actor.parameters()}
         self.assertFalse(actor_ids & {id(p) for p in model.critic.parameters()})
-        self.assertIsNot(model.actor.task_decoder, model.actor.vm_decoder)
+        for module, widths in ((model.actor.vm_encoder, (4,64,64,8)),
+                               (model.critic.vm_encoder, (4,64,64,8)),
+                               (model.actor.decoder, (24,64,64,1)),
+                               (model.critic.network, (16,64,64,1))):
+            layers = [m for m in module if isinstance(m, torch.nn.Linear)]
+            self.assertEqual(tuple([layers[0].in_features] + [m.out_features for m in layers]), widths)
+        self.assertNotIn('task_decoder', model.actor._modules)
+        self.assertNotIn('vm_decoder', model.actor._modules)
         self.assertEqual(model.actor.task_encoder.convs[0].heads, 4)
         self.assertFalse(model.actor.task_encoder.convs[0].concat)
+
+    def test_both_stages_use_one_decoder_and_backpropagate_through_it(self):
+        model = TwoStageActorCritic(); outputs = []
+        def capture(module, inputs, output):
+            output.retain_grad()
+            outputs.append(output)
+        hook = model.actor.decoder.register_forward_hook(capture)
+        try:
+            _, logp, _, _ = model([graph()], [5])
+            logp.sum().backward()
+        finally:
+            hook.remove()
+        self.assertEqual([tuple(x.shape) for x in outputs], [(4,1),(3,1)])
+        for output in outputs:
+            self.assertTrue(torch.isfinite(output.grad).all())
+            self.assertGreater(float(output.grad.abs().sum()), 0.)
 
     def test_joint_logprob_is_task_plus_selected_vm_and_masks_are_exact(self):
         from algorithms.two_stage_gat.networks import _batch
         model = TwoStageActorCritic(); state = graph()
         data = _batch([state], torch.device('cpu'))
         h, pool, avg_vm = model.actor.contexts(data)
-        logits = model.actor.task_decoder(torch.cat((h, pool.expand(len(h),-1), avg_vm.expand(len(h),-1)),dim=1)).flatten()
+        logits = model.actor.decoder(torch.cat((h, pool.expand(len(h),-1), avg_vm.expand(len(h),-1)),dim=1)).flatten()
         mask = torch.tensor(state.task_mask)
         task_dist = torch.distributions.Categorical(logits=logits.masked_fill(~mask,-torch.inf))
         chosen_task = 1; chosen_vm = 2
         encoded = model.actor.vm_encoder(torch.tensor(state.vm_features[chosen_task]))
-        vm_logits = model.actor.vm_decoder(torch.cat((encoded,pool.expand(len(encoded),-1),
+        vm_logits = model.actor.decoder(torch.cat((encoded,pool.expand(len(encoded),-1),
             encoded.mean(0,keepdim=True).expand(len(encoded),-1)),dim=1)).flatten()
         vm_dist = torch.distributions.Categorical(logits=vm_logits)
         _, logp, entropy, _ = model([state], [chosen_task*3+chosen_vm])
@@ -265,6 +368,8 @@ class NetworkPPOTests(unittest.TestCase):
         bad = replace(state,task_mask=np.zeros(4,dtype=bool))
         with self.assertRaises(ValueError): model([bad])
         with self.assertRaises(ValueError): model([state],[6])
+        old_vm3 = replace(state, vm_features=state.vm_features[:, :, 1:].copy())
+        with self.assertRaises(ValueError): model([old_vm3])
 
     def test_gae_keeps_vector_paths_and_terminal_boundaries_separate(self):
         def r(reward, done, nxt, env): return Transition(None,0,0.,0.,reward,done,nxt,env)
@@ -272,11 +377,11 @@ class NetworkPPOTests(unittest.TestCase):
         adv, ret = compute_gae(records,.5,1.)
         np.testing.assert_allclose(adv,[3.5,10,3,22]);np.testing.assert_array_equal(adv,ret)
 
-    def test_ppo_updates_both_heads_encoders_and_critic_without_resampling_stored_actions(self):
+    def test_ppo_updates_shared_decoder_encoders_and_critic_without_resampling_stored_actions(self):
         cfg = TwoStageGATConfig(num_steps=2)
         agent = PPOAgent(cfg); states = [graph(4,3),graph(5,2)]
         groups = dict(gat=agent.network.actor.task_encoder,vm=agent.network.actor.vm_encoder,
-            task=agent.network.actor.task_decoder,decoder=agent.network.actor.vm_decoder,critic=agent.network.critic)
+            decoder=agent.network.actor.decoder,critic=agent.network.critic)
         before = {n:vector(m).clone() for n,m in groups.items()}
         records = []
         for i in range(8):
@@ -316,6 +421,9 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(rows[-1]['policy_updates_at_validation'],agent.updates)
             loaded,obj = load_checkpoint(directory/'final.pth',scene)
             self.assertEqual(obj['source_commit'],SOURCE_COMMIT)
+            self.assertEqual(obj['model_version'],MODEL_VERSION)
+            self.assertEqual(obj['architecture'],ARCHITECTURE)
+            self.assertEqual(obj['policy_input'],INPUT_ENCODING)
             self.assertEqual(obj['checkpoint_selection'], selection_metadata())
             self.assertEqual(obj['protocol']['selection'], SELECTION_TAG)
             self.assertEqual(summary['best_validation_selection'],
@@ -345,6 +453,17 @@ class RunnerTests(unittest.TestCase):
             old.pop('checkpoint_selection')
             torch.save(old,directory/'old_energy_only.pth')
             with self.assertRaises(ValueError): load_checkpoint(directory/'old_energy_only.pth',scene)
+            legacy = deepcopy(obj)
+            legacy.update(model_version='two_stage_gat_source_aae1397_selection_v2',
+                          policy_input='task6_vm4_signed_slack_shared_v1')
+            legacy.pop('architecture')
+            torch.save(legacy,directory/'old_vm4_independent_decoders.pth')
+            with self.assertRaises(ValueError): load_checkpoint(directory/'old_vm4_independent_decoders.pth',scene)
+            vm3 = deepcopy(obj)
+            vm3.update(model_version='two_stage_gat_paper_v3',
+                       policy_input='task6_vm3_signed_slack_shared_v2')
+            torch.save(vm3,directory/'old_vm3_shared_decoder.pth')
+            with self.assertRaises(ValueError): load_checkpoint(directory/'old_vm3_shared_decoder.pth',scene)
             with self.assertRaises(FileExistsError): train(scene,cfg,kwargs,directory)
 
     def test_checkpoint_updates_follow_feasibility_not_only_energy(self):

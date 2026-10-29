@@ -14,7 +14,7 @@
 
 新增独立消融 `mahdrl_oe_ge_apf_score_fast_nta`（MAHDRL-AS-Fast-V2-NTA）：在 AS-Fast v2 上将 TA 改为随机合法排序权重增量，仅训练 HA/VA，保留 OE/GE/APF、集合打分网络和 SR099 选模规则。训练和评测入口位于同名算法目录；模型与结果独立，详见 [AS-Fast-V2-NTA 说明](docs/MAHDRL_AS_Fast_NTA.md)。
 
-新增独立对比算法 `two_stage_gat`（2SD-GAT-Adapted）：保留作者两阶段 GAT–PPO 与忙碌 VM 队尾未来预留，接入共同能耗—截止期问题，使用原 6＋4 维观测的目标适配。当前独立选模 v2 按论文 Gamma=0.92、beta=0.99，在验证经验达标候选中选最低能耗；其他算法的选模保持原样。训练/评测入口为 `algorithms/two_stage_gat/train.py`、`evaluate.py`；选模边界、源码差异和单场景显存测量见 [2SD-GAT 实现说明](docs/Two_stage_GAT_implementation.md)。
+独立对比算法 `two_stage_gat`（2SD-GAT-Adapted）当前模型为 `two_stage_gat_paper_v4`：恢复 VM 队尾完成时间/T_ref 输入，使用任务6维/VM4维；保留按原论文设置的两个隐藏层 MLP 和两阶段共享 Decoder。仍保留两阶段 GAT–PPO、父任务实际完成后 Ready、忙碌 VM 队尾未来预约，以及 SR>=0.92/ESP>=0.99 的选模规则。训练目录缩短为 `outputs/ckpts/2sd_gat_v4/SS_L_m1_cXXXXXXXX`，最终评测CSV平铺在 `outputs/run/2sd_gat_v4/`，文件名包含目标/源场景及种子。旧结构权重需要重训。后台函数见 [运行指令](docs/two_stage_gat_v4_commands.sh)，输入、原文/源码差异及历史显存记录见 [实现说明](docs/Two_stage_GAT_implementation.md)。
 
 `algorithms/` 按算法分目录，每个算法集中保存统一训练/评测入口及专用智能体；环境集中在 `environments/`。场景由命令行参数选择。
 

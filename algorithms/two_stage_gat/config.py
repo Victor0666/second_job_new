@@ -1,13 +1,15 @@
-"""Frozen author architecture/PPO; only the public problem and budget are adapted."""
+"""Paper MLP depth/shared decoder with task6/VM4 inputs; author PPO retained."""
 from dataclasses import asdict, dataclass
 
 SOURCE_REPOSITORY = 'https://github.com/kdsuneraavinash/2sd-gat-cloud-scheduler'
 SOURCE_COMMIT = 'aae1397f11e8e75d5dcb70c9b38608dcf05ef773'
-MODEL_VERSION = 'two_stage_gat_source_aae1397_selection_v2'
+MODEL_VERSION = 'two_stage_gat_paper_v4'
+OUTPUT_TAG = '2sd_gat_v4'
+ARCHITECTURE = 'gat3_mlp2_shared_actor_decoder_v1'
 SELECTION_TAG = 'select_sr092_esp099_v2'
 WORKFLOW_SUCCESS_THRESHOLD = .92
 SATISFACTION_PROBABILITY_TARGET = .99
-INPUT_ENCODING = 'task6_vm4_signed_slack_shared_v1'
+INPUT_ENCODING = 'task6_vm4_signed_slack_shared_v3'
 REWARD_PROTOCOL = 'common_energy_tardiness_v2'
 SCHEDULING_PROTOCOL = 'arrived_parent_finished_vm_tail_reservation_v1'
 COMMON_REWARD = dict(alpha_delay_vm=.75, energy_reward_scale=.001, task_baseline_norm=300.)

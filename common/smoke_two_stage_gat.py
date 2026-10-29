@@ -4,14 +4,13 @@ import hashlib
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from types import SimpleNamespace
 
 import numpy as np
 import torch
 
 from algorithms.two_stage_gat.config import TwoStageGATConfig
 from algorithms.two_stage_gat.environment import TwoStageGATEnv
-from algorithms.two_stage_gat.networks import GraphState, TwoStageActorCritic
+from algorithms.two_stage_gat.networks import GraphState
 from algorithms.two_stage_gat.ppo import PPOAgent, Transition
 from algorithms.two_stage_gat.runner import (env_kwargs, evaluate, load_checkpoint,
     objective_metadata, seed_everything, train)
@@ -24,58 +23,11 @@ def vector(module):
 
 
 def check_author_network(path):
-    """Optional parity against the locally inspected frozen upstream file."""
-    if not path.is_file():
-        return dict(executed=False, reason='Fixed upstream file not present; no network fetch performed')
-    digest=hashlib.sha256(path.read_bytes()).hexdigest()
-    if digest != 'ce90a71a9ab960d72b7fb7afdaf8f492ea119e542cbbdb93d0a5a6aa85e96630':
-        raise ValueError('Refusing to execute a different upstream network snapshot')
-    source = path.read_text(encoding='utf-8')
-    for statement in ('from constants import F_TASK, F_VM, N_TASK, N_VM',
-                      'from env.observation import decode_env_obs_batched',
-                      'from models.base_agent import BaseAgent'):
-        source = source.replace(statement, '')
-    # The sole correctness fix to upstream is the documented per-sample pool index.
-    source = source.replace('.repeat(num_x, 1)', '.repeat_interleave(num_x, dim=0)')
-    class BaseAgent(torch.nn.Module):
-        def __init__(self, device): super().__init__()
-    rng = np.random.RandomState(17)
-    states = [GraphState(rng.uniform(.1,1,(4,6)).astype(np.float32),
-        rng.uniform(.1,1,(4,3,4)).astype(np.float32),np.asarray([(0,2),(1,2),(2,3)]),
-        np.array([True,True,False,False]),np.ones((4,3),dtype=bool),tuple(range(4))) for _ in range(2)]
-    holder = {}
-    namespace = dict(F_TASK=6,F_VM=4,N_TASK=4,N_VM=3,BaseAgent=BaseAgent,
-                     decode_env_obs_batched=lambda _:holder['obs'])
-    exec(compile(source,str(path),'exec'),namespace)
-    seed_everything(1)
-    reference = namespace['GnnAgent'](device=torch.device('cpu'))
-    adapted = TwoStageActorCritic()
-    mapped = {}
-    for name,value in reference.state_dict().items():
-        for component in ('task_encoder','vm_encoder','task_decoder','vm_decoder'):
-            name=name.replace('.'+component+'.network.','.'+component+'.')
-        mapped[name]=value
-    adapted.load_state_dict(mapped)
-    gaps=[]
-    for batch in (states[:1],states):
-        dependency=np.zeros((len(batch),4,4),dtype=np.int64)
-        for i,state in enumerate(batch):
-            dependency[i,state.dependencies[:,0],state.dependencies[:,1]]=1
-        holder['obs']=SimpleNamespace(task_features=torch.tensor(np.stack([s.task_features for s in batch])),
-            vm_features=torch.tensor(np.stack([s.vm_features for s in batch])),
-            task_dependencies=torch.tensor(dependency),task_mask=torch.tensor(np.stack([s.task_mask for s in batch])),
-            vm_mask=torch.tensor(np.stack([s.vm_mask for s in batch])))
-        actions=torch.tensor([1,5][:len(batch)])
-        with torch.no_grad():
-            expected=reference.get_action_and_value(torch.empty(len(batch),1),actions)
-            actual=adapted(batch,actions)
-        for a,b in zip(actual,expected):
-            torch.testing.assert_close(a,b,rtol=3e-5,atol=3e-6)
-            gaps.append(float((a-b).abs().max()))
-    return dict(executed=True,upstream_sha256=digest,
-        single_and_batched_outputs_match=True,max_absolute_gap=max(gaps),
-        upstream_context_repeat_index_corrected=True,
-        comparison='identical real task/VM counts, copied author weights, same 6+4 input tensors')
+    """The paper MLP depth/shared decoder differ from the upstream architecture."""
+    return dict(executed=False,
+        upstream_sha256=hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None,
+        reason='Paper-v4 uses VM4, two-hidden-layer MLPs and one shared decoder; '
+               'author VM4/MLP3/independent-decoder weight parity does not apply')
 
 
 def check_trace(kwargs):
@@ -135,7 +87,7 @@ def run():
     seed_everything(scene.model_seed);initial=PPOAgent(cfg)
     def groups(agent):
         return dict(task_gat=agent.network.actor.task_encoder,vm_encoder=agent.network.actor.vm_encoder,
-            task_decoder=agent.network.actor.task_decoder,vm_decoder=agent.network.actor.vm_decoder,
+            shared_decoder=agent.network.actor.decoder,
             critic_gat=agent.network.critic.task_encoder,critic_vm=agent.network.critic.vm_encoder,
             critic_value=agent.network.critic.network)
     before={n:vector(m).clone() for n,m in groups(initial).items()}
@@ -156,13 +108,13 @@ def run():
         normalization=obj['normalization'],cuda=cuda_check(),
         author_network_parity=check_author_network(ROOT/'tmp/two_stage_gat_source/models_gnn_agent.py'),
         verification_overrides=dict(episodes=1,workflows_per_episode=2,temporary_outputs=True,
-            architecture='unchanged author widths, 4-head GAT, 8-d embeddings',four_logical_environments=True),
+            architecture='task6/VM4, paper MLP2/shared decoder, 4-head GAT, 8-d embeddings',four_logical_environments=True),
         formal_600_episode_training_executed=False,formal_30_seed_evaluation_executed=False)
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(__doc__)
-    parser.add_argument('--out',default='docs/Two_stage_GAT_smoke.json')
+    parser.add_argument('--out',default='docs/Two_stage_GAT_paper_v4_smoke.json')
     args=parser.parse_args()
     result=run()
     Path(args.out).write_text(json.dumps(result,indent=2,ensure_ascii=False,allow_nan=False),encoding='utf-8')

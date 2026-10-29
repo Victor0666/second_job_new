@@ -15,11 +15,12 @@ from common.f11 import protect_training_outputs
 from common.f18_state_normalization import check_checkpoint
 from common.f22_instances import instance_identity, write_run_metadata
 from common.read_xml_opt_Tsize import load_workflow_from_dax
-from common.scenarios import ROOT, parse_scenario
+from common.scenarios import parse_scenario
 from common.workflow_opt import ENERGY_ACCOUNTING, COMMUNICATION_MODEL
-from .config import (COMMON_REWARD, INPUT_ENCODING, MODEL_VERSION, REWARD_PROTOCOL,
+from .config import (ARCHITECTURE, COMMON_REWARD, INPUT_ENCODING, MODEL_VERSION, REWARD_PROTOCOL,
                      SCHEDULING_PROTOCOL, SOURCE_COMMIT, SOURCE_REPOSITORY, TwoStageGATConfig)
 from .environment import TwoStageGATEnv
+from .paths import evaluation_directory, evaluation_identity, evaluation_root, evaluation_stem
 from .ppo import PPOAgent, Transition
 from .selection import (selection_key, selection_metadata, selection_protocol, selection_scenario,
                         validation_selection)
@@ -53,17 +54,16 @@ def output_dir(scenario, kind):
         return scenario.checkpoint_dir('two_stage_gat')
     if kind == 'logs':
         return scenario.log_dir('two_stage_gat')
-    return ROOT / 'outputs' / kind / MODEL_VERSION / scenario.model_name('two_stage_gat') / (
-        scenario.task + scenario.resource + '_' + scenario.deadline)
+    if kind == 'run':
+        return evaluation_root()
+    raise ValueError('Unknown two-stage GAT output kind: ' + kind)
 
 
 def artifact_name(scenario, kind):
-    count = f'_{len(scenario.seeds)}seeds' if kind != 'train' else ''
-    source = (scenario.train_task, scenario.train_resource or scenario.resource,
-              scenario.train_deadline or scenario.deadline)
-    suffix = f'_from_task{source[0]}_res{source[1]}_{source[2]}' if kind != 'train' and source != (
-        scenario.task, scenario.resource, scenario.deadline) else ''
-    return f'{kind}_two_stage_gat_task{scenario.task}_res{scenario.resource}{count}_{scenario.deadline}_model{scenario.model_seed}{suffix}'
+    if kind == 'train':
+        return 'train'
+    stem = evaluation_stem(scenario)
+    return stem if kind == 'eval' else kind + stem[len('eval'):]
 
 
 def append_json(path, value):
@@ -73,7 +73,7 @@ def append_json(path, value):
 
 def objective_metadata():
     return dict(source_repository=SOURCE_REPOSITORY, source_commit=SOURCE_COMMIT,
-        model_version=MODEL_VERSION, policy_input=INPUT_ENCODING,
+        model_version=MODEL_VERSION, architecture=ARCHITECTURE, policy_input=INPUT_ENCODING,
         reward_protocol=REWARD_PROTOCOL, reward_settings=COMMON_REWARD,
         scheduling_protocol=SCHEDULING_PROTOCOL, energy_accounting=ENERGY_ACCOUNTING,
         communication_model=COMMUNICATION_MODEL, pooling='real_arrived_tasks_and_real_VMs',
@@ -329,20 +329,26 @@ def train_main():
 
 def evaluate_main():
     scenario = selection_scenario(parse_scenario('eval', 'two_stage_gat'))
+    directory = output_dir(scenario, 'run')
+    path = directory / (artifact_name(scenario, 'eval') + '.csv')
+    summary_path = directory / (artifact_name(scenario, 'summary') + '.json')
+    details = evaluation_directory(scenario)
+    if path.exists() or summary_path.exists() or details.exists():
+        raise FileExistsError('Refusing to overwrite two-stage GAT evaluation: ' + str(path))
     device = (scenario.paper_options or {}).get('device') or ('cuda' if torch.cuda.is_available() else 'cpu')
     checkpoint = output_dir(scenario, 'ckpts')
     agent, obj = load_checkpoint(checkpoint / 'best.pth', scenario, device)
     selected = obj['validation_selection']
     print(f'[2SD-GAT selected checkpoint] validation_SR={selected["workflow_success_rate"]:.4f} '
         f'validation_ESP={selected["validation_ESP"]:.4f} feasible={selected["feasible"]}', flush=True)
-    directory = output_dir(scenario, 'run'); directory.mkdir(parents=True, exist_ok=True)
-    rows, summary = evaluate(agent, scenario, scenario.seeds, directory=directory / 'measurements',
+    details.mkdir(parents=True)
+    write_run_metadata(details, scenario)
+    rows, summary = evaluate(agent, scenario, scenario.seeds, directory=details / 'measurements',
         checkpoint_directory=checkpoint)
-    path = directory / (artifact_name(scenario, 'eval') + '.csv')
-    with path.open('w', encoding='utf-8', newline='') as stream:
+    rows = [dict(**evaluation_identity(scenario), **row) for row in rows]
+    with path.open('x', encoding='utf-8', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0])); writer.writeheader(); writer.writerows(rows)
-    summary_path = directory / (artifact_name(scenario, 'summary') + '.json')
-    summary_path.write_text(json.dumps(dict(**objective_metadata(), summary=summary,
+    summary_path.write_text(json.dumps(dict(objective_metadata(), **evaluation_identity(scenario), summary=summary,
         protocol=selection_protocol(scenario), selected_checkpoint_validation=selected,
         source_checkpoint=str(checkpoint / 'best.pth')),
         indent=2), encoding='utf-8')

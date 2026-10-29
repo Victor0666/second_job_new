@@ -19,6 +19,18 @@
 
 模型/日志进入 `outputs/ckpts/mahdrl_as_fast_noapf_v3/<紧凑源场景配置>/` 和对应logs目录。主CSV沿用平铺布局，文件名含新模型版本、目标/源场景、实际测试种子和配置摘要；summary、CSV及机制文件记录NoAPF身份。候选明细为 `candidates_episode*.json` / `candidates_seed*.json`，阈值 `r_H/r_V` 为null，原始与保留候选数量相等。
 
+标准九源场景、模型种子1的训练末级目录名为21–22个字符，例如 `SS_Tight_m1_cf8c2abc3`。`c` 后的8位摘要绑定协议、选模、模型、归一化配置及能耗口径，由程序生成，不手工填写。
+
+最终 CSV 全部直接位于 `outputs/run/mahdrl_oe_ge_apf_score_fast/`，例如同一个SS/Tight源模型的三个目标为：
+
+```text
+eval_mahdrl_as_fast_noapf_v3_SS_Tight_fromSS_Tight_m1_s700-729_cf8c2abc3.csv
+eval_mahdrl_as_fast_noapf_v3_MS_Tight_fromSS_Tight_m1_s700-729_cf8c2abc3.csv
+eval_mahdrl_as_fast_noapf_v3_LS_Tight_fromSS_Tight_m1_s700-729_cf8c2abc3.csv
+```
+
+目标场景在 `from` 前，训练源在 `from` 后；下载CSV到同一文件夹仍可区分。诊断和测量位于 `_details/<16位摘要>/`，不用于区分主CSV。已有CSV或明细目录非空时拒绝覆盖。
+
 TA/HA/VA仍成套保存并核验角色、参数形状、源尺度、协议、机制、模型版本和选模证据。旧APF V2模型即使形状相同也拒绝加载，需要从头训练；旧目录不移动或覆盖。APF V2对应Git提交 `da90ab6`，复查其权重时使用该历史代码。
 
 原11个独立消融的机制身份、路径、奖励、角色及严格 `SR > 0.92` 选模保持。本次没有修改共享AS配置、F22文件、物理引擎或参考缓存。
@@ -31,6 +43,20 @@ python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S 
 ```
 
 压力场景在两条命令中同时追加 `--workload-profile stress_a1_l006_ref003`。添加 `--dry-run` 可查看当前模型、日志和CSV路径。常规九源训练/评测指令和 `Linux_CUDA_stress_four_algorithms.sh` 中的MAHDRL入口均使用当前NoAPF版本。
+
+后台函数分别见 [训练脚本](mahdrl_as_fast_noapf_v3_train.sh) 和 [评测脚本](mahdrl_as_fast_noapf_v3_evaluate.sh)。在项目根目录 `source` 后调用，不会自动启动任务：
+
+```bash
+source docs/mahdrl_as_fast_noapf_v3_train.sh
+train_mahdrl_as_fast_noapf_v3 S Tight
+# 对应600回合源模型训练完成后：
+source docs/mahdrl_as_fast_noapf_v3_evaluate.sh
+eval_mahdrl_as_fast_noapf_v3_all S Tight
+# 可选第三参数指定目标子集，例如：
+eval_mahdrl_as_fast_noapf_v3_all M Medium "M L"
+```
+
+九源训练共9个作业；默认每个评测作业顺序测试S/M/L目标，共27个场景、每场景30个测试种子。控制台日志和PID分别写入 `outputs/server_train_logs/`、`outputs/server_eval_logs/`，带启动时间和随机后缀以免覆盖；模型目录仍由源配置决定，重复调用不会生成另一套训练模型。完整九组调用见 [训练指令](Linux_CUDA_MAHDRL_AS_Fast_600代训练指令.txt) 和 [评测指令](Linux_CUDA_MAHDRL_AS_Fast_九场景评测指令.txt)。默认GPU为0，可在调用前设置 `GPU=1`；按显存分批运行。
 
 专项检查为 `python -B -m unittest common.test_mahdrl_as_fast -v`。覆盖慢速/超期/高能耗合法资源保留、忙碌与填充拒绝、主机摘要、GE/随机/贪心、TD掩码、同动作三层奖励/物理一致、缓存失效、CPU/CUDA更新、APF函数调用即失败的真实训练/保存/重载/冻结评测、旧模型拒绝、46/50边界及防覆盖；短程检查不替代600回合效果实验。
 

@@ -4,6 +4,8 @@
 
 **2026-10-30：新增独立 `mahdrl_as_fast_vaaware` 变式，默认 VA 预评估增强 HA、每4条有效HA经验更新一次。训练目录采用17字符场景配置名，最终CSV在统一目录平铺，文件名包含目标/源场景、机制与种子。说明见 [VAware](docs/MAHDRL_AS_Fast_VAware.md)，后台训练和评测函数见 [运行指令](docs/mahdrl_as_fast_vaaware_commands.sh)。**
 
+**2026-10-30：新增 `mahdrl_as_fast_vaaware_tl`，作为 VAware 的 TA/全局 VA 两层消融。删除 HA，沿用 VAware 的分配后更新、OE 原奖励和 `SR >= 0.92` 选模；短训练目录、场景命名的平铺 CSV 与其他版本隔离。见 [VAware-TL 说明](docs/MAHDRL_AS_Fast_VAware_TL.md)及[后台运行函数](docs/mahdrl_as_fast_vaaware_tl_commands.sh)。**
+
 # MAHDRL 实验代码
 
 新增独立消融 `mahdrl_oe_ge_apf_score_fast_nva`（MAHDRL-AS-Fast-V2-NVA）：保留主机 APF，删除 VM APF，在选定主机的全部合法空闲 VM 中等概率随机选择，仅训练 TA/HA，保留 HA GE、OE 奖励和 SR099 选模。模型与结果独立；定义、验证及 Linux/CUDA 后台并行指令见 [AS-Fast-V2-NVA 说明](docs/MAHDRL_AS_Fast_NVA.md)。

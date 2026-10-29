@@ -1,0 +1,42 @@
+{
+  "model_version": "mahdrl_as_fast_vaaware_tl_noapf_v1",
+  "parsed_python_files": 12,
+  "protected_baseline_files": 23,
+  "baseline_hashes_unchanged": true,
+  "unique_training_paths": 9,
+  "unique_evaluation_paths": 27,
+  "public_CLI_dry_runs": {
+    "train": "passed",
+    "evaluate": "passed",
+    "precompute": "passed"
+  },
+  "bash_syntax": "passed",
+  "bash_stub_invocations": 44,
+  "bash_failure_stops_remaining_targets": true,
+  "training_directory_name_length": 17,
+  "max_training_directory_absolute_length": 101,
+  "max_training_measurement_absolute_length": 128,
+  "max_evaluation_CSV_absolute_length": 157,
+  "formal_600_episode_training_executed": false,
+  "regression": {
+    "command": "python -X utf8 -B -m unittest common.test_mahdrl_as_fast_vaaware_tl common.test_mahdrl_as_fast_vaaware common.test_mahdrl_as_fast common.test_mahdrl_as_fast_tl common.test_mahdrl_as_fast_sync common.test_mahdrl_as_fast_nta common.test_mahdrl_as_fast_nha common.test_mahdrl_as_fast_nva common.test_mahdrl_as_fast_fixed_ta common.test_mahdrl_as_fast_r090 common.test_mahdrl_as_fast_r010_nopf common.test_mahdrl_ablation_settings -q",
+    "tests": 149,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "seconds": 168.31,
+    "includes": [
+      "CPU",
+      "CUDA",
+      "production_width_updates",
+      "two_episode_train_save_reload_frozen_evaluation",
+      "fixed_assignment_physical_reward_parity",
+      "post_assignment_optimizer_barrier",
+      "global_GE",
+      "strict_identity_and_selection_evidence",
+      "unequal_VM_topology",
+      "compact_paths",
+      "flat_scene_named_CSVs"
+    ]
+  }
+}

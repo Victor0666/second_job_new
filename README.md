@@ -2,6 +2,8 @@
 
 **2026-10-30：`mahdrl_oe_ge_apf_score_fast` 入口已升级为 `mahdrl_as_fast_noapf_v3`，保留 TA/HA/VA、OE、GE、共享打分及原 0.75/0.25 奖励，关闭两级 APF。HA 选择所有拥有合法空闲 VM 的主机，VA 选择所选主机全部合法空闲 VM；忙碌、填充和物理非法动作仍屏蔽。选模继续采用 `SR >= 0.92` 后最低验证能耗，模型、日志及评测与旧 APF V2 隔离，需重新训练。常规和压力场景命令入口保持，说明见 [AS-Fast-NoAPF V3](docs/MAHDRL_AS_Fast.md)。**
 
+**2026-10-30：新增独立 `mahdrl_as_fast_vaaware` 变式，默认 VA 预评估增强 HA、每4条有效HA经验更新一次。训练目录采用17字符场景配置名，最终CSV在统一目录平铺，文件名包含目标/源场景、机制与种子。说明见 [VAware](docs/MAHDRL_AS_Fast_VAware.md)，后台训练和评测函数见 [运行指令](docs/mahdrl_as_fast_vaaware_commands.sh)。**
+
 # MAHDRL 实验代码
 
 新增独立消融 `mahdrl_oe_ge_apf_score_fast_nva`（MAHDRL-AS-Fast-V2-NVA）：保留主机 APF，删除 VM APF，在选定主机的全部合法空闲 VM 中等概率随机选择，仅训练 TA/HA，保留 HA GE、OE 奖励和 SR099 选模。模型与结果独立；定义、验证及 Linux/CUDA 后台并行指令见 [AS-Fast-V2-NVA 说明](docs/MAHDRL_AS_Fast_NVA.md)。

@@ -13,10 +13,10 @@ SCHEDULING_POLICY = 'idle_vm_only_v1'
 
 def training_run_name(scenario):
     protocol = scenario.protocol()
-    return training_name(scenario, MODEL_VERSION, dict(
+    return training_name(scenario, MODEL_VERSION, scenario.with_workload_metadata(dict(
         protocol=protocol.metadata() if protocol else {'data_split': 'Legacy'},
         checkpoint_selection=selection_metadata(), observation_layout=OBSERVATION_LAYOUT,
-        scheduling_policy=SCHEDULING_POLICY))
+        scheduling_policy=SCHEDULING_POLICY)))
 
 
 def evaluation_csv(scenario, project_dir):

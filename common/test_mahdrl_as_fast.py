@@ -533,7 +533,8 @@ class FastTests(unittest.TestCase):
         self.assertEqual(metadata['reproducibility']['data_split']['selection'], selection.SELECTION_TAG)
         self.assertEqual(scene.protocol().selection, 'minimum_validation_total_energy')
         self.assertIn('mahdrl_as_fast_v2', str(scene.checkpoint_dir()))
-        self.assertIn(selection.SELECTION_TAG, scene.model_name())
+        self.assertLessEqual(len(scene.model_name()), 32)
+        self.assertEqual(scene.selection_protocol()['selection'], selection.SELECTION_TAG)
         target = replace(scene, mode='eval', task='L', train_resource='S', train_deadline='Tight')
         self.assertEqual(scene.checkpoint_dir(), target.checkpoint_dir())
 

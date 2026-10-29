@@ -48,4 +48,4 @@ def selection_protocol(scenario):
     # The shared F22 file and calibration hash remain unchanged for other algorithms.
     metadata = scenario.protocol().metadata()
     metadata.update(selection=SELECTION_TAG, checkpoint_selection=selection_metadata())
-    return metadata
+    return scenario.with_workload_metadata(metadata)

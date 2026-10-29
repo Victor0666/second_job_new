@@ -23,14 +23,14 @@ def set_seed(seed):
 
 
 def env_kwargs(scenario):
-    return dict(dax_paths=scenario.dax_paths(), horizon=1e9, arrival_lambda=.03,
+    return dict(dax_paths=scenario.dax_paths(), horizon=1e9, arrival_lambda=scenario.arrival_lambda,
         random_seed=scenario.first_training_seed(), workflows_per_episode=50,
         max_ready_tasks='auto', normalize=True, num_hosts=scenario.num_hosts,
         vms_per_host=scenario.vms_per_host, pc_tiers=(1., 2., 4., 6., 8.),
         bw_tiers=(1000., 2000., 4000., 6000., 8000.), alpha_delay_vm=.75,
         task_baseline_norm=300., energy_reward_scale=.001, energy_norm_per_mi_ref=20.,
         deadline_mode='cache_fcfs', deadline_cache_path=str(scenario.cache_path),
-        deadline_alpha=1.5, deadline_alpha_choices=[2., 3.],
+        deadline_alpha=1.5, deadline_alpha_choices=list(scenario.deadline_choices),
         deadline_alpha_probs=list(scenario.deadline_probs), deadline_cache_strict=True,
         **scenario.normalization_kwargs())
 

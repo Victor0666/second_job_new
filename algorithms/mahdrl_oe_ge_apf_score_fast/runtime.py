@@ -43,12 +43,13 @@ def set_seed(seed):
 
 
 def build_env_kwargs(scene, seed):
-    return dict(dax_paths=scene.dax_paths(), horizon=1e9, arrival_lambda=.03,
+    return dict(dax_paths=scene.dax_paths(), horizon=1e9, arrival_lambda=scene.arrival_lambda,
         random_seed=int(seed), max_ready_tasks="auto", normalize=True, workflows_per_episode=50,
         num_hosts=scene.num_hosts, vms_per_host=scene.vms_per_host,
         pc_tiers=(1., 2., 4., 6., 8.), bw_tiers=(1000., 2000., 4000., 6000., 8000.),
         deadline_mode="cache_fcfs", deadline_cache_path=str(scene.cache_path), deadline_cache_strict=True,
-        deadline_alpha_small=2., deadline_alpha_large=3., deadline_alpha_small_prob=scene.small_probability,
+        deadline_alpha_small=scene.deadline_choices[0], deadline_alpha_large=scene.deadline_choices[1],
+        deadline_alpha_small_prob=scene.small_probability,
         manager_alpha_delay=.75, manager_delay_mode="tardiness", **scene.normalization_kwargs())
 
 
@@ -276,6 +277,9 @@ def train(scene):
 
 def evaluate(scene):
     directory = scene.evaluation_dir()
+    csv_path = scene.evaluation_csv()
+    if csv_path.exists():
+        raise FileExistsError(f'Refusing to overwrite evaluation CSV: {csv_path}')
     if directory.exists() and any(directory.iterdir()):
         raise FileExistsError(f"Refusing to overwrite evaluation artifacts: {directory}")
     validate_inputs(scene)
@@ -299,7 +303,6 @@ def evaluate(scene):
         append_json(directory/"stage_timings.jsonl", dict(seed=seed, scope="evaluation", environment=env.profiler.report()))
         write_json(directory/f"apf_seed{seed}.json", apf_report(env))
         append_json(directory/"evaluation.jsonl", dict(seed=seed, **result))
-        csv_path = directory/"evaluation_mahdrl_as_fast.csv"
         row = dict(seed=seed, model_seed=scene.model_seed, **episode_metrics(env))
         with csv_path.open("a", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(row))
@@ -314,5 +317,5 @@ def evaluate(scene):
         checkpoint_selection=selection_metadata(), selected_episode=agents['TA'].loaded_selection['selected_episode'],
         best_validation_selection=agents['TA'].loaded_selection['best_validation_selection'],
         seeds=list(scene.seeds), metrics=summary))
-    print(f"[MAHDRL-AS-Fast eval completed] results={directory.resolve()}")
+    print(f"[MAHDRL-AS-Fast eval completed] csv={csv_path.resolve()} details={directory.resolve()}")
     return summary

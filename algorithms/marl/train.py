@@ -163,7 +163,8 @@ def _train(resources):
     env_kwargs = dict(
         dax_paths=dax_list,
         horizon=1000000000.0,
-        arrival_lambda=0.03,
+        arrival_lambda=SCENARIO.arrival_lambda,
+        arrival_source='poisson' if SCENARIO.is_stress_workload else 'cache',
         random_seed=random_seed,
         normalize=True,
         num_hosts=SCENARIO.num_hosts,
@@ -178,7 +179,7 @@ def _train(resources):
         deadline_mode="cache_fcfs",
         deadline_cache_path=deadline_cache_path,
         alpha_deadline=1.5,
-        alpha_deadline_choices=(2.0, 3.0),
+        alpha_deadline_choices=SCENARIO.deadline_choices,
         alpha_deadline_probs=SCENARIO.deadline_probs,
         strict_cache=True,
         dump_deadlines=True,

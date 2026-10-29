@@ -4,12 +4,13 @@ from dataclasses import dataclass, field
 import hashlib
 import json
 from pathlib import Path
-from common.scenarios import Scenario, ROOT
+from common.scenarios import Scenario, ROOT, add_workload_argument
 from common.experiment_protocol import DEFAULT_PROTOCOL, protocol_hash
 from common.f18_state_normalization import CURRENT_VERSION, DEFAULT_CONFIG, SHARED_VERSIONS
 from common.f11 import LEARNING_MODEL
 from common.ta_weights import TA_WEIGHT_MODEL
 from common.workflow_opt import ENERGY_ACCOUNTING
+from common.r010_paths import training_name, evaluation_stem
 from .config import ALGORITHM, DISPLAY_NAME, MODEL_VERSION, variant_metadata, implementation_metadata
 from .selection import SELECTION_TAG, selection_metadata
 
@@ -57,28 +58,43 @@ class ScoreScenario(Scenario):
         return Path(self.cache_file).resolve() if self.cache_file else super().cache_path
 
     def model_name(self, algorithm=ALGORITHM):
+        return training_name(self, MODEL_VERSION,
+            dict(protocol=self.selection_protocol(), variant=variant_metadata(),
+                 implementation=implementation_metadata()))
+
+    def legacy_model_name(self):
         task = self.task if self.mode == "train" else self.train_task
         resource = self.resource if self.mode == "train" else self.train_resource or self.resource
         deadline = self.deadline if self.mode == "train" else self.train_deadline or self.deadline
         protocol = "protocol_"+protocol_hash(self.experiment_protocol)[:12] if self.protocol() else "legacy"
-        return (f"{MODEL_VERSION}_task{task}_res{resource}_{deadline}_model{self.model_seed}_"
-                f"{LEARNING_MODEL}_{TA_WEIGHT_MODEL}_{self.normalization_mode}_{protocol}_{ENERGY_ACCOUNTING}_{SELECTION_TAG}")
+        name = (f"{MODEL_VERSION}_task{task}_res{resource}_{deadline}_model{self.model_seed}_"
+                f"{LEARNING_MODEL}_{TA_WEIGHT_MODEL}_{self.normalization_mode}_{protocol}_{ENERGY_ACCOUNTING}_{SELECTION_TAG}{self.workload_suffix}")
+        if self.is_stress_workload:
+            return f'{MODEL_VERSION}_{task}{resource}_m{self.model_seed}{self.workload_suffix}_' + hashlib.sha256(name.encode()).hexdigest()[:12]
+        return name
 
     def checkpoint_dir(self, algorithm=ALGORITHM):
         if self.mode == "eval" and self.checkpoint_override:
             return Path(self.checkpoint_override).resolve()
-        return Path(self.output_root)/"outputs/ckpts"/self.model_name()
+        current = Path(self.output_root)/"outputs/ckpts"/MODEL_VERSION/self.model_name()
+        legacy = Path(self.output_root)/"outputs/ckpts"/self.legacy_model_name()
+        if self.mode == 'eval' and not current.exists() and legacy.is_dir():
+            return legacy
+        return current
 
     def log_dir(self, algorithm=ALGORITHM):
-        return Path(self.output_root)/"outputs/logs"/self.model_name()
+        return Path(self.output_root)/"outputs/logs"/MODEL_VERSION/self.model_name()
+
+    @property
+    def evaluation_root(self):
+        return Path(self.output_root)/"outputs/run"/ALGORITHM
+
+    def evaluation_csv(self):
+        return self.evaluation_root / (evaluation_stem(self, MODEL_VERSION, self.model_name()) + '.csv')
 
     def evaluation_dir(self):
-        # Keep paths below Windows MAX_PATH in the user's deep workspace.
-        version = MODEL_VERSION+"_"+hashlib.sha256(self.output_version.encode()).hexdigest()[:12]
-        source = (f"from_task{self.train_task}_res{self.train_resource or self.resource}_"
-                  f"{self.train_deadline or self.deadline}_model{self.model_seed}")
-        return (Path(self.output_root)/"outputs/run"/ALGORITHM/version/source/
-                f"eval_task{self.task}_res{self.resource}_{self.deadline}")
+        key = hashlib.sha256(self.evaluation_csv().name.encode()).hexdigest()[:16]
+        return self.evaluation_root / '_details' / key
 
     @property
     def output_version(self):
@@ -88,7 +104,7 @@ class ScoreScenario(Scenario):
         protocol = self.protocol()
         metadata = protocol.metadata() if protocol else dict(version="legacy", validation=self.validation_seeds())
         metadata.update(selection=SELECTION_TAG, checkpoint_selection=selection_metadata())
-        return metadata
+        return self.with_workload_metadata(metadata)
 
     def reproducibility_metadata(self):
         metadata = super().reproducibility_metadata()
@@ -109,12 +125,14 @@ class ScoreScenario(Scenario):
                       model_version=MODEL_VERSION, checkpoint_selection=selection_metadata(),
                       experiment_protocol=self.selection_protocol(),
                       checkpoint_dir=str(self.checkpoint_dir()), log_dir=str(self.log_dir()),
-                      evaluation_dir=str(self.evaluation_dir()), device=self.device or "auto")
+                      evaluation_dir=str(self.evaluation_dir()), evaluation_csv=str(self.evaluation_csv()),
+                      device=self.device or "auto")
         return result
 
 
 def parse_scenario(mode, argv=None):
     p = argparse.ArgumentParser(description=DISPLAY_NAME+": "+mode)
+    add_workload_argument(p)
     p.add_argument("--task", choices="SML", default="S")
     p.add_argument("--resource", choices="SML", default="S")
     p.add_argument("--deadline", choices=("Tight", "Medium", "Loose"), default="Tight")
@@ -147,7 +165,7 @@ def parse_scenario(mode, argv=None):
             checkpoint_override=a.checkpoint_dir, cache_output=a.out,
             resource_config=a.resource_config, cache_file=a.deadline_cache,
             experiment_protocol=a.experiment_protocol, legacy_split=a.legacy_split,
-            model_seed=a.model_seed, normalization_mode=a.normalization_mode,
+            model_seed=a.model_seed, workload_profile=a.workload_profile, normalization_mode=a.normalization_mode,
             normalization_config=a.normalization_config, device=a.device,
             diagnostics_every=a.diagnostics_every, profile_mode=a.profile_mode, profile_every=a.profile_every)
     except (ValueError, OSError, TypeError) as exc:

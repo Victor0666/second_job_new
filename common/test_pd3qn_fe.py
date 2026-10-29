@@ -103,11 +103,12 @@ class IsolationTests(unittest.TestCase):
         scene = FEScenario(mode='train')
         self.assertNotEqual(scene.checkpoint_dir(), original_path)
         self.assertNotEqual(scene.checkpoint_dir(), replace(scene, model_seed=2).checkpoint_dir())
-        self.assertIn(SELECTION_TAG, scene.model_name())
+        self.assertLessEqual(len(scene.model_name()), 32)
+        self.assertEqual(scene.selection_protocol()['selection'], SELECTION_TAG)
         target = replace(scene, mode='eval', task='L', resource='M', deadline='Loose',
                          train_resource='S', train_deadline='Tight')
         self.assertEqual(scene.checkpoint_dir(), target.checkpoint_dir())
-        self.assertIn('taskL_resM_Loose', str(target.evaluation_dir))
+        self.assertIn('_LM_Loose_fromSS_Tight_', target.evaluation_csv.name)
         self.assertEqual(scene.protocol().selection, 'minimum_validation_total_energy')
         self.assertEqual(scene.reproducibility_metadata()['data_split']['selection'], SELECTION_TAG)
         self.assertEqual(original.checkpoint_dir('pd3qn'), original_path)
@@ -126,8 +127,8 @@ class IsolationTests(unittest.TestCase):
             self.assertEqual(result['checkpoint_selection'], selection_metadata())
             self.assertEqual(result['experiment_protocol']['validation'], [600])
             if mode == 'eval':
-                self.assertEqual(Path(result['evaluation_csv']).name,
-                    'eval_pd3qn_fe_taskS_resS_Tight_model1_seeds700-729.csv')
+                self.assertTrue(Path(result['evaluation_csv']).name.startswith(
+                    'eval_pd3qn_fe_SS_Tight_fromSS_Tight_m1_s700-729_c'))
         with redirect_stdout(io.StringIO()), patch('sys.stderr', io.StringIO()), self.assertRaises(SystemExit):
             parse_scenario('train', ['--normalization-mode', PD3QN_UNITS, '--dry-run'])
 
@@ -137,11 +138,9 @@ class IsolationTests(unittest.TestCase):
                  for task in 'SML' for resource in 'SML' for deadline in ('Tight', 'Medium', 'Loose')}
         self.assertEqual(len(names), 27)
         loose = replace(scene, deadline='Loose')
-        self.assertEqual(loose.evaluation_csv.name,
-                         'eval_pd3qn_fe_taskS_resS_Loose_model1_seeds700-729.csv')
+        self.assertIn('_SS_Loose_fromSS_Loose_m1_s700-729_c', loose.evaluation_csv.name)
         self.assertNotEqual(scene.evaluation_csv.name, replace(scene, model_seed=2).evaluation_csv.name)
-        self.assertEqual(replace(scene, seed_spec='700,702').evaluation_csv.name,
-                         'eval_pd3qn_fe_taskS_resS_Tight_model1_seeds700_702.csv')
+        self.assertIn('_s700+702_', replace(scene, seed_spec='700,702').evaluation_csv.name)
 
     def test_all_checkpoint_provenance_reports_actual_selector(self):
         metadata = FEScenario(normalization_mode='legacy').normalization_metadata()
@@ -212,6 +211,10 @@ class SmokeTests(unittest.TestCase):
             @property
             def evaluation_dir(self):
                 return cls.root / 'evaluation'
+
+            @property
+            def evaluation_root(self):
+                return cls.root / 'results'
 
         cls.scene = LocalScenario(mode='train', episodes=2, paper_options={'device': 'cpu'})
         cls.eval_scene = replace(cls.scene, mode='eval', seed_spec='700')

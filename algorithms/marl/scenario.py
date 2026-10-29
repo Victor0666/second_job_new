@@ -7,7 +7,7 @@ from algorithms.marl.selection import SELECTION_TAG, selection_metadata
 class MARLScenario(Scenario):
     def selection_protocol(self):
         metadata = self.protocol().metadata() if self.protocol() else {'data_split': 'Legacy'}
-        return dict(metadata, selection=SELECTION_TAG, checkpoint_selection=selection_metadata())
+        return self.with_workload_metadata(dict(metadata, selection=SELECTION_TAG, checkpoint_selection=selection_metadata()))
 
     def model_name(self, algorithm='marl'):
         return training_run_name(self) if algorithm == 'marl' else super().model_name(algorithm)

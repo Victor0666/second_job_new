@@ -18,6 +18,14 @@ from algorithms.pd3qn_dag.identity import RUN_NAME as PD3QN_DAG, MODEL_VERSION a
 ROOT = Path(__file__).resolve().parents[1]
 VM_COUNTS = {"S": (9, 8, 8), "M": (9, 9, 8, 8, 8, 8), "L": (9, 9, 9, 8, 8, 8, 8, 8, 8)}
 SMALL_PROBABILITY = {"Tight": 0.8, "Medium": 0.5, "Loose": 0.2}
+WORKLOAD_PROFILES = ("standard", "stress_a1_l006_ref003")
+
+
+def add_workload_argument(parser):
+    parser.add_argument('--workload-profile', choices=WORKLOAD_PROFILES, default='standard',
+                        help='Stress: alpha=1, arrivals=0.06, FCFS reference cache=0.03')
+
+
 DAX_GROUPS = (
     ("CyberShake_30.xml", "Epigenomics_24.xml", "Ligo_30.xml", "Montage_25.xml", "Sipht_29.xml"),
     ("CyberShake_50.xml", "Epigenomics_47.xml", "Ligo_50.xml", "Montage_50.xml", "Sipht_58.xml"),
@@ -107,6 +115,31 @@ class Scenario:
     normalization_config: str = str(DEFAULT_CONFIG)
     train_resource: str | None = None
     train_deadline: str | None = None
+    workload_profile: str = "standard"
+
+    @property
+    def is_stress_workload(self):
+        return self.workload_profile == 'stress_a1_l006_ref003'
+
+    @property
+    def arrival_lambda(self):
+        return .06 if self.is_stress_workload else .03
+
+    @property
+    def deadline_choices(self):
+        return (1., 1.) if self.is_stress_workload else (2., 3.)
+
+    @property
+    def workload_suffix(self):
+        return '_a1l006r003' if self.is_stress_workload else ''
+
+    def with_workload_metadata(self, metadata):
+        if self.is_stress_workload:
+            metadata = dict(metadata, workload=dict(profile=self.workload_profile,
+                arrival_lambda=self.arrival_lambda, reference_arrival_lambda=.03,
+                deadline_alpha=1., arrival_source='poisson', workflows_per_episode=50,
+                reference_policy='FCFS_task + VM_first_idle'))
+        return metadata
 
     def normalization_kwargs(self):
         source = scene_id(self.task if self.mode == 'train' else self.train_task,
@@ -126,7 +159,7 @@ class Scenario:
                             experiment_protocol=self.protocol().metadata())
         metadata['reproducibility'] = self.reproducibility_metadata()
         metadata['energy_accounting'] = ENERGY_ACCOUNTING
-        return metadata
+        return self.with_workload_metadata(metadata)
 
     def validate_calibration(self):
         if self.protocol() and self.normalization_mode in SHARED_VERSIONS:
@@ -139,10 +172,17 @@ class Scenario:
         metadata = reproducibility_metadata(self)
         if self.normalization_mode == PD3QN_UNITS:
             metadata['checkpoint_selection'] = 'minimum_validation_total_energy'
-        return metadata
+        return self.with_workload_metadata(metadata)
 
 
     def __post_init__(self):
+        if self.workload_profile not in WORKLOAD_PROFILES:
+            raise ValueError('Unknown workload profile')
+        if self.is_stress_workload:
+            if self.mode not in ('train', 'eval') or self.protocol() is None:
+                raise ValueError('Stress workload requires a disjoint train/eval protocol; reuse the 0.03 reference cache')
+            if self.deadline != 'Tight' or self.train_deadline not in (None, 'Tight'):
+                raise ValueError('Stress workload uses --deadline Tight and --train-deadline Tight for frozen source scales')
         if not 0 <= self.model_seed <= 0xffffffff:
             raise ValueError("Model seed must be an unsigned 32-bit integer")
         if (
@@ -183,12 +223,12 @@ class Scenario:
 
     @property
     def small_probability(self):
-        return SMALL_PROBABILITY[self.deadline]
+        return 1. if self.is_stress_workload else SMALL_PROBABILITY[self.deadline]
 
     @property
     def deadline_probs(self):
         # Explicit values avoid float rounding differences from 1 - 0.8.
-        return {"Tight": (0.8, 0.2), "Medium": (0.5, 0.5), "Loose": (0.2, 0.8)}[self.deadline]
+        return (1., 0.) if self.is_stress_workload else {"Tight": (0.8, 0.2), "Medium": (0.5, 0.5), "Loose": (0.2, 0.8)}[self.deadline]
 
     @property
     def seeds(self):
@@ -262,7 +302,7 @@ class Scenario:
         encoding = self.normalization_mode
         if encoding == PD3QN_UNITS:
             encoding = PD3QN_DAG_VERSION + '_' + PD3QN_OBSERVATION
-        return encoding + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING
+        return encoding + ('_protocol_' + protocol_hash(self.experiment_protocol)[:12] if self.protocol() else '_Legacy') + '_' + ENERGY_ACCOUNTING + self.workload_suffix
 
     def checkpoint_dir(self, algorithm):
         if self.mode == "eval" and self.checkpoint_override:
@@ -285,7 +325,7 @@ class Scenario:
             vms_per_host=self.vms_per_host,
             dax_weights=dict(Counter(Path(p).name for p in self.dax_paths())),
             cache=str(self.cache_path),
-            deadline_choices=(2.0, 3.0),
+            deadline_choices=self.deadline_choices,
             deadline_probs=self.deadline_probs,
             episodes=self.episodes if self.mode == "train" else None,
             seeds=self.seeds if self.mode != "train" else None,
@@ -330,12 +370,14 @@ class Scenario:
             if self.mode == 'eval':
                 result.update(evaluation_directory=str(evaluation_directory(self, ROOT)),
                               evaluation_csv=str(evaluation_csv(self, ROOT)))
-        return result
+        return self.with_workload_metadata(result)
 
 
 def parse_scenario(mode, algorithm=None, scenario_class=Scenario):
     parser = argparse.ArgumentParser(description=f'{algorithm or "Deadline cache"}: {mode}')
     explicit_pd3qn_dag = algorithm in ('pd3qn_v5', PD3QN_DAG)
+    if algorithm == 'marl':
+        add_workload_argument(parser)
     if explicit_pd3qn_dag:
         algorithm = 'pd3qn'
     parser.add_argument("--task", choices=VM_COUNTS, default="S", help="Workflow size mixture")
@@ -400,6 +442,7 @@ def parse_scenario(mode, algorithm=None, scenario_class=Scenario):
             experiment_protocol=getattr(args, 'experiment_protocol', str(DEFAULT_PROTOCOL)),
             legacy_split=getattr(args, 'legacy_split', False),
             model_seed=getattr(args, 'model_seed', 1),
+            workload_profile=getattr(args, 'workload_profile', 'standard'),
             normalization_mode=getattr(args, 'normalization_mode', CURRENT_VERSION),
             normalization_config=getattr(args, 'normalization_config', str(DEFAULT_CONFIG)),
             train_resource=getattr(args, 'train_resource', None), train_deadline=getattr(args, 'train_deadline', None),

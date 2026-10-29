@@ -21,6 +21,9 @@ from environments.pd3qn import CloudWorkflowEnv_PD3QN_Cost
 
 def evaluate(scenario):
     directory = scenario.evaluation_dir
+    path = scenario.evaluation_csv
+    if path.exists():
+        raise FileExistsError(f'Refusing to overwrite evaluation CSV: {path}')
     protect_training_outputs(directory, directory)
     kwargs = env_kwargs(scenario)
     set_seed(scenario.model_seed)
@@ -35,9 +38,9 @@ def evaluate(scenario):
     print(f'[{DISPLAY_NAME} selected checkpoint] episode={selected["episode"]} '
           f'validation={selected["validation_selection"]}', flush=True)
     directory.mkdir(parents=True, exist_ok=True)
+    path.parent.mkdir(parents=True, exist_ok=True)
     rows = evaluate_instances(agent, scenario, scenario.seeds, split='test', kwargs=kwargs,
                               directory=directory / 'measurements')
-    path = scenario.evaluation_csv
     with path.open('x', encoding='utf-8', newline='') as stream:
         writer = csv.DictWriter(stream, fieldnames=list(rows[0]))
         writer.writeheader()

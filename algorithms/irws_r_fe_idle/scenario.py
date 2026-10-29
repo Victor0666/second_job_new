@@ -2,7 +2,7 @@
 import argparse
 import json
 from pathlib import Path
-from common.scenarios import Scenario,VM_COUNTS,SMALL_PROBABILITY,DEFAULT_PROTOCOL
+from common.scenarios import Scenario,VM_COUNTS,SMALL_PROBABILITY,DEFAULT_PROTOCOL,add_workload_argument
 from common.f18_state_normalization import CURRENT_VERSION,SHARED_VERSIONS,DEFAULT_CONFIG
 from .config import ALGORITHM,DISPLAY_NAME,MODEL_VERSION,IMPLEMENTATION,REWARD_PROTOCOL,BEST_CHECKPOINT,COMMON_REWARD,PaperConfig,SCHEDULING_PROTOCOL
 from .selection import selection_metadata, selection_protocol
@@ -31,6 +31,7 @@ class FEScenario(Scenario):
 
 def parse_scenario(mode,algorithm=None,argv=None):
     parser=argparse.ArgumentParser(description=DISPLAY_NAME+': '+mode)
+    add_workload_argument(parser)
     parser.add_argument('--task',choices=VM_COUNTS,default='S')
     parser.add_argument('--resource',choices=VM_COUNTS,default='S')
     parser.add_argument('--deadline',choices=SMALL_PROBABILITY,default='Tight')
@@ -62,7 +63,7 @@ def parse_scenario(mode,algorithm=None,argv=None):
             episodes=getattr(args,'episodes',600),seed_spec=getattr(args,'seeds','700-729'),
             train_task=getattr(args,'train_task','S'),train_resource=getattr(args,'train_resource',None),
             train_deadline=getattr(args,'train_deadline',None),checkpoint_override=getattr(args,'checkpoint_dir',None),
-            experiment_protocol=args.experiment_protocol,model_seed=args.model_seed,
+            experiment_protocol=args.experiment_protocol,model_seed=args.model_seed,workload_profile=args.workload_profile,
             normalization_mode=args.normalization_mode,normalization_config=args.normalization_config,
             paper_options=dict(device=args.device,resume_checkpoint=getattr(args,'resume_checkpoint',None),
                                queue_capacity=args.queue_capacity,slot_duration=args.slot_duration,

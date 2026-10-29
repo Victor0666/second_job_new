@@ -21,7 +21,7 @@ from algorithms.marl.scenario import MARLScenario
 from common.test_f18 import fixture_config
 
 
-def run_smoke(hidden_dims=(16,8)):
+def run_smoke(hidden_dims=(16,8), workload_profile='standard'):
     torch.set_num_threads(1)
     with tempfile.TemporaryDirectory(prefix='marl_q_') as directory:
         root = Path(directory)
@@ -34,7 +34,7 @@ def run_smoke(hidden_dims=(16,8)):
             def checkpoint_dir(self, algorithm): return root/'ckpts'
             def log_dir(self, algorithm): return Path(self.model_name(algorithm))
 
-        scene = SmokeScenario(mode='train', episodes=1, normalization_config=str(config))
+        scene = SmokeScenario(mode='train', episodes=1, normalization_config=str(config), workload_profile=workload_profile)
         original = train.CloudWorkflowEnv_MARL
         assignment_checks = dict(count=0)
         original_assign = original._assign_task_to_vm
@@ -134,6 +134,14 @@ def run_smoke(hidden_dims=(16,8)):
                 g, locals, dims = evaluate.build_agents_and_probe_dims(kwargs,700,'cpu',
                     str(scene.checkpoint_dir('marl')/'best_global.pth'),
                     str(scene.checkpoint_dir('marl')/'best_local_actor_critics.pth'))
+                if scene.is_stress_workload:
+                    from algorithms.marl.runtime import validate_pair
+                    try:
+                        validate_pair(g, locals, replace(eval_scene, workload_profile='standard'))
+                    except ValueError:
+                        pass
+                    else:
+                        raise AssertionError('Stress checkpoint accepted by standard profile')
                 before = [{name:{k:v.clone() for k,v in getattr(a,name).state_dict().items()}
                            for name in ('actor','critic')} for a in (g,*locals.agents)]
                 result = evaluate.evaluate_one_seed(kwargs,g,locals,700,0)

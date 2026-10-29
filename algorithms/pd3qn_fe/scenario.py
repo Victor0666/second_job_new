@@ -1,5 +1,6 @@
 """Variant-local CLI and provenance; no registration in shared algorithm tables."""
 import argparse
+import hashlib
 import json
 from pathlib import Path
 
@@ -8,8 +9,9 @@ from algorithms.pd3qn_fe import ALGORITHM, DISPLAY_NAME
 from algorithms.pd3qn_fe.selection import SELECTION_TAG, selection_metadata
 from common.experiment_protocol import DEFAULT_PROTOCOL, protocol_hash
 from common.f18_state_normalization import CURRENT_VERSION, DEFAULT_CONFIG, SHARED_VERSIONS
-from common.scenarios import ROOT, SMALL_PROBABILITY, VM_COUNTS, Scenario
+from common.scenarios import ROOT, SMALL_PROBABILITY, VM_COUNTS, Scenario, add_workload_argument
 from common.workflow_opt import ENERGY_ACCOUNTING
+from common.r010_paths import training_name, evaluation_stem
 
 
 class FEScenario(Scenario):
@@ -23,31 +25,48 @@ class FEScenario(Scenario):
     def model_name(self, algorithm=ALGORITHM):
         if algorithm != ALGORITHM:
             raise ValueError('PD3QN-FE paths only accept pd3qn_fe')
+        return training_name(self, ALGORITHM,
+            dict(protocol=self.selection_protocol(), agent=agent_kwargs(self)))
+
+    def legacy_model_name(self):
         task = self.task if self.mode == 'train' else self.train_task
         resource = self.resource if self.mode == 'train' else (self.train_resource or self.resource)
         deadline = self.deadline if self.mode == 'train' else (self.train_deadline or self.deadline)
-        return (f'{ALGORITHM}_task{task}_res{resource}_model{self.model_seed}_{deadline}_'
+        name = (f'{ALGORITHM}_task{task}_res{resource}_model{self.model_seed}_{deadline}_'
                 f'{self.normalization_mode}_p{protocol_hash(self.experiment_protocol)[:12]}_'
-                f'{ENERGY_ACCOUNTING}_{SELECTION_TAG}')
+                f'{ENERGY_ACCOUNTING}_{SELECTION_TAG}{self.workload_suffix}')
+        if self.is_stress_workload:
+            return f'{ALGORITHM}_{task}{resource}_m{self.model_seed}{self.workload_suffix}_' + hashlib.sha256(name.encode()).hexdigest()[:12]
+        return name
 
     def checkpoint_dir(self, algorithm=ALGORITHM):
         if self.mode == 'eval' and self.checkpoint_override:
             return Path(self.checkpoint_override).resolve()
-        return ROOT / 'outputs' / 'ckpts' / self.model_name(algorithm)
+        current = ROOT / 'outputs' / 'ckpts' / ALGORITHM / self.model_name(algorithm)
+        legacy = ROOT / 'outputs' / 'ckpts' / self.legacy_model_name()
+        if self.mode == 'eval' and not current.exists() and legacy.is_dir():
+            return legacy
+        return current
 
     def log_dir(self, algorithm=ALGORITHM):
-        return ROOT / 'outputs' / 'logs' / self.model_name(algorithm)
+        return ROOT / 'outputs' / 'logs' / ALGORITHM / self.model_name(algorithm)
+
+    @property
+    def evaluation_root(self):
+        return ROOT / 'outputs' / 'run' / ALGORITHM
+
+    @property
+    def evaluation_stem(self):
+        return evaluation_stem(self, ALGORITHM, self.model_name())
 
     @property
     def evaluation_dir(self):
-        target = f'task{self.task}_res{self.resource}_{self.deadline}_seeds{self.seed_spec.replace(",", "_")}'
-        return ROOT / 'outputs' / 'run' / ALGORITHM / self.model_name() / target
+        key = hashlib.sha256(self.evaluation_stem.encode()).hexdigest()[:16]
+        return self.evaluation_root / '_details' / key
 
     @property
     def evaluation_csv(self):
-        seeds = self.seed_spec.replace(',', '_')
-        return self.evaluation_dir / (f'eval_{ALGORITHM}_task{self.task}_res{self.resource}_'
-            f'{self.deadline}_model{self.model_seed}_seeds{seeds}.csv')
+        return self.evaluation_root / (self.evaluation_stem + '.csv')
 
     @property
     def output_version(self):
@@ -56,7 +75,7 @@ class FEScenario(Scenario):
     def selection_protocol(self):
         metadata = self.protocol().metadata()
         metadata.update(selection=SELECTION_TAG, checkpoint_selection=selection_metadata())
-        return metadata
+        return self.with_workload_metadata(metadata)
 
     def reproducibility_metadata(self):
         metadata = super().reproducibility_metadata()
@@ -83,6 +102,7 @@ class FEScenario(Scenario):
 
 def parse_scenario(mode, argv=None):
     parser = argparse.ArgumentParser(description=f'{DISPLAY_NAME}: {mode}')
+    add_workload_argument(parser)
     parser.add_argument('--task', choices=VM_COUNTS, default='S')
     parser.add_argument('--resource', choices=VM_COUNTS, default='S')
     parser.add_argument('--deadline', choices=SMALL_PROBABILITY, default='Tight')

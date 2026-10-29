@@ -36,11 +36,11 @@ def learning_settings(scenario):
 
 
 def env_kwargs(scenario,seed):
-    return dict(dax_paths=scenario.dax_paths(),horizon=1e9,arrival_lambda=.03,random_seed=seed,
+    return dict(dax_paths=scenario.dax_paths(),horizon=1e9,arrival_lambda=scenario.arrival_lambda,random_seed=seed,
         workflows_per_episode=50,num_hosts=scenario.num_hosts,vms_per_host=scenario.vms_per_host,
         pc_tiers=(1.,2.,4.,6.,8.),bw_tiers=(1000.,2000.,4000.,6000.,8000.),
         deadline_mode='cache_fcfs',deadline_cache_path=str(scenario.cache_path),deadline_cache_strict=True,
-        deadline_alpha_choices=[2.,3.],deadline_alpha_probs=list(scenario.deadline_probs),
+        deadline_alpha_choices=list(scenario.deadline_choices),deadline_alpha_probs=list(scenario.deadline_probs),
         max_ready_tasks='auto',**queue_settings(scenario),**COMMON_REWARD,**scenario.normalization_kwargs())
 
 

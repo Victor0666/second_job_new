@@ -37,4 +37,4 @@ def evaluation_stem(scenario, algorithm_tag, train_name):
             seed_tag = f'n{len(seeds)}-{digest}'
     config_tag = train_name.rsplit('_', 1)[-1]
     return (f'eval_{algorithm_tag}_{scenario.task}{scenario.resource}_{scenario.deadline}_'
-            f'from{source_scene(scenario)}_m{scenario.model_seed}_s{seed_tag}_{config_tag}')
+            f'from{source_scene(scenario)}_m{scenario.model_seed}_s{seed_tag}_{config_tag}{scenario.workload_suffix}')

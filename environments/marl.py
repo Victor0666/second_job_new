@@ -68,6 +68,7 @@ class CloudWorkflowEnv_MARL(gym.Env):
         deadlines_out_dir: Optional[str] = None,
         deadlines_file_prefix: str = "marl",
         normalization_mode='legacy', normalization_config=None, source_train_scene=None,
+        arrival_source='cache',
     ):
         super().__init__()
         self.state_normalizer = load_normalizer(normalization_mode, normalization_config, source_train_scene)
@@ -81,6 +82,9 @@ class CloudWorkflowEnv_MARL(gym.Env):
             self.dax_map[key] = path
         self.horizon = float(horizon)
         self.arrival_lambda = float(arrival_lambda)
+        if arrival_source not in ('cache', 'poisson'):
+            raise ValueError("arrival_source must be 'cache' or 'poisson'")
+        self.arrival_source = arrival_source
         self.random_seed = int(random_seed)
         self.normalize = bool(normalize)
 
@@ -266,6 +270,9 @@ class CloudWorkflowEnv_MARL(gym.Env):
                         f"cache record length mismatch: expect n={n}, "
                         f"arr={len(self.arrival_times)} dax={len(self._wf_dax_names_episode)} mref={len(self._wf_makespans_ref_episode)}"
                     )
+            if self.arrival_source == 'poisson':
+                # Regenerate only arrivals; templates and 0.03 FCFS durations stay paired.
+                self.arrival_times = poisson_arrival_times(self.arrival_lambda, n_max=n, seed=self.episode_seed)
         else:
             self.arrival_times = poisson_arrival_times(
                 self.arrival_lambda,

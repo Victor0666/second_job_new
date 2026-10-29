@@ -19,7 +19,7 @@ from common.f11 import PendingDecision
 from common.precompute_deadlines import main as precompute
 from common.scenarios import Scenario, MODEL_NAMES
 from common.test_f18 import fixture_config
-from common.test_mahdrl_as_fast import tiny_agents as base_tiny_agents, validation_row
+from common.test_mahdrl_as_fast import tiny_agents as base_tiny_agents, validation_row, FastEnv as APFReferenceEnv
 from common.test_mahdrl_as_fast_nta import tiny_agents as nta_tiny_agents
 from common.test_mahdrl_as_fast_nha import tiny_agents as nha_tiny_agents
 from common.test_mahdrl_oe_ge_apf_score import parameter_hash, observation
@@ -108,7 +108,9 @@ class NVATests(unittest.TestCase):
             self.assertFalse(snapshot["vm_apf_enabled"])
 
     def test_filtered_slow_VM_becomes_selectable_and_HA_summary_covers_it(self):
-        environments = [self.env(base_runtime), self.env()]
+        with patch.object(base_runtime, 'CloudWorkflowEnv_VMAgents', APFReferenceEnv):
+            reference = self.env(base_runtime)
+        environments = [reference, self.env()]
         candidates = []
         for env in environments:
             first_host = env.host_to_vm_indices[env.host_ids[0]]

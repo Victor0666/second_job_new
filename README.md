@@ -1,6 +1,6 @@
 **2026-10-29：AS-Fast 的 11 个消融/奖励变体已统一关闭两级 APF、严格按 `SR > 0.92` 选模，训练目录采用短配置名，最终评测 CSV 在文件名中包含目标/源场景并平铺保存。当前规则与运行说明见[消融统一配置](docs/MAHDRL_AS_Fast_消融统一配置_2026-10-29.md)；下文早期新增记录中的 APF/选模设置以该说明为准。
 
-**2026-10-29：完整版 `mahdrl_as_fast_v2` 现采用 `SR >= 0.92` 后最低验证能耗选模，规则为 `select_sr092_minenergy_v1`；保留两级 APF。模型和日志目录追加新选模标识，与旧 99% 规则隔离；旧规则模型不能直接作为新规则 best 使用。运行说明见 [AS-Fast](docs/MAHDRL_AS_Fast.md)。**
+**2026-10-30：`mahdrl_oe_ge_apf_score_fast` 入口已升级为 `mahdrl_as_fast_noapf_v3`，保留 TA/HA/VA、OE、GE、共享打分及原 0.75/0.25 奖励，关闭两级 APF。HA 选择所有拥有合法空闲 VM 的主机，VA 选择所选主机全部合法空闲 VM；忙碌、填充和物理非法动作仍屏蔽。选模继续采用 `SR >= 0.92` 后最低验证能耗，模型、日志及评测与旧 APF V2 隔离，需重新训练。常规和压力场景命令入口保持，说明见 [AS-Fast-NoAPF V3](docs/MAHDRL_AS_Fast.md)。**
 
 # MAHDRL 实验代码
 

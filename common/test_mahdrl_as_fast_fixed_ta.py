@@ -20,7 +20,7 @@ from common.experiment_protocol import protocol_binding
 from common.precompute_deadlines import main as precompute
 from common.scenarios import Scenario, MODEL_NAMES
 from common.test_f18 import fixture_config
-from common.test_mahdrl_as_fast import validation_row
+from common.test_mahdrl_as_fast import validation_row, FastEnv as APFReferenceEnv
 from common.test_mahdrl_oe_ge_apf_score import observation, parameter_hash
 from common.workflow_opt import Workflow
 from environments.mahdrl_oe import CloudWorkflowEnv_VMAgents as OEEnv
@@ -200,7 +200,9 @@ class FixedTATests(unittest.TestCase):
 
     def test_no_APF_retains_slow_hosts_slow_VMs_and_overdue_actions(self):
         for klass in SCENES:
-            old, env = self.env(BaseScenario), self.env(klass)
+            with patch.object(baseline, 'CloudWorkflowEnv_VMAgents', APFReferenceEnv):
+                old = self.env(BaseScenario)
+            env = self.env(klass)
             old.set_manager_combo(env.fixed_config.weights)
             owners = {j: hi for hi, hid in enumerate(env.host_ids) for j in env.host_to_vm_indices[hid]}
             duration = lambda tid, j: (1., 20., 100.)[owners[j]] * (j % 3 + 1)

@@ -1,4 +1,42 @@
-# MAHDRL-AS-Fast
+# MAHDRL-AS-Fast-NoAPF V3
+
+2026-10-30：原 `algorithms/mahdrl_oe_ge_apf_score_fast/train.py`、`evaluate.py` 和 `precompute.py` 入口保持，当前模型版本升级为 `mahdrl_as_fast_noapf_v3`。入口目录中保留的 `apf` 是历史名称；当前训练、验证、测试及 TD 后继均不执行 APF 筛选。
+
+## 当前算法定义
+
+- TA、HA、VA 三层均学习，保留 OE、GE、共享候选打分及 Fast 回放、缓存、诊断和计时实现。
+- HA 候选为所有至少拥有一个物理合法空闲 VM 的主机；VA 候选为所选主机内全部物理合法空闲 VM。空闲判断沿用现有物理检查及 `current_time + 1e-12` 容差。
+- 忙碌 VM、填充槽位和物理非法动作继续屏蔽；速度慢、预计超期、预计能耗高均不排除候选。无合法候选时沿用原事件推进，不增加排队、未来预留或等待动作。
+- 不计算主机/VM 速度筛选阈值，不使用按时最低能耗特例保留通道；预测时长、能耗和超期仍用于观测与 GE。
+- HA 主机摘要覆盖该主机全部合法空闲 VM；输入维度保持 HA 23/10、VA 30/7，TA 状态15维、动作243个。GE 保留原 epsilon 时钟和0.5引导概率，随机、引导、贪心、Dueling合法均值和TD后继共用物理合法掩码。
+- 保留三层原0.75超期/0.25能耗权重、能耗尺度0.001、超期尺度300、OE分配与阶段尾结算、网络、学习率、回放、batch、目标更新与梯度裁剪。
+- 选模仍为 `select_sr092_minenergy_v1`：总体SR至少0.92后最小验证平均能耗，能耗相同优先更高SR；未达标时先SR、再能耗，完全并列保留较早模型。默认验证50个工作流时46个按时完成即可达标。
+- 常规与 `--workload-profile stress_a1_l006_ref003` 场景继续使用原工作负载、F22划分、源场景冻结尺度和参考缓存；仅取消APF不要求重建缓存或重新校准。
+
+当前环境适配为 `environments/mahdrl_as_fast_noapf_v3.py`，复用 `environments/mahdrl_as_fast_noapf.py`；共享APF环境保留供历史实现与既有变式使用。环境元数据保留OE运行期尺度，并与Agent身份一致声明 `host_apf_enabled=false`、`vm_apf_enabled=false`、`candidate_filter=physical_legality_only`。
+
+## 版本与输出
+
+模型/日志进入 `outputs/ckpts/mahdrl_as_fast_noapf_v3/<紧凑源场景配置>/` 和对应logs目录。主CSV沿用平铺布局，文件名含新模型版本、目标/源场景、实际测试种子和配置摘要；summary、CSV及机制文件记录NoAPF身份。候选明细为 `candidates_episode*.json` / `candidates_seed*.json`，阈值 `r_H/r_V` 为null，原始与保留候选数量相等。
+
+TA/HA/VA仍成套保存并核验角色、参数形状、源尺度、协议、机制、模型版本和选模证据。旧APF V2模型即使形状相同也拒绝加载，需要从头训练；旧目录不移动或覆盖。APF V2对应Git提交 `da90ab6`，复查其权重时使用该历史代码。
+
+原11个独立消融的机制身份、路径、奖励、角色及严格 `SR > 0.92` 选模保持。本次没有修改共享AS配置、F22文件、物理引擎或参考缓存。
+
+## 当前运行与验证
+
+```bash
+python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/train.py --task S --resource S --deadline Tight --episodes 600 --model-seed 1 --device cuda
+python -u launch.py algorithms/mahdrl_oe_ge_apf_score_fast/evaluate.py --task S --resource S --deadline Tight --train-task S --train-resource S --train-deadline Tight --seeds 700-729 --model-seed 1 --device cuda
+```
+
+压力场景在两条命令中同时追加 `--workload-profile stress_a1_l006_ref003`。添加 `--dry-run` 可查看当前模型、日志和CSV路径。常规九源训练/评测指令和 `Linux_CUDA_stress_four_algorithms.sh` 中的MAHDRL入口均使用当前NoAPF版本。
+
+专项检查为 `python -B -m unittest common.test_mahdrl_as_fast -v`。覆盖慢速/超期/高能耗合法资源保留、忙碌与填充拒绝、主机摘要、GE/随机/贪心、TD掩码、同动作三层奖励/物理一致、缓存失效、CPU/CUDA更新、APF函数调用即失败的真实训练/保存/重载/冻结评测、旧模型拒绝、46/50边界及防覆盖；短程检查不替代600回合效果实验。
+
+## 以下为APF V1/V2历史记录
+
+下文保留旧算法与性能测量的历史条件，APF语义、旧路径和旧权重说明不适用于当前NoAPF V3。旧版执行优化基准只比较APF骨架，不代表V3的训练轨迹或整体加速比。
 
 独立入口为 `algorithms/mahdrl_oe_ge_apf_score_fast/`，环境为
 `environments/mahdrl_oe_ge_apf_score_fast.py`。当前运行身份是 `mahdrl_as_fast_v2`。

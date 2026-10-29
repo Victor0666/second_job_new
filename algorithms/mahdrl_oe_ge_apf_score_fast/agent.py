@@ -8,7 +8,7 @@ from torch.nn import functional as F
 from common.d3qn_agent_EXDehid import _polyak_update
 from common.f11 import validate_transition
 from algorithms.mahdrl_oe_ge_apf_score.agent import TAAgent as OriginalTA, SetD3QNAgent as OriginalSet
-from .config import APF, ALGORITHM, MODEL_VERSION, implementation_metadata
+from .config import APF, ALGORITHM, MODEL_VERSION, variant_metadata, implementation_metadata
 from .selection import selection_metadata, validate_checkpoint_selection
 from .packing import frozen_array, frozen_observation, validate_observation, pack, to_device, collate
 from .diagnostics import FastDiagnostics
@@ -31,6 +31,9 @@ class FastLearner:
 
     def bind(self, scenario, role):
         super().bind(scenario, role)
+        self.identity = dict(variant_metadata(), role=role,
+            parameter_shapes={key: list(value.shape) for key, value in self.online.state_dict().items()})
+        self.normalization_metadata["algorithm_variant"] = deepcopy(self.identity)
         self.normalization_metadata["implementation"] = implementation_metadata()
         self.selection_expectation = dict(algorithm=ALGORITHM, model_version=MODEL_VERSION,
             learner_role=role, checkpoint_selection=selection_metadata(), protocol=scenario.selection_protocol(),
@@ -45,7 +48,7 @@ class FastLearner:
     def load(self, path, strict=True, require_learning_model=False):
         checkpoint = torch.load(path, map_location="cpu", weights_only=True)
         if not isinstance(checkpoint, dict) or not isinstance(checkpoint.get('normalization'), dict):
-            raise ValueError('Missing MAHDRL-AS-Fast v2 checkpoint normalization/selection metadata')
+            raise ValueError(f'Missing {MODEL_VERSION} checkpoint normalization/selection metadata')
         actual = checkpoint.get('normalization', {})
         record = validate_checkpoint_selection(actual.get('mahdrl_as_fast'), self.selection_expectation)
         for key in ('model_version', 'checkpoint_selection', 'experiment_protocol'):

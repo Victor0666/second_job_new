@@ -78,9 +78,12 @@ _stress_eval_all() {
 train_marl_q42_stress() { _stress_train marl marl_q42 "$@"; }
 train_pd3qn_fe_stress() { _stress_train pd3qn_fe pd3qn_fe "$@"; }
 train_irws_r_fe_idle_stress() { _stress_train irws_r_fe_idle irws_r_fe_idle "$@"; }
-train_mahdrl_as_fast_v2_stress() { _stress_train mahdrl_oe_ge_apf_score_fast mahdrl_as_fast_v2 "$@"; }
+train_mahdrl_as_fast_noapf_v3_stress() { _stress_train mahdrl_oe_ge_apf_score_fast mahdrl_as_fast_noapf_v3 "$@"; }
+# Historical function names follow the current NoAPF entry; APF V2 weights remain incompatible.
+train_mahdrl_as_fast_v2_stress() { train_mahdrl_as_fast_noapf_v3_stress "$@"; }
 
 eval_marl_q42_stress_all() { _stress_eval_all marl marl_q42 "$@"; }
 eval_pd3qn_fe_stress_all() { _stress_eval_all pd3qn_fe pd3qn_fe "$@"; }
 eval_irws_r_fe_idle_stress_all() { _stress_eval_all irws_r_fe_idle irws_r_fe_idle "$@"; }
-eval_mahdrl_as_fast_v2_stress_all() { _stress_eval_all mahdrl_oe_ge_apf_score_fast mahdrl_as_fast_v2 "$@"; }
+eval_mahdrl_as_fast_noapf_v3_stress_all() { _stress_eval_all mahdrl_oe_ge_apf_score_fast mahdrl_as_fast_noapf_v3 "$@"; }
+eval_mahdrl_as_fast_v2_stress_all() { eval_mahdrl_as_fast_noapf_v3_stress_all "$@"; }

@@ -47,7 +47,7 @@ def selection_key(candidate):
 def validate_checkpoint_selection(record, expected, row_selector=validation_selection):
     """Recompute saved evidence before accepting any new-rule checkpoint."""
     if not isinstance(record, dict):
-        raise ValueError('Missing MAHDRL-AS-Fast v2 checkpoint selection metadata; use v1 for legacy weights')
+        raise ValueError('Missing MAHDRL-AS-Fast checkpoint selection metadata; use matching historical code for legacy weights')
     for key, value in expected.items():
         if record.get(key) != value:
             raise ValueError('MAHDRL-AS-Fast checkpoint selection mismatch: ' + key)

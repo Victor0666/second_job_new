@@ -144,11 +144,11 @@ class NTATests(unittest.TestCase):
         self.assertEqual(logs[0], logs[1])
         self.assertEqual(parameter_hash(learners), weights)
 
-    def test_SR092_selector_is_strict_and_does_not_change_full_model(self):
+    def test_SR092_selector_remains_strict_while_full_model_is_inclusive(self):
         self.assertIsNot(selection.validation_selection, base_runtime.validation_selection)
         self.assertFalse(selection.validation_selection([validation_row(46)])["feasible"])
         self.assertTrue(selection.validation_selection([validation_row(47)])["feasible"])
-        self.assertFalse(base_runtime.validation_selection([validation_row(47)])["feasible"])
+        self.assertTrue(base_runtime.validation_selection([validation_row(46)])["feasible"])
         low = selection.validation_selection([validation_row(46, 1.)])
         high = selection.validation_selection([validation_row(47, 100.)])
         self.assertLess(selection.selection_key(high), selection.selection_key(low))

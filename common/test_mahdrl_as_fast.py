@@ -19,6 +19,8 @@ from common.scenarios import Scenario
 from common.experiment_protocol import protocol_binding
 from environments.mahdrl_oe_ge_apf_score import CloudWorkflowEnv_VMAgents as OriginalEnv, apf_candidates as original_apf
 from environments.mahdrl_oe_ge_apf_score_fast import CloudWorkflowEnv_VMAgents as FastEnv, apf_candidates
+from environments.mahdrl_as_fast_noapf_v3 import CloudWorkflowEnv_VMAgents as NoAPFEnv
+from algorithms.mahdrl_oe_ge_apf_score_fast.config import MODEL_VERSION, variant_metadata
 from algorithms.mahdrl_oe_ge_apf_score import agent as old, runtime as old_runtime
 from algorithms.mahdrl_oe_ge_apf_score.networks import collate as old_collate
 from algorithms.mahdrl_oe_ge_apf_score_fast import agent as fast, runtime
@@ -179,6 +181,132 @@ class FastTests(unittest.TestCase):
         self.assertEqual(a.assignment_ledger.segments, b.assignment_ledger.segments)
         self.assertEqual(repr(a.rng.get_state()), repr(b.rng.get_state()))
 
+    def test_noapf_keeps_slow_late_high_energy_candidates_and_rejects_busy_padding(self):
+        env = self.env(NoAPFEnv)
+        env.vm_available_at[0] = env.current_time + 100.
+        env.task_baseline_finish = [env.current_time - 1.] * len(env.task_baseline_finish)
+        with patch.object(env, '_task_duration', side_effect=lambda tid, j: float(1000 * (j + 1))), \
+             patch.object(env.assignment_ledger, 'preview', side_effect=lambda hid, start, end, pc: float(1e6 * pc)), \
+             patch('environments.mahdrl_oe_ge_apf_score.apf_candidates', side_effect=AssertionError('APF called')), \
+             patch('environments.mahdrl_oe_ge_apf_score_fast.apf_candidates', side_effect=AssertionError('APF called')):
+            host, ok = env.get_host_state_for_next_assignment()
+            self.assertTrue(ok)
+            np.testing.assert_array_equal(host['mask'], np.ones(env.num_hosts))
+            snapshot = env._apf_snapshot(env._cur_tid)
+            self.assertEqual(set(snapshot['rows']), set(range(env.num_vms)) - {0})
+            self.assertIsNone(snapshot['r_H']); self.assertIsNone(snapshot['r_V'])
+            self.assertTrue(all(row[2] > 0 and row[1] > 0 for row in snapshot['rows'].values()))
+            for hi, hid in enumerate(env.host_ids):
+                env.host_select(hi)
+                vm, ok = env.get_vm_state_for_current_task()
+                self.assertTrue(ok)
+                indices = env.host_to_vm_indices[hid]
+                np.testing.assert_array_equal(vm['mask'], [j != 0 for j in indices])
+                with self.assertRaisesRegex(ValueError, 'physically legal'):
+                    env.vm_assign(len(indices))
+                if 0 in indices:
+                    with self.assertRaisesRegex(ValueError, 'physically legal'):
+                        env.vm_assign(indices.index(0))
+            env.vm_assign(len(indices) - 1)
+            decision = env.apf_decisions[-1]
+            self.assertFalse(decision['predicted_ontime'])
+            self.assertEqual(decision['raw_host_count'], decision['retained_host_count'])
+            self.assertEqual(decision['local_raw_vm_count'], decision['local_retained_vm_count'])
+        self.assertEqual({key: env.variant_metadata()[key] for key in variant_metadata()}, variant_metadata())
+
+    def test_noapf_host_summary_covers_all_legal_idle_vms(self):
+        from environments.mahdrl_oe import POWER_REF_W
+        env = self.env(NoAPFEnv)
+        host, ok = env.get_host_state_for_next_assignment()
+        self.assertTrue(ok)
+        snapshot = env._apf_snapshot(env._cur_tid)
+        ref = env._obs_ref('T_ref', env.task_baseline_norm)
+        for i, hid in enumerate(env.host_ids):
+            rows = [snapshot['rows'][j] for j in env.host_to_vm_indices[hid] if j in snapshot['rows']]
+            fastest, cheapest = min(r[0] for r in rows), min(r[1] for r in rows)
+            expected = [fastest/ref,
+                min(r[1] for r in rows if abs(r[0]-fastest) <= 1e-9)/(POWER_REF_W*ref),
+                min(r[2] for r in rows)/ref, cheapest/(POWER_REF_W*ref),
+                min(r[0] for r in rows if np.isclose(r[1], cheapest, rtol=1e-9, atol=1e-9))/ref]
+            np.testing.assert_allclose(host['obs']['candidates'][i, 5:], expected, rtol=1e-6, atol=1e-7)
+
+    def test_noapf_preview_is_readonly_and_cache_tracks_decision_changes(self):
+        env = self.env(NoAPFEnv)
+        host, _ = env.get_host_state_for_next_assignment()
+        tid = env._cur_tid
+        before = (repr(env._records), repr(env.assignment_ledger.segments), env.current_time,
+                  repr(env.rng.get_state()))
+        first = env._apf_snapshot(tid)
+        self.assertIs(first, env._apf_snapshot(tid))
+        self.assertEqual(before, (repr(env._records), repr(env.assignment_ledger.segments),
+                                 env.current_time, repr(env.rng.get_state())))
+        env.task_baseline_finish[tid] += 1.
+        second = env._apf_snapshot(tid)
+        self.assertIsNot(first, second)
+        env.apply_manager_delta(np.zeros(5))
+        self.assertIsNone(env._fast_key)
+        host, _ = env.get_host_state_for_next_assignment()
+        env.host_select(int(np.flatnonzero(host['mask'])[0]))
+        vm, _ = env.get_vm_state_for_current_task()
+        env.vm_assign(int(np.flatnonzero(vm['mask'])[0]))
+        self.assertIsNone(env._fast_key)
+        env.finish_phase_and_advance()
+        self.assertIsNone(env._fast_key)
+        env.reset()
+        self.assertIsNone(env._fast_key)
+
+    def test_noapf_ge_uniform_and_greedy_share_physical_masks(self):
+        env = self.env(NoAPFEnv)
+        env.vm_available_at[0] = env.current_time + 100.
+        env.get_host_state_for_next_assignment()
+        env.host_select(0)
+        vm, ok = env.get_vm_state_for_current_task()
+        self.assertTrue(ok)
+        agent = fast.SetD3QNAgent(30, 7, hidden_dims=(8,), entity_dims=(8,), device='cpu')
+        legal = np.flatnonzero(vm['mask'])
+        slow = int(legal[np.argmax(vm['performance_times'][legal])])
+        q = torch.zeros((1, len(vm['mask'])))
+        q[0, 0], q[0, slow] = 1e6, 1000.
+        with patch.object(agent.online, 'forward', return_value=q):
+            self.assertEqual(agent.select_action(vm['obs'], vm['mask'], deterministic=True, count_step=False), slow)
+        with patch('random.random', side_effect=[0., .9]), patch('numpy.random.choice', return_value=slow) as choose:
+            self.assertEqual(agent.select_action(vm['obs'], vm['mask'], performance_times=vm['performance_times']), slow)
+            np.testing.assert_array_equal(choose.call_args.args[0], legal)
+        with patch('random.random', side_effect=[0., 0.]), patch('numpy.random.choice', side_effect=lambda ids: int(ids[0])):
+            selected = agent.select_action(vm['obs'], vm['mask'], performance_times=vm['performance_times'])
+            self.assertAlmostEqual(vm['performance_times'][selected], vm['performance_times'][legal].min())
+
+    def test_noapf_fixed_common_actions_preserve_physics_and_all_three_rewards(self):
+        old_env, new_env = self.env(OriginalEnv), self.env(NoAPFEnv)
+        for env in (old_env, new_env):
+            env.task_baseline_finish = [value - 1e6 for value in env.task_baseline_finish]
+        assignments = 0
+        with redirect_stdout(io.StringIO()):
+            while not old_env.done_flag:
+                while True:
+                    ha, oka = old_env.get_host_state_for_next_assignment()
+                    hb, okb = new_env.get_host_state_for_next_assignment()
+                    self.assertEqual(oka, okb)
+                    if not oka:
+                        break
+                    self.assertTrue(np.all(hb['mask'] >= ha['mask']))
+                    host = int(np.flatnonzero(ha['mask'])[0])
+                    old_env.host_select(host); new_env.host_select(host)
+                    va, _ = old_env.get_vm_state_for_current_task()
+                    vb, _ = new_env.get_vm_state_for_current_task()
+                    self.assertTrue(np.all(vb['mask'] >= va['mask']))
+                    vm = int(np.flatnonzero(va['mask'])[0])
+                    self.assertEqual(old_env.vm_assign(vm), new_env.vm_assign(vm))
+                    self.assertEqual(old_env.assignment_ledger.segments, new_env.assignment_ledger.segments)
+                    assignments += 1
+                self.assertEqual(old_env.finish_phase_and_advance(), new_env.finish_phase_and_advance())
+                np.testing.assert_array_equal(old_env.get_manager_state(), new_env.get_manager_state())
+                if not old_env.done_flag:
+                    old_env.apply_manager_delta(np.zeros(5)); new_env.apply_manager_delta(np.zeros(5))
+        self.assertGreater(assignments, 20)
+        self.assertEqual(old_env.total_energy, new_env.total_energy)
+        self.assertEqual(old_env._records, new_env._records)
+
     def test_cache_reuse_readonly_preview_and_deadline_invalidation(self):
         env = self.env()
         host, ok = env.get_host_state_for_next_assignment()
@@ -331,7 +459,7 @@ class FastTests(unittest.TestCase):
             old_runtime.save_agents(agents, directory, "best")
             target = replace(scene, mode="eval", train_resource="S", checkpoint_override=directory)
             with patch.object(runtime, "build_agents", side_effect=tiny_agents):
-                with self.assertRaisesRegex(ValueError, 'Missing MAHDRL-AS-Fast v2'):
+                with self.assertRaisesRegex(ValueError, 'Missing MAHDRL-AS-Fast checkpoint'):
                     runtime.load_agents(target)
                 agents = tiny_agents(scene)
                 rows = [validation_row(seed=scene.validation_seeds()[0])]
@@ -362,7 +490,8 @@ class FastTests(unittest.TestCase):
                                 best=best, rows=rows, best_rows=rows)
             path = Path(directory)/'best_host.pth'
             checkpoint = torch.load(path, weights_only=True)
-            for field, value in (('model_version', 'mahdrl_as_fast_v1'),
+            for field, value in (('model_version', 'mahdrl_as_fast_v1'), ('model_version', 'mahdrl_as_fast_v2'),
+                                 ('algorithm_variant', dict(checkpoint['normalization']['algorithm_variant'], host_apf_enabled=True)),
                                  ('checkpoint_selection', {}), ('experiment_protocol', {}),
                                  ('checkpoint_selection', dict(selection.selection_metadata(),
                                      version='select_sr099_minenergy_v1', workflow_success_threshold=.99))):
@@ -370,9 +499,11 @@ class FastTests(unittest.TestCase):
                 changed['normalization'][field] = value
                 tampered = Path(directory)/'tampered.pth'
                 torch.save(changed, tampered)
-                with self.subTest(top_level=field), self.assertRaisesRegex(ValueError, field):
+                with self.subTest(top_level=field), self.assertRaisesRegex(ValueError,
+                        'variant/architecture' if field == 'algorithm_variant' else field):
                     agents['HA'].load(str(tampered))
             for field, value in (('checkpoint_selection', {}), ('model_version', 'mahdrl_as_fast_v1'),
+                                 ('model_version', 'mahdrl_as_fast_v2'),
                                  ('model_seed', 999), ('selected_episode', 1), ('episode', -1),
                                  ('validation_selection', {}), ('validation_seeds', [999]),
                                  ('validation_rows', [validation_row(seed=999)]), ('best_validation_rows', [])):
@@ -413,12 +544,14 @@ class FastTests(unittest.TestCase):
             scales.write_text(json.dumps(config), encoding="utf-8")
             scene = self.scene(output_root=directory, legacy_split=False, experiment_protocol=str(protocol), normalization_config=str(scales))
             original_kwargs = runtime.build_env_kwargs
-            old_dir = Path(str(scene.checkpoint_dir()).replace('mahdrl_as_fast_v2', 'mahdrl_as_fast_v1'))
+            old_dir = Path(str(scene.checkpoint_dir()).replace(MODEL_VERSION, 'mahdrl_as_fast_v2'))
             old_dir.mkdir(parents=True)
-            (old_dir/'historical.txt').write_text('keep v1 outputs', encoding='utf-8')
+            (old_dir/'historical.txt').write_text('keep v2 outputs', encoding='utf-8')
             def small(scene, seed):
                 return dict(original_kwargs(scene, seed), workflows_per_episode=2, max_ready_tasks=100)
-            with patch.object(runtime, "build_agents", side_effect=tiny_agents), patch.object(runtime, "build_env_kwargs", side_effect=small):
+            with patch.object(runtime, "build_agents", side_effect=tiny_agents), patch.object(runtime, "build_env_kwargs", side_effect=small), \
+                 patch('environments.mahdrl_oe_ge_apf_score.apf_candidates', side_effect=AssertionError('APF called')), \
+                 patch('environments.mahdrl_oe_ge_apf_score_fast.apf_candidates', side_effect=AssertionError('APF called')):
                 with redirect_stdout(io.StringIO()):
                     agents = runtime.train(scene)
                     self.assertTrue(all(a._updates > 0 for a in agents.values()))
@@ -436,7 +569,14 @@ class FastTests(unittest.TestCase):
             measurements = json.loads((scene.log_dir()/"training_measurements.jsonl").read_text().splitlines()[0])
             self.assertTrue(all(v > 0 for v in measurements["optimizer_steps"].values()))
             self.assertTrue((target.evaluation_dir()/"measurements/episodes/seed700.json").exists())
-            self.assertEqual((old_dir/'historical.txt').read_text(encoding='utf-8'), 'keep v1 outputs')
+            self.assertEqual((old_dir/'historical.txt').read_text(encoding='utf-8'), 'keep v2 outputs')
+            for report_path in (scene.log_dir()/'candidates_episode0.json', target.evaluation_dir()/'candidates_seed700.json'):
+                report = json.loads(report_path.read_text())
+                self.assertEqual(report['variant']['model_version'], MODEL_VERSION)
+                self.assertFalse(report['variant']['host_apf_enabled'])
+                self.assertFalse(report['variant']['vm_apf_enabled'])
+                self.assertTrue(report['decisions'])
+                self.assertTrue(all(row['r_H'] is None and row['r_V'] is None for row in report['decisions']))
 
     def test_real_training_selects_same_layer_snapshot_and_ignores_measurement_flags(self):
         schedule = [(0, 1.), (1, 30.), (2, 100.), (1, 1.), (2, 80.), (2, 80.)]
@@ -521,7 +661,9 @@ class FastTests(unittest.TestCase):
             row = json.loads(out.getvalue())
             self.assertEqual(row["algorithm"], "mahdrl_oe_ge_apf_score_fast")
             self.assertEqual(row["diagnostics_every"], 200)
-            self.assertEqual(row['model_version'], 'mahdrl_as_fast_v2')
+            self.assertEqual(row['model_version'], MODEL_VERSION)
+            self.assertFalse(row['variant']['host_apf_enabled'])
+            self.assertFalse(row['variant']['vm_apf_enabled'])
             self.assertEqual(row['checkpoint_selection'], selection.selection_metadata())
             self.assertEqual(row['experiment_protocol']['selection'], selection.SELECTION_TAG)
         self.assertEqual(before, MODEL_NAMES)
@@ -532,7 +674,7 @@ class FastTests(unittest.TestCase):
         self.assertEqual(metadata['experiment_protocol']['selection'], selection.SELECTION_TAG)
         self.assertEqual(metadata['reproducibility']['data_split']['selection'], selection.SELECTION_TAG)
         self.assertEqual(scene.protocol().selection, 'minimum_validation_total_energy')
-        self.assertIn('mahdrl_as_fast_v2', str(scene.checkpoint_dir()))
+        self.assertIn(MODEL_VERSION, str(scene.checkpoint_dir()))
         self.assertLessEqual(len(scene.model_name()), 32)
         self.assertEqual(scene.selection_protocol()['selection'], selection.SELECTION_TAG)
         target = replace(scene, mode='eval', task='L', train_resource='S', train_deadline='Tight')

@@ -1,4 +1,4 @@
-"""Reproducible local AS/AS-Fast timings; this does not run a scientific experiment."""
+"""Legacy APF-backbone execution timings; this does not measure NoAPF v3 episodes."""
 import argparse
 from contextlib import redirect_stdout
 import hashlib
@@ -78,6 +78,7 @@ def make_agent(module, role, device):
 
 def benchmark(device, updates=20, pack_repeats=300, episode=False, resource="S"):
     result = dict(python=platform.python_version(), platform=platform.platform(), numpy=np.__version__,
+                  algorithm_scope="legacy_apf_backbone_only_not_noapf_v3",
                   torch=torch.__version__, cuda=torch.version.cuda, device=device,
                   gpu=torch.cuda.get_device_name(device) if device == "cuda" else None,
                   threads=torch.get_num_threads(), batch_size=256,

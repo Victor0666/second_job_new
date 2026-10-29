@@ -18,7 +18,7 @@ from common.f11 import PendingDecision
 from common.precompute_deadlines import main as precompute
 from common.scenarios import Scenario, MODEL_NAMES
 from common.test_f18 import fixture_config
-from common.test_mahdrl_as_fast import tiny_agents as base_tiny_agents, validation_row
+from common.test_mahdrl_as_fast import tiny_agents as base_tiny_agents, validation_row, FastEnv as APFReferenceEnv
 from common.test_mahdrl_as_fast_nta import tiny_agents as nta_tiny_agents
 from common.test_mahdrl_oe_ge_apf_score import parameter_hash, observation
 from algorithms.mahdrl_oe_ge_apf_score_fast import runtime as base_runtime
@@ -78,7 +78,9 @@ class TLTests(unittest.TestCase):
         return env
 
     def test_global_mask_retains_slow_hosts_and_keeps_per_host_VM_APF(self):
-        old, env = self.env(base_runtime), self.env()
+        with patch.object(base_runtime, 'CloudWorkflowEnv_VMAgents', APFReferenceEnv):
+            old = self.env(base_runtime)
+        env = self.env()
         owners = {j: hi for hi, h in enumerate(env.host_ids) for j in env.host_to_vm_indices[h]}
         duration = lambda tid, j: [1., 20., 100.][owners[j]] * (j % 3 + 1)
         for current in (old, env):

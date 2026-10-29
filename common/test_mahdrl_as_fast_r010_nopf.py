@@ -18,7 +18,7 @@ from common.precompute_deadlines import main as precompute
 from common.scenarios import Scenario, MODEL_NAMES
 from common.test_f18 import fixture_config
 from common.test_mahdrl_oe_ge_apf_score import observation, parameter_hash
-from common.test_mahdrl_as_fast import tiny_agents as base_tiny_agents, validation_row
+from common.test_mahdrl_as_fast import tiny_agents as base_tiny_agents, validation_row, FastEnv as APFReferenceEnv
 from common.f11 import PendingDecision
 from algorithms.mahdrl_oe.reward import finish_lower_phase
 from algorithms.mahdrl_oe_ge_apf_score_fast import runtime as base_runtime, agent as base_agent, config as base_config
@@ -85,7 +85,9 @@ class R010Tests(unittest.TestCase):
             CloudWorkflowEnv_VMAgents(**args)
 
     def test_slow_and_late_hosts_and_vms_remain_legal_without_calling_any_apf(self):
-        old, new = self.env(base_runtime), self.env()
+        with patch.object(base_runtime, 'CloudWorkflowEnv_VMAgents', APFReferenceEnv):
+            old = self.env(base_runtime)
+        new = self.env()
         for env in (old, new):
             env.task_baseline_finish = [env.current_time - 1.] * len(env.task_baseline_finish)
         durations = lambda tid, j: 1. if j == 0 else 100. + 10. * j

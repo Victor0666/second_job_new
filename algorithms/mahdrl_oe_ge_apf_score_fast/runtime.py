@@ -13,7 +13,7 @@ from common.f22_cache import check_cache
 from common.f22_instances import write_run_metadata, episode_identity
 from common.experiment_measurements import TrainingRecorder, EvaluationRecorder, episode_metrics, collect_validation
 from algorithms.mahdrl_oe.reward import finish_lower_phase, LowerRewardAudit
-from environments.mahdrl_oe_ge_apf_score_fast import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
+from environments.mahdrl_as_fast_noapf_v3 import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
 from .agent import TAAgent, SetD3QNAgent
 from .config import ALGORITHM, DISPLAY_NAME, MODEL_VERSION, TA_HIDDEN, learning_kwargs, variant_metadata, implementation_metadata
 from .selection import selection_metadata, validation_selection, selection_key, validate_checkpoint_selection
@@ -140,7 +140,7 @@ def run_episode(env, agents, *, training=False, warmup=.03, phase_log=None):
             env.host_select(ah)
             vm, ok = env.get_vm_state_for_current_task()
             if not ok:
-                raise RuntimeError("Selected APF host has no legal VM")
+                raise RuntimeError("Selected host has no physically legal idle VM")
             vm = snapshot_decision(vm)
             if training:
                 traces["VA"].advance(vm["obs"], vm["mask"])
@@ -192,7 +192,7 @@ def apf_report(env):
         else:
             windows[r.server_id][0] = min(windows[r.server_id][0], float(r.start_time))
             windows[r.server_id][1] = max(windows[r.server_id][1], float(r.end_time))
-    return dict(variant=variant_metadata(), decisions=env.apf_decisions,
+    return dict(variant=env.variant_metadata(), decisions=env.apf_decisions,
                 host_windows={str(h): dict(start=w[0], end=w[1], duration=w[1]-w[0]) for h,w in windows.items()})
 
 
@@ -255,14 +255,14 @@ def train(scene):
                 instance_seed=scene.training_seed(episode), validation_rows=rows,
                 validation_selection=candidate, best_validation_selection=best,
                 selected_as_best=selected, selected_episode=best['episode']))
-            write_json(scene.log_dir()/f"apf_episode{episode}.json", apf_report(env))
+            write_json(scene.log_dir()/f"candidates_episode{episode}.json", apf_report(env))
             print(f"[{DISPLAY_NAME}] episode={episode+1}/{scene.episodes} energy={result['total_energy']:.6f} "
                   f"validation_energy={energy:.6f} SR={candidate['workflow_success_rate']:.4f} "
                   f"feasible={candidate['feasible']} selected={selected} best_episode={best['episode']}", flush=True)
         save_agents(agents, scene.checkpoint_dir(), "final", episode=episode,
                     candidate=candidate, best=best, rows=rows, best_rows=best_rows)
         write_json(scene.log_dir()/"training_summary.json", dict(algorithm=ALGORITHM,
-            model_version=MODEL_VERSION, episodes=scene.episodes, checkpoint_selection=selection_metadata(),
+            model_version=MODEL_VERSION, variant=variant_metadata(), episodes=scene.episodes, checkpoint_selection=selection_metadata(),
             protocol=scene.selection_protocol(), selected_episode=best['episode'],
             best_validation_selection=best, final_validation_selection=candidate,
             feasible_model_found=best['feasible'], resume_supported=False,
@@ -301,9 +301,10 @@ def evaluate(scene):
         finally:
             recorder.finish()
         append_json(directory/"stage_timings.jsonl", dict(seed=seed, scope="evaluation", environment=env.profiler.report()))
-        write_json(directory/f"apf_seed{seed}.json", apf_report(env))
+        write_json(directory/f"candidates_seed{seed}.json", apf_report(env))
         append_json(directory/"evaluation.jsonl", dict(seed=seed, **result))
-        row = dict(seed=seed, model_seed=scene.model_seed, **episode_metrics(env))
+        row = dict(seed=seed, model_seed=scene.model_seed, model_version=MODEL_VERSION,
+            host_apf_enabled=False, vm_apf_enabled=False, **episode_metrics(env))
         with csv_path.open("a", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(row))
             if f.tell() == 0:
@@ -313,7 +314,7 @@ def evaluate(scene):
     summary = {key: dict(mean=float(np.mean([v[key] for v in values])),
                         std=float(np.std([v[key] for v in values], ddof=1)) if len(values)>1 else 0.)
                for key in ("total_energy", "wf_success_rate", "wf_avg_tardiness", "makespan", "wf_avg_response_time")}
-    write_json(directory/"summary.json", dict(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+    write_json(directory/"summary.json", dict(algorithm=ALGORITHM, model_version=MODEL_VERSION, variant=variant_metadata(),
         checkpoint_selection=selection_metadata(), selected_episode=agents['TA'].loaded_selection['selected_episode'],
         best_validation_selection=agents['TA'].loaded_selection['best_validation_selection'],
         seeds=list(scene.seeds), metrics=summary))

@@ -1,0 +1,117 @@
+{
+  "algorithm": "drl_gnn_fast_idle",
+  "model_version": "drl_gnn_fast_idle_v6",
+  "scheduling_protocol": "arrived_parent_finished_idle_vm_v1",
+  "selection_threshold": 0.92,
+  "scope": "Fixed legal policy physical smoke, not a trained-policy performance benchmark",
+  "results": [
+    {
+      "scene": "SS_T",
+      "vms": 25,
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "queued_assignments": 0,
+      "energy_reintegration_error": 0.0,
+      "seconds": 6.32748099998571,
+      "instance": {
+        "version": "f22_instance_v1",
+        "task": "S",
+        "resource": "S",
+        "deadline": "Tight",
+        "instance_seed": 0,
+        "content_hash": "0a62c664901804a82b46d02b94c9aaf5048a44c719f51f530e2d13506c3d02ae",
+        "instance_hash": "971a8409b881141709527b3a19d06afb781ee6012d0136e1537a112da01e7d74"
+      },
+      "metrics": {
+        "total_energy": 318476.6902680407,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 2287.484430385718,
+        "makespan": 2264.8200335867546,
+        "task_count": 1371,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 50,
+        "wf_completed_count": 50,
+        "wf_success_count": 50,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 371.55033742447887
+      }
+    },
+    {
+      "scene": "SM_T",
+      "vms": 50,
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "queued_assignments": 0,
+      "energy_reintegration_error": 0.0,
+      "seconds": 7.7204783000051975,
+      "instance": {
+        "version": "f22_instance_v1",
+        "task": "S",
+        "resource": "M",
+        "deadline": "Tight",
+        "instance_seed": 0,
+        "content_hash": "f9be74ce044e4dcea40c6440f74fcbdc20bdb6c894197faae04c82471d112f3e",
+        "instance_hash": "f02af3fc0abdc6d3b3f66f50c652c47fcdc09bbc96c4f0464b2f9817798a72b1"
+      },
+      "metrics": {
+        "total_energy": 377623.97578523925,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 2331.1285813773534,
+        "makespan": 2308.46418457839,
+        "task_count": 1371,
+        "task_tardy_count": 14,
+        "task_avg_tardiness": 0.5670631256988085,
+        "task_success_rate": 0.9897884755652808,
+        "wf_count": 50,
+        "wf_completed_count": 50,
+        "wf_success_count": 48,
+        "wf_tardy_count": 2,
+        "wf_success_rate": 0.96,
+        "wf_avg_tardiness": 6.611226856708745,
+        "wf_avg_response_time": 370.5956195791457
+      }
+    },
+    {
+      "scene": "SL_T",
+      "vms": 75,
+      "seed": 0,
+      "workflows": 50,
+      "assignments": 1371,
+      "queued_assignments": 0,
+      "energy_reintegration_error": 0.0,
+      "seconds": 9.808315000031143,
+      "instance": {
+        "version": "f22_instance_v1",
+        "task": "S",
+        "resource": "L",
+        "deadline": "Tight",
+        "instance_seed": 0,
+        "content_hash": "db98ccb064b6e18975d82484778de069447a563bbb1d66c3090b623658d501ce",
+        "instance_hash": "6b6d72d14ca1dfc3fd0e6f827aab3b68ae993ad590ca95f64fb4f47c2b59659d"
+      },
+      "metrics": {
+        "total_energy": 453874.43534974847,
+        "first_arrival_time": 22.664396798963654,
+        "final_completion_time": 2320.588018353872,
+        "makespan": 2297.9236215549086,
+        "task_count": 1371,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 50,
+        "wf_completed_count": 50,
+        "wf_success_count": 50,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 394.58646455729934
+      }
+    }
+  ]
+}

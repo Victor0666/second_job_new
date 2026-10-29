@@ -1,0 +1,9 @@
+"""Evaluate the independent DRL-GNN-Fast-Idle variant."""
+from pathlib import Path
+import sys
+root = str(Path(__file__).resolve().parents[2])
+if root not in sys.path:
+    sys.path.insert(0, root)
+from algorithms.drl_gnn_fast_idle.runner import evaluate_main
+if __name__ == '__main__':
+    evaluate_main()

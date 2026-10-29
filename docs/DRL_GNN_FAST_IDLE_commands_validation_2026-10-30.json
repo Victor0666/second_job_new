@@ -1,0 +1,49 @@
+{
+  "scope": "Bash dispatch uses a stub python; every captured command is validated using the actual CLI dry-run, no 600-episode jobs launched",
+  "command_counts": {
+    "train": 9,
+    "eval": 27
+  },
+  "background_jobs": 18,
+  "unique_training_names": [
+    "SL_L_v6_sr092_m1_cf73bbb9c",
+    "SL_M_v6_sr092_m1_cf73bbb9c",
+    "SL_T_v6_sr092_m1_cf73bbb9c",
+    "SM_L_v6_sr092_m1_cf73bbb9c",
+    "SM_M_v6_sr092_m1_cf73bbb9c",
+    "SM_T_v6_sr092_m1_cf73bbb9c",
+    "SS_L_v6_sr092_m1_cf73bbb9c",
+    "SS_M_v6_sr092_m1_cf73bbb9c",
+    "SS_T_v6_sr092_m1_cf73bbb9c"
+  ],
+  "max_training_directory_name_length": 26,
+  "unique_evaluation_csv_names": [
+    "eval_drl_idle_v6_sr092_LL_L_from_SL_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_LL_M_from_SL_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_LL_T_from_SL_T_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_LM_L_from_SM_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_LM_M_from_SM_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_LM_T_from_SM_T_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_LS_L_from_SS_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_LS_M_from_SS_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_LS_T_from_SS_T_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_ML_L_from_SL_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_ML_M_from_SL_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_ML_T_from_SL_T_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_MM_L_from_SM_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_MM_M_from_SM_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_MM_T_from_SM_T_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_MS_L_from_SS_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_MS_M_from_SS_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_MS_T_from_SS_T_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SL_L_from_SL_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SL_M_from_SL_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SL_T_from_SL_T_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SM_L_from_SM_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SM_M_from_SM_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SM_T_from_SM_T_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SS_L_from_SS_L_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SS_M_from_SS_M_m1_s700-729_cf73bbb9c.csv",
+    "eval_drl_idle_v6_sr092_SS_T_from_SS_T_m1_s700-729_cf73bbb9c.csv"
+  ]
+}

@@ -62,7 +62,7 @@ class ScoreScenario(Scenario):
         deadline = self.deadline if self.mode == "train" else self.train_deadline or self.deadline
         protocol = "protocol_"+protocol_hash(self.experiment_protocol)[:12] if self.protocol() else "legacy"
         return (f"{MODEL_VERSION}_task{task}_res{resource}_{deadline}_model{self.model_seed}_"
-                f"{LEARNING_MODEL}_{TA_WEIGHT_MODEL}_{self.normalization_mode}_{protocol}_{ENERGY_ACCOUNTING}")
+                f"{LEARNING_MODEL}_{TA_WEIGHT_MODEL}_{self.normalization_mode}_{protocol}_{ENERGY_ACCOUNTING}_{SELECTION_TAG}")
 
     def checkpoint_dir(self, algorithm=ALGORITHM):
         if self.mode == "eval" and self.checkpoint_override:

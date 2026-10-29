@@ -40,26 +40,26 @@ def validation_row(success=50, energy=100., count=50, seed=600):
 
 
 class SelectionTests(unittest.TestCase):
-    def test_matches_pd3qn_dag_fe_boundary_and_aggregate_definition(self):
-        from algorithms.pd3qn_dag_fe import selection as reference
+    def test_matches_marl_boundary_and_aggregate_definition(self):
+        from algorithms.marl import selection as reference
         self.assertEqual(selection.selection_metadata(), reference.selection_metadata())
         self.assertIsNot(selection.validation_selection, reference.validation_selection)
-        for rows in ([validation_row(49)], [validation_row(50)],
-                     [validation_row(100, count=100), validation_row(98, count=100)],
-                     [validation_row(1, 10, 1), validation_row(98, 30, 100)]):
+        for rows in ([validation_row(45)], [validation_row(46)], [validation_row(50)],
+                     [validation_row(100, count=100), validation_row(84, count=100)],
+                     [validation_row(2, 10, 2), validation_row(90, 30, 98)]):
             self.assertEqual(selection.validation_selection(rows), reference.validation_selection(rows))
-        self.assertFalse(selection.validation_selection([validation_row(49)])['feasible'])
-        self.assertTrue(selection.validation_selection([validation_row(50)])['feasible'])
-        self.assertTrue(selection.validation_selection([validation_row(99, count=100)])['feasible'])
+        self.assertFalse(selection.validation_selection([validation_row(45)])['feasible'])
+        self.assertTrue(selection.validation_selection([validation_row(46)])['feasible'])
+        self.assertTrue(selection.validation_selection([validation_row(92, count=100)])['feasible'])
 
     def test_order_feasible_fallback_energy_success_and_earlier_ties(self):
         def candidate(success, energy):
             return selection.validation_selection([validation_row(success, energy, 100)])
         key = selection.selection_key
-        for better, worse in (((99, 1000), (98, 1)), ((99, 10), (100, 11)),
-                              ((100, 10), (99, 10)), ((98, 100), (97, 1)), ((98, 1), (98, 2))):
+        for better, worse in (((92, 1000), (91, 1)), ((92, 10), (100, 11)),
+                              ((100, 10), (92, 10)), ((91, 100), (90, 1)), ((91, 1), (91, 2))):
             self.assertLess(key(candidate(*better)), key(candidate(*worse)))
-        candidates = [candidate(98, 1), candidate(99, 10), candidate(99, 10)]
+        candidates = [candidate(91, 1), candidate(92, 10), candidate(92, 10)]
         self.assertEqual(min(range(3), key=lambda i: key(candidates[i])), 1)
 
     def test_reject_invalid_validation_metrics(self):
@@ -363,7 +363,9 @@ class FastTests(unittest.TestCase):
             path = Path(directory)/'best_host.pth'
             checkpoint = torch.load(path, weights_only=True)
             for field, value in (('model_version', 'mahdrl_as_fast_v1'),
-                                 ('checkpoint_selection', {}), ('experiment_protocol', {})):
+                                 ('checkpoint_selection', {}), ('experiment_protocol', {}),
+                                 ('checkpoint_selection', dict(selection.selection_metadata(),
+                                     version='select_sr099_minenergy_v1', workflow_success_threshold=.99))):
                 changed = deepcopy(checkpoint)
                 changed['normalization'][field] = value
                 tampered = Path(directory)/'tampered.pth'
@@ -531,6 +533,9 @@ class FastTests(unittest.TestCase):
         self.assertEqual(metadata['reproducibility']['data_split']['selection'], selection.SELECTION_TAG)
         self.assertEqual(scene.protocol().selection, 'minimum_validation_total_energy')
         self.assertIn('mahdrl_as_fast_v2', str(scene.checkpoint_dir()))
+        self.assertIn(selection.SELECTION_TAG, scene.model_name())
+        target = replace(scene, mode='eval', task='L', train_resource='S', train_deadline='Tight')
+        self.assertEqual(scene.checkpoint_dir(), target.checkpoint_dir())
 
 
 if __name__ == "__main__":

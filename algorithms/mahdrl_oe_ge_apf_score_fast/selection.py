@@ -1,8 +1,8 @@
-"""AS-Fast local selector: aggregate workflow SR >= .99, then minimum energy."""
+"""AS-Fast local selector: aggregate workflow SR >= .92, then minimum energy."""
 import math
 
-SELECTION_TAG = 'select_sr099_minenergy_v1'
-WORKFLOW_SUCCESS_THRESHOLD = .99
+SELECTION_TAG = 'select_sr092_minenergy_v1'
+WORKFLOW_SUCCESS_THRESHOLD = .92
 
 
 def selection_metadata():
@@ -44,7 +44,7 @@ def selection_key(candidate):
     return (1, -candidate['workflow_success_rate'], candidate['mean_total_energy'])
 
 
-def validate_checkpoint_selection(record, expected):
+def validate_checkpoint_selection(record, expected, row_selector=validation_selection):
     """Recompute saved evidence before accepting any new-rule checkpoint."""
     if not isinstance(record, dict):
         raise ValueError('Missing MAHDRL-AS-Fast v2 checkpoint selection metadata; use v1 for legacy weights')
@@ -66,7 +66,7 @@ def validate_checkpoint_selection(record, expected):
                 or [row.get('seed') for row in rows] != expected['validation_seeds']):
             raise ValueError('Checkpoint validation seeds mismatch: ' + name)
         try:
-            summaries.append(validation_selection(rows))
+            summaries.append(row_selector(rows))
         except (KeyError, TypeError, OverflowError) as error:
             raise ValueError('Invalid checkpoint validation evidence: ' + name) from error
     candidate, best_metrics = summaries

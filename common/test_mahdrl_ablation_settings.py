@@ -77,8 +77,9 @@ class AblationSettingsTests(unittest.TestCase):
         self.assertFalse(selection.validation_selection([row(50), row(42)])["feasible"])
         self.assertTrue(selection.validation_selection([row(50), row(43)])["feasible"])
         self.assertEqual(selection.selection_metadata()["workflow_success_comparison"], "strictly_greater")
-        self.assertEqual(full_selection.WORKFLOW_SUCCESS_THRESHOLD, .99)
-        self.assertFalse(full_selection.validation_selection([row(47)])["feasible"])
+        self.assertEqual(full_selection.WORKFLOW_SUCCESS_THRESHOLD, .92)
+        self.assertFalse(full_selection.validation_selection([row(45)])["feasible"])
+        self.assertTrue(full_selection.validation_selection([row(46)])["feasible"])
         with self.assertRaises(ValueError):
             selection.validation_selection([dict(row(47), wf_success_rate=.92)])
 

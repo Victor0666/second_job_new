@@ -37,7 +37,7 @@ def train(scenario):
     metric_fields = ['task_avg_lateness', 'task_avg_tardiness', 'pct_tardy', 'wf_avg_lateness',
         'wf_avg_tardiness', 'wf_lateness_sum', 'wf_tardiness_sum', 'makespan']
     fields = ['step', 'episode', 'type', 'eps', 'ep_length', 'episode_energy', *metric_fields,
-        'eval_energy', 'eval_workflow_success_rate', 'eval_ESP', 'eval_feasible',
+        'eval_energy', 'eval_workflow_success_rate', 'eval_feasible',
         'selected_as_best', 'best_episode']
     logger = CSVLogger(str(logs / 'train_metrics_pd3qn_fe_cost.csv'), fields)
     best = None
@@ -82,7 +82,7 @@ def train(scenario):
                 **{key: float(metrics[key]) for key in metric_fields},
                 eval_energy=candidate['mean_total_energy'],
                 eval_workflow_success_rate=candidate['workflow_success_rate'],
-                eval_ESP=candidate['validation_ESP'], eval_feasible=candidate['feasible'],
+                eval_feasible=candidate['feasible'],
                 selected_as_best=selected, best_episode=best['episode'])
             record = dict(algorithm=ALGORITHM, episode=episode,
                 instance_seed=scenario.training_seed(episode), validation=rows,
@@ -91,7 +91,7 @@ def train(scenario):
                 stream.write(json.dumps(record, allow_nan=False) + '\n')
             print(f'[{DISPLAY_NAME} {episode + 1}/{scenario.episodes}] '
                 f'validation_energy={candidate["mean_total_energy"]:.6f} '
-                f'SR={candidate["workflow_success_rate"]:.4f} ESP={candidate["validation_ESP"]:.4f} '
+                f'SR={candidate["workflow_success_rate"]:.4f} '
                 f'feasible={candidate["feasible"]} selected={selected}', flush=True)
             if episode + 1 < scenario.episodes:
                 env.random_seed = scenario.training_seed(episode + 1)

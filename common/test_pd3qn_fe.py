@@ -1,6 +1,7 @@
 """PD3QN-FE selection boundaries, isolation and real train/save/load/test smoke."""
 from contextlib import redirect_stdout
 from dataclasses import replace
+import csv
 import io
 import json
 from pathlib import Path
@@ -30,42 +31,44 @@ def row(success=50, energy=100., count=50, seed=600):
 
 
 class SelectionTests(unittest.TestCase):
-    def test_both_99_percent_boundaries_and_50_workflow_discreteness(self):
-        self.assertFalse(validation_selection([row(49)])['feasible'])
-        self.assertTrue(validation_selection([row(50)])['feasible'])
-        self.assertTrue(validation_selection([row(99, count=100)])['feasible'])
-        self.assertFalse(validation_selection([row(98, count=100)])['feasible'])
-        rows = [row(99, count=100)] * 99 + [row(98, count=100)]
-        self.assertEqual(validation_selection(rows)['validation_ESP'], .99)
-        self.assertTrue(validation_selection(rows)['feasible'])
-        self.assertFalse(validation_selection(rows[1:] + [row(98, count=100)])['feasible'])
+    def test_inclusive_92_percent_boundary_and_50_workflow_discreteness(self):
+        self.assertFalse(validation_selection([row(45)])['feasible'])
+        self.assertTrue(validation_selection([row(46)])['feasible'])
+        self.assertTrue(validation_selection([row(92, count=100)])['feasible'])
+        self.assertFalse(validation_selection([row(91, count=100)])['feasible'])
+        self.assertEqual(SELECTION_TAG, 'select_sr092_minenergy_v1')
+        self.assertNotIn('satisfaction_probability_target', selection_metadata())
+        self.assertNotIn('validation_ESP', validation_selection([row(46)]))
 
     def test_feasible_always_wins_then_energy_then_success(self):
         def candidate(success, energy):
             return validation_selection([row(success, energy, count=100)])
-        self.assertLess(selection_key(candidate(99, 1000)), selection_key(candidate(98, 1)))
-        self.assertLess(selection_key(candidate(99, 10)), selection_key(candidate(100, 11)))
-        self.assertLess(selection_key(candidate(100, 10)), selection_key(candidate(99, 10)))
+        self.assertLess(selection_key(candidate(92, 1000)), selection_key(candidate(91, 1)))
+        self.assertLess(selection_key(candidate(92, 10)), selection_key(candidate(100, 11)))
+        self.assertLess(selection_key(candidate(100, 10)), selection_key(candidate(92, 10)))
 
-    def test_fallback_esp_then_success_then_energy(self):
-        high_esp = validation_selection([row(50, 1000), row(0, 1000)])
-        high_success = validation_selection([row(49, 1), row(49, 1)])
-        self.assertLess(selection_key(high_esp), selection_key(high_success))
-        self.assertLess(selection_key(high_success), selection_key(validation_selection([row(48, 0)])))
-        self.assertLess(selection_key(validation_selection([row(49, 1)])),
-                        selection_key(validation_selection([row(49, 2)])))
+    def test_fallback_success_then_energy_without_instance_pass_rate(self):
+        one_perfect_instance = validation_selection([row(50, 1000), row(0, 1000)])
+        high_success = validation_selection([row(45, 1), row(45, 1)])
+        self.assertFalse(high_success['feasible'])
+        self.assertLess(selection_key(high_success), selection_key(one_perfect_instance))
+        self.assertLess(selection_key(high_success), selection_key(validation_selection([row(44, 0)])))
+        self.assertLess(selection_key(validation_selection([row(45, 1)])),
+                        selection_key(validation_selection([row(45, 2)])))
 
     def test_weighted_workflow_success_and_instance_mean_energy(self):
         result = validation_selection([row(1, 10, 1), row(98, 30, 100)])
         self.assertEqual(result['workflow_success_rate'], 99 / 101)
         self.assertEqual(result['mean_total_energy'], 20.)
-        self.assertEqual(result['validation_ESP'], .5)
+        self.assertTrue(result['feasible'])
+        self.assertNotIn('validation_ESP', result)
+        self.assertTrue(validation_selection([row(2, count=2), row(90, count=98)])['feasible'])
 
     def test_strict_comparison_keeps_earlier_checkpoint(self):
-        candidates = [validation_selection([row(49, 1)]),
-                      validation_selection([row(50, 100)]),
-                      validation_selection([row(50, 100)]),
-                      validation_selection([row(49, 0)])]
+        candidates = [validation_selection([row(45, 1)]),
+                      validation_selection([row(46, 100)]),
+                      validation_selection([row(46, 100)]),
+                      validation_selection([row(45, 0)])]
         best, episode = None, None
         for index, candidate in enumerate(candidates):
             if best is None or selection_key(candidate) < selection_key(best):
@@ -234,6 +237,9 @@ class SmokeTests(unittest.TestCase):
         self.assertEqual(best['normalization']['pd3qn_fe']['episode'], expected['episode'])
         self.assertEqual(self.summary['best_validation_selection']['episode'], expected['episode'])
         self.assertEqual(best['normalization']['pd3qn_fe']['validation_selection'], expected['validation_selection'])
+        self.assertNotIn('validation_ESP', expected['validation_selection'])
+        with (self.scene.log_dir() / 'train_metrics_pd3qn_fe_cost.csv').open(newline='') as stream:
+            self.assertNotIn('eval_ESP', csv.DictReader(stream).fieldnames)
         self.assertEqual(final['pd3qn_implementation'], 'legacy')
         self.assertGreater(final['updates'], 0)
         self.assertEqual(final['normalization']['normalization_version'], 'f19_shared_v1')
@@ -262,7 +268,10 @@ class SmokeTests(unittest.TestCase):
         source = torch.load(self.scene.checkpoint_dir() / 'best_pd3qn_fe.pth', weights_only=True)
         weights = {key: value.clone() for key, value in self.agent.online.state_dict().items()}
         for field, value in (('algorithm', 'pd3qn'), ('role', 'final'),
-                             ('checkpoint_selection', {}), ('model_seed', 99)):
+                             ('checkpoint_selection', {}), ('model_seed', 99),
+                             ('checkpoint_selection', dict(selection_metadata(),
+                                 version='select_sr099_esp099_v1', workflow_success_threshold=.99,
+                                 satisfaction_probability_target=.99))):
             obj = dict(source)
             obj['normalization'] = dict(source['normalization'])
             obj['normalization']['pd3qn_fe'] = dict(source['normalization']['pd3qn_fe'], **{field: value})

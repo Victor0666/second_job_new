@@ -43,7 +43,7 @@ class ConfigurationTests(unittest.TestCase):
         self.assertIs(runtime.isolated_evaluation, original_runtime.isolated_evaluation)
         self.assertIs(runtime.set_seed, original_runtime.set_seed)
 
-    def test_single_aggregate_sr_reuses_pure_selector_without_changing_original_fe(self):
+    def test_single_aggregate_sr_keeps_099_independent_of_fe_092(self):
         rows = [dict(seed=600, wf_count=100, wf_success_count=success,
                      wf_success_rate=success / 100, total_energy=energy)
                 for success, energy in ((100, 100.), (98, 200.))]
@@ -54,8 +54,8 @@ class ConfigurationTests(unittest.TestCase):
         self.assertEqual(result['workflow_success_rate'], .99)
         self.assertEqual(result['mean_total_energy'], 150.)
         self.assertNotIn('validation_ESP', result)
-        self.assertFalse(original_selection.validation_selection(rows)['feasible'])
-        self.assertEqual(original_selection.SATISFACTION_PROBABILITY_TARGET, .99)
+        self.assertTrue(original_selection.validation_selection(rows)['feasible'])
+        self.assertEqual(original_selection.WORKFLOW_SUCCESS_THRESHOLD, .92)
 
     def test_nine_source_and_27_target_paths_include_reward_identity(self):
         names = dict(MODEL_NAMES)

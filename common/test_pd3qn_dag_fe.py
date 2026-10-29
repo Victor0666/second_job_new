@@ -33,13 +33,13 @@ def row(success=50, energy=100., count=50):
 
 
 class SelectionTests(unittest.TestCase):
-    def test_aggregate_99_boundary_replaces_instance_esp(self):
+    def test_aggregate_99_boundary_is_independent_of_fe_092(self):
         rows = [row(100, count=100), row(98, count=100)]
         current = selection.validation_selection(rows)
         self.assertTrue(current['feasible'])
         self.assertEqual(current['workflow_success_rate'], .99)
         self.assertNotIn('validation_ESP', current)
-        self.assertFalse(legacy_selection.validation_selection(rows)['feasible'])
+        self.assertTrue(legacy_selection.validation_selection(rows)['feasible'])
         self.assertFalse(selection.validation_selection([row(49)])['feasible'])
         self.assertTrue(selection.validation_selection([row(50)])['feasible'])
         self.assertFalse(selection.validation_selection([row(98, count=100)])['feasible'])
@@ -111,7 +111,7 @@ class IsolationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'fixed, disjoint'):
             DAGFEScenario(legacy_split=True)
 
-    def test_selector_is_local_and_old_fe_keeps_dual_99(self):
+    def test_selector_is_local_and_fe_uses_single_092_gate(self):
         self.assertIsNot(selection.validation_selection, legacy_selection.validation_selection)
         self.assertNotEqual(selection.SELECTION_TAG, legacy_selection.SELECTION_TAG)
         self.assertIs(runtime.isolated_evaluation, legacy_runtime.isolated_evaluation)
@@ -123,7 +123,8 @@ class IsolationTests(unittest.TestCase):
         self.assertLess(selection.selection_key(feasible), selection.selection_key(fallback))
         self.assertEqual(selection.selection_metadata()['workflow_success_threshold'], .99)
         self.assertNotIn('satisfaction_probability_target', selection.selection_metadata())
-        self.assertEqual(legacy_selection.selection_metadata()['satisfaction_probability_target'], .99)
+        self.assertEqual(legacy_selection.selection_metadata()['workflow_success_threshold'], .92)
+        self.assertNotIn('satisfaction_probability_target', legacy_selection.selection_metadata())
 
     def test_paths_and_original_algorithms_remain_isolated(self):
         table = dict(MODEL_NAMES)

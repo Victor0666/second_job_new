@@ -16,7 +16,7 @@ from algorithms.marl import train, evaluate
 from algorithms.marl.q_agents import MODEL_VERSION, QAgent, QConfig, QDecisionTrace
 from algorithms.marl.identity import evaluation_directory, evaluation_csv, SCHEDULING_POLICY
 from common.precompute_deadlines import main as precompute
-from common.scenarios import Scenario
+from common.scenarios import Scenario, WORKLOAD_PROFILES
 from algorithms.marl.scenario import MARLScenario
 from common.test_f18 import fixture_config
 
@@ -136,12 +136,15 @@ def run_smoke(hidden_dims=(16,8), workload_profile='standard'):
                     str(scene.checkpoint_dir('marl')/'best_local_actor_critics.pth'))
                 if scene.is_stress_workload:
                     from algorithms.marl.runtime import validate_pair
-                    try:
-                        validate_pair(g, locals, replace(eval_scene, workload_profile='standard'))
-                    except ValueError:
-                        pass
-                    else:
-                        raise AssertionError('Stress checkpoint accepted by standard profile')
+                    for profile in WORKLOAD_PROFILES:
+                        if profile == scene.workload_profile:
+                            continue
+                        try:
+                            validate_pair(g, locals, replace(eval_scene, workload_profile=profile))
+                        except ValueError:
+                            pass
+                        else:
+                            raise AssertionError('Stress checkpoint accepted by another profile')
                 before = [{name:{k:v.clone() for k,v in getattr(a,name).state_dict().items()}
                            for name in ('actor','critic')} for a in (g,*locals.agents)]
                 result = evaluate.evaluate_one_seed(kwargs,g,locals,700,0)

@@ -1,5 +1,7 @@
 # 四算法新增压力场景：alpha=1，lambda=0.06，参考负载=0.03
 
+另有 alpha=1.5 变式，参数为 `--workload-profile stress_a15_l006_ref003`，使用说明与新后台函数见 [Stress_a15_l006_ref003.md](Stress_a15_l006_ref003.md)。本文的 alpha=1 参数与原后台函数行为不变。
+
 新增参数：`--workload-profile stress_a1_l006_ref003`。省略参数或使用 `--workload-profile standard` 时，继续运行原场景的混合 alpha 和训练/评测逻辑。
 
 适用入口：MARL-Q4.2、PD3QN-FE、IRWS-R-FE-IDLE、MAHDRL-AS-Fast-V2。其他算法未接入此参数。

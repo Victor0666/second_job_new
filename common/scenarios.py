@@ -18,12 +18,13 @@ from algorithms.pd3qn_dag.identity import RUN_NAME as PD3QN_DAG, MODEL_VERSION a
 ROOT = Path(__file__).resolve().parents[1]
 VM_COUNTS = {"S": (9, 8, 8), "M": (9, 9, 8, 8, 8, 8), "L": (9, 9, 9, 8, 8, 8, 8, 8, 8)}
 SMALL_PROBABILITY = {"Tight": 0.8, "Medium": 0.5, "Loose": 0.2}
-WORKLOAD_PROFILES = ("standard", "stress_a1_l006_ref003")
+STRESS_DEADLINE_ALPHAS = {"stress_a1_l006_ref003": 1., "stress_a15_l006_ref003": 1.5}
+WORKLOAD_PROFILES = ("standard", *STRESS_DEADLINE_ALPHAS)
 
 
 def add_workload_argument(parser):
     parser.add_argument('--workload-profile', choices=WORKLOAD_PROFILES, default='standard',
-                        help='Stress: alpha=1, arrivals=0.06, FCFS reference cache=0.03')
+                        help='Stress: alpha=1 or 1.5, arrivals=0.06, FCFS reference cache=0.03')
 
 
 DAX_GROUPS = (
@@ -119,7 +120,7 @@ class Scenario:
 
     @property
     def is_stress_workload(self):
-        return self.workload_profile == 'stress_a1_l006_ref003'
+        return self.workload_profile in STRESS_DEADLINE_ALPHAS
 
     @property
     def arrival_lambda(self):
@@ -127,17 +128,21 @@ class Scenario:
 
     @property
     def deadline_choices(self):
-        return (1., 1.) if self.is_stress_workload else (2., 3.)
+        if self.is_stress_workload:
+            alpha = STRESS_DEADLINE_ALPHAS[self.workload_profile]
+            return (alpha, alpha)
+        return (2., 3.)
 
     @property
     def workload_suffix(self):
-        return '_a1l006r003' if self.is_stress_workload else ''
+        return {'standard': '', 'stress_a1_l006_ref003': '_a1l006r003',
+                'stress_a15_l006_ref003': '_a15l006r003'}[self.workload_profile]
 
     def with_workload_metadata(self, metadata):
         if self.is_stress_workload:
             metadata = dict(metadata, workload=dict(profile=self.workload_profile,
                 arrival_lambda=self.arrival_lambda, reference_arrival_lambda=.03,
-                deadline_alpha=1., arrival_source='poisson', workflows_per_episode=50,
+                deadline_alpha=self.deadline_choices[0], arrival_source='poisson', workflows_per_episode=50,
                 reference_policy='FCFS_task + VM_first_idle'))
         return metadata
 
@@ -344,13 +349,13 @@ class Scenario:
             result["model_training_task"] = self.task if self.mode == "train" else self.train_task
         if algorithm == 'two_stage_gat':
             from algorithms.two_stage_gat.config import MODEL_VERSION, INPUT_ENCODING
-            from algorithms.two_stage_gat.paths import evaluation_csv, evaluation_directory
+            from algorithms.two_stage_gat.paths import evaluation_csv as gat_csv, evaluation_directory as gat_directory
             from algorithms.two_stage_gat.selection import selection_metadata, selection_protocol
             result.update(model_version=MODEL_VERSION, policy_input=INPUT_ENCODING,
                 training_log_dir=str(self.log_dir(algorithm)))
             if self.mode == 'eval':
-                result.update(evaluation_csv=str(evaluation_csv(self)),
-                    evaluation_directory=str(evaluation_directory(self)))
+                result.update(evaluation_csv=str(gat_csv(self)),
+                    evaluation_directory=str(gat_directory(self)))
             result['checkpoint_selection'] = selection_metadata()
             if self.protocol():
                 result['experiment_protocol'] = selection_protocol(self)

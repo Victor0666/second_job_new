@@ -7,14 +7,15 @@ from unittest.mock import patch
 
 from algorithms.pd3qn_fe.scenario import FEScenario as PDScene
 from algorithms.mahdrl_oe_ge_apf_score_fast.scenario import ScoreScenario
-from common.test_stress_workload import SCENES, PROFILE, checkpoint, csv_path
+from common.test_stress_workload import SCENES, PROFILE, PROFILE_A15, checkpoint, csv_path
 
 
 class PrimaryOutputPathTests(unittest.TestCase):
     def test_all_four_flat_unique_csvs_and_compact_training_names(self):
         for cls in SCENES:
             files = []
-            for profile, deadlines in [('standard', ('Tight', 'Medium', 'Loose')), (PROFILE, ('Tight',))]:
+            for profile, deadlines in [('standard', ('Tight', 'Medium', 'Loose')),
+                                      (PROFILE, ('Tight',)), (PROFILE_A15, ('Tight',))]:
                 for resource in 'SML':
                     for deadline in deadlines:
                         source = cls(mode='train', resource=resource, deadline=deadline, workload_profile=profile)
@@ -27,9 +28,10 @@ class PrimaryOutputPathTests(unittest.TestCase):
                             self.assertIn(f'_{task}{resource}_{deadline}_fromS{resource}_{deadline}_', path.name)
                             self.assertIn('_m1_s700-729_c', path.name)
                             self.assertEqual('_a1l006r003' in path.name, profile == PROFILE)
+                            self.assertEqual('_a15l006r003' in path.name, profile == PROFILE_A15)
                             files.append(path)
             self.assertEqual(len({p.parent for p in files}), 1)
-            self.assertEqual(len({p.name for p in files}), 36)
+            self.assertEqual(len({p.name for p in files}), 45)
 
     def test_downloaded_names_distinguish_source_seeds_and_settings(self):
         for cls in SCENES:
@@ -37,7 +39,7 @@ class PrimaryOutputPathTests(unittest.TestCase):
             variants = [target, replace(target, train_task='M'), replace(target, model_seed=2),
                         replace(target, seed_spec='701-729'), replace(target, seed_spec='700,702,704'),
                         replace(target, normalization_mode='f18_shared_v1'),
-                        replace(target, workload_profile=PROFILE)]
+                        replace(target, workload_profile=PROFILE), replace(target, workload_profile=PROFILE_A15)]
             self.assertEqual(len({csv_path(s).name for s in variants}), len(variants))
 
     def test_legacy_model_fallback_does_not_redirect_new_training(self):
@@ -45,7 +47,7 @@ class PrimaryOutputPathTests(unittest.TestCase):
             root = Path(directory)
             with patch('algorithms.pd3qn_fe.scenario.ROOT', root):
                 for cls in (PDScene, ScoreScenario):
-                    for profile in ('standard', PROFILE):
+                    for profile in ('standard', PROFILE, PROFILE_A15):
                         scene = cls(mode='train', workload_profile=profile,
                                     **({'output_root': str(root)} if cls is ScoreScenario else {}))
                         legacy = root / 'outputs/ckpts' / scene.legacy_model_name()

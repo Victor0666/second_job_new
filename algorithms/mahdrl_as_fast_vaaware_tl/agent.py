@@ -7,8 +7,7 @@ from algorithms.mahdrl_oe_ge_apf_score_fast.agent import TAAgent as BaseTA, SetD
 from algorithms.mahdrl_as_fast_vaaware.preview import behavior_probabilities
 from algorithms.mahdrl_oe_ge_apf_score_fast.packing import collate, validate_observation
 from .config import (
-    ALGORITHM, MODEL_VERSION, CHECKPOINT_METADATA_KEY,
-    tl_policy_metadata, variant_metadata, implementation_metadata, VM_CONTEXT_DIM, VM_CANDIDATE_DIM,
+    CHECKPOINT_METADATA_KEY, tl_policy_metadata, VM_CONTEXT_DIM, VM_CANDIDATE_DIM,
 )
 from .selection import selection_metadata, validate_checkpoint_selection
 
@@ -20,20 +19,22 @@ class TLIdentity:
         if role == "VA" and (getattr(self, "context_dim", None), getattr(self, "candidate_dim", None)) != (VM_CONTEXT_DIM, VM_CANDIDATE_DIM):
             raise ValueError("TL VA requires 23 context and 14 candidate features")
         super().bind(scenario, role)
-        self.identity = dict(variant_metadata(), role=role,
+        self.model_version = scenario.model_version
+        self.implementation = scenario.implementation_metadata()
+        self.identity = dict(scenario.variant_metadata(), role=role,
             parameter_shapes={key: list(value.shape) for key, value in self.online.state_dict().items()})
         self.normalization_metadata.update(algorithm_variant=deepcopy(self.identity),
-            implementation=implementation_metadata(), tl_policy=tl_policy_metadata())
-        self.selection_expectation.update(checkpoint_selection=selection_metadata(), algorithm=ALGORITHM, model_version=MODEL_VERSION,
+            implementation=deepcopy(self.implementation), tl_policy=tl_policy_metadata())
+        self.selection_expectation.update(checkpoint_selection=selection_metadata(), algorithm=scenario.algorithm, model_version=self.model_version,
                                           tl_policy=tl_policy_metadata())
         return self
 
     def _check_metadata(self, actual):
         if not isinstance(actual, dict):
             raise ValueError("Missing TL checkpoint normalization metadata")
-        expected = dict(model_version=MODEL_VERSION, checkpoint_selection=selection_metadata(),
+        expected = dict(model_version=self.model_version, checkpoint_selection=selection_metadata(),
             experiment_protocol=self.selection_expectation["protocol"], tl_policy=tl_policy_metadata(),
-            implementation=implementation_metadata(), algorithm_variant=self.identity)
+            implementation=self.implementation, algorithm_variant=self.identity)
         for key, value in expected.items():
             if actual.get(key) != value:
                 raise ValueError("MAHDRL-AS-Fast-VAware-TL checkpoint mismatch: " + key)

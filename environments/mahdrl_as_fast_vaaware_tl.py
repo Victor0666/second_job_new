@@ -7,5 +7,12 @@ from algorithms.mahdrl_as_fast_vaaware_tl.config import ALGORITHM, variant_metad
 class CloudWorkflowEnv_VMAgents(GlobalVMEnv):
     algorithm = ALGORITHM
 
+    def __init__(self, *args, experiment_metadata=None, **kwargs):
+        self._experiment_metadata = experiment_metadata
+        if experiment_metadata is not None:
+            self.algorithm = experiment_metadata["algorithm"]
+        super().__init__(*args, **kwargs)
+
     def variant_metadata(self):
-        return dict(super().variant_metadata(), **variant_metadata())
+        return dict(super().variant_metadata(), **(
+            self._experiment_metadata if self._experiment_metadata is not None else variant_metadata()))

@@ -1,0 +1,135 @@
+{
+  "formal_training_started": false,
+  "cuda_available": true,
+  "probe_policy": "untrained_tiny_networks_for_physics_and_reference_checks_only",
+  "fixed_reference_protocol": "fixed_load_r50_reference_v1",
+  "public_entries": [
+    {
+      "scale": 100,
+      "mode": "train",
+      "status": "passed"
+    },
+    {
+      "scale": 100,
+      "mode": "evaluate",
+      "status": "passed"
+    },
+    {
+      "scale": 100,
+      "mode": "precompute",
+      "status": "passed"
+    },
+    {
+      "scale": 150,
+      "mode": "train",
+      "status": "passed"
+    },
+    {
+      "scale": 150,
+      "mode": "evaluate",
+      "status": "passed"
+    },
+    {
+      "scale": 150,
+      "mode": "precompute",
+      "status": "passed"
+    }
+  ],
+  "full_workloads": [
+    {
+      "resource": "R100",
+      "hosts": 12,
+      "vms": 100,
+      "workflows": 50,
+      "arrival_lambda": 0.03,
+      "completed": 50,
+      "assignment_count": 1370,
+      "workflow_identity_hash": "4f1bab17e2e0da8ed1599d9498cb6bdbc3d1b9617db06f049bbf3e037ec58b3b",
+      "matched_full_reference_identical": true,
+      "evaluation_parameters_frozen": true,
+      "matched_full_completed": 50,
+      "diagnostics": {
+        "global_vm": {
+          "mean": 49.47007299270073,
+          "max": 100
+        },
+        "host": {
+          "mean": 11.997810218978103,
+          "max": 12
+        }
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": -5.684341886080801e-13,
+        "team_energy_reward": -519.895064542746,
+        "selected_host_energy_reward": -519.895064542746,
+        "assignment_energy_total": 519895.0645427455,
+        "assignment_energy_physical_gap": -6.984919309616089e-10,
+        "complete_episode": true,
+        "VA_reward_formula_balance": 2.842170943040401e-14
+      },
+      "paired_probe_elapsed_seconds": 36.41263649996836
+    },
+    {
+      "resource": "R150",
+      "hosts": 18,
+      "vms": 150,
+      "workflows": 50,
+      "arrival_lambda": 0.03,
+      "completed": 50,
+      "assignment_count": 1370,
+      "workflow_identity_hash": "4f1bab17e2e0da8ed1599d9498cb6bdbc3d1b9617db06f049bbf3e037ec58b3b",
+      "matched_full_reference_identical": true,
+      "evaluation_parameters_frozen": true,
+      "matched_full_completed": 50,
+      "diagnostics": {
+        "global_vm": {
+          "mean": 91.1992700729927,
+          "max": 150
+        },
+        "host": {
+          "mean": 18.0,
+          "max": 18
+        }
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": 2.2737367544323206e-13,
+        "team_energy_reward": -704.5463576694781,
+        "selected_host_energy_reward": -704.5463576694781,
+        "assignment_energy_total": 704546.3576694783,
+        "assignment_energy_physical_gap": -4.656612873077393e-10,
+        "complete_episode": true,
+        "VA_reward_formula_balance": 0.0
+      },
+      "paired_probe_elapsed_seconds": 46.69474279996939
+    }
+  ],
+  "existing_identity_path_configurations_unchanged": 135,
+  "paths": {
+    "default_model_leaf_length": 16,
+    "max_uint32_seed_leaf_length": 25,
+    "unique_training_configurations_tested": 36,
+    "unique_flat_CSV_filenames_tested": 108
+  },
+  "shell": {
+    "syntax": "passed",
+    "stub_calls": 35,
+    "CLI_arguments_checked": true,
+    "source_starts_no_jobs": true,
+    "evaluation_failure_stops_remaining_targets": true
+  },
+  "regression": {
+    "tests_run": 41,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "elapsed_seconds": 84.28,
+    "modules": [
+      "common.test_mahdrl_as_fast_vaaware_resources_tl",
+      "common.test_mahdrl_as_fast_vaaware_resources",
+      "common.test_mahdrl_as_fast_vaaware_tl",
+      "common.test_mahdrl_as_fast_vaaware"
+    ]
+  }
+}

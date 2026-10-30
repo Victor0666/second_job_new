@@ -123,7 +123,7 @@ python -B -X utf8 -m unittest \
   common.test_mahdrl_as_fast_vaaware_tl -v
 ```
 
-原 VAware 的默认路径/身份及 TL 入口保持兼容；此次只实现 VAware 两个规模分支。后续 TL 消融必须另行使用相同实际拓扑和固定参考协议，不能直接替代为原 TL 的其他规模结果。短程测试和物理探针不代表正式600回合的性能结论。
+原 VAware 的默认路径/身份及 TL 入口保持兼容。对应的 R100-TL / R150-TL 已补齐，使用相同实际拓扑和固定参考协议，入口为 `mahdrl_as_fast_vaaware_r100_tl` / `mahdrl_as_fast_vaaware_r150_tl`；方案、独立输出和训练/评测命令见 [TL说明](MAHDRL_AS_Fast_VAware_R100_R150_TL.md)。不能直接替代为原TL其他资源规模的结果。短程测试和物理探针不代表正式600回合的性能结论。
 
 ## 本次验证记录
 

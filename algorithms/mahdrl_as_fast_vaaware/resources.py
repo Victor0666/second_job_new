@@ -7,10 +7,9 @@ from common.f18_state_normalization import scene_id
 from common.f22_cache import check_cache
 from common.precompute_deadlines import main as generate_reference
 from .scenario import ScoreScenario
-from .config import variant_metadata, implementation_metadata
 
 
-class ResourceScenario(ScoreScenario):
+class ResourceReferences:
     """Only concrete R100/R150 entry points select a physical resource preset."""
 
     def __post_init__(self):
@@ -71,13 +70,13 @@ class ResourceScenario(ScoreScenario):
             normalization_reference_resource="M", arrival_lambda=.03, workflows_per_episode=50)
 
     def variant_metadata(self):
-        metadata = variant_metadata(self.mechanism)
+        metadata = super().variant_metadata()
         metadata.update(algorithm=self.algorithm, scheme=self.model_version, model_version=self.model_version,
                         resource_experiment=self.resource_metadata())
         return metadata
 
     def implementation_metadata(self):
-        metadata = implementation_metadata(self.mechanism)
+        metadata = super().implementation_metadata()
         metadata.update(algorithm=self.algorithm, implementation_version=self.model_version,
                         scientific_variant=self.variant_metadata())
         return metadata
@@ -113,6 +112,10 @@ class ResourceScenario(ScoreScenario):
     @staticmethod
     def scene_tag(task, resource, deadline):
         return ScoreScenario.scene_tag(task, resource.removeprefix("R"), deadline)
+
+
+class ResourceScenario(ResourceReferences, ScoreScenario):
+    """VAware with the shared fixed-load resource reference protocol."""
 
 
 def precompute_reference(scene):

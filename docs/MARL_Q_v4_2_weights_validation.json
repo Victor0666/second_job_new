@@ -1,0 +1,167 @@
+{
+  "date": "2026-10-31",
+  "source": "algorithms/marl (MARL-Q4.2)",
+  "command_files": [
+    {
+      "path": "docs/Linux_CUDA_MARL_Q_v4_2_010_600代训练指令.txt",
+      "bash_syntax": "passed",
+      "expanded_commands": 9,
+      "real_parser": "passed",
+      "mock_execution_only": true
+    },
+    {
+      "path": "docs/Linux_CUDA_MARL_Q_v4_2_010_27场景评测指令.txt",
+      "bash_syntax": "passed",
+      "expanded_commands": 27,
+      "real_parser": "passed",
+      "mock_execution_only": true
+    },
+    {
+      "path": "docs/Linux_CUDA_MARL_Q_v4_2_090_600代训练指令.txt",
+      "bash_syntax": "passed",
+      "expanded_commands": 9,
+      "real_parser": "passed",
+      "mock_execution_only": true
+    },
+    {
+      "path": "docs/Linux_CUDA_MARL_Q_v4_2_090_27场景评测指令.txt",
+      "bash_syntax": "passed",
+      "expanded_commands": 27,
+      "real_parser": "passed",
+      "mock_execution_only": true
+    }
+  ],
+  "entrypoint_dry_runs": [
+    {
+      "entry": "algorithms/marl_q_v4_2_010/train.py",
+      "algorithm": "marl_q_v4_2_010",
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\marl_q_v4_2_010\\SS_Tight_m1_c8b5ba5dd",
+      "evaluation_csv": null,
+      "passed": true
+    },
+    {
+      "entry": "algorithms/marl_q_v4_2_010/evaluate.py",
+      "algorithm": "marl_q_v4_2_010",
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\marl_q_v4_2_010\\SS_Tight_m1_c8b5ba5dd",
+      "evaluation_csv": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\marl_q_v4_2_010\\eval_marl_q_v4_2_010_SS_Tight_fromSS_Tight_m1_s700-729_c8b5ba5dd.csv",
+      "passed": true
+    },
+    {
+      "entry": "algorithms/marl_q_v4_2_090/train.py",
+      "algorithm": "marl_q_v4_2_090",
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\marl_q_v4_2_090\\SS_Tight_m1_c210bc788",
+      "evaluation_csv": null,
+      "passed": true
+    },
+    {
+      "entry": "algorithms/marl_q_v4_2_090/evaluate.py",
+      "algorithm": "marl_q_v4_2_090",
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\marl_q_v4_2_090\\SS_Tight_m1_c210bc788",
+      "evaluation_csv": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\marl_q_v4_2_090\\eval_marl_q_v4_2_090_SS_Tight_fromSS_Tight_m1_s700-729_c210bc788.csv",
+      "passed": true
+    }
+  ],
+  "unchanged_original_snapshot_files": 13,
+  "python_syntax_files": 21,
+  "training_commands": 18,
+  "evaluation_commands": 54,
+  "formal_600_episode_training_run": false,
+  "variants": {
+    "MARL_Q4.2_010": {
+      "namespace": "algorithms/marl_q_v4_2_010",
+      "alpha_delay": 0.1,
+      "energy_weight": 0.9
+    },
+    "MARL_Q4.2_090": {
+      "namespace": "algorithms/marl_q_v4_2_090",
+      "alpha_delay": 0.9,
+      "energy_weight": 0.1
+    }
+  },
+  "tests": {
+    "passed": 66,
+    "failed": 0,
+    "skipped": 0,
+    "runs": [
+      {
+        "count": 42,
+        "result": "OK",
+        "modules": [
+          "common.test_marl_q42_weights (7 methods at execution time)",
+          "common.test_marl_v4_2",
+          "common.test_marl_v4",
+          "common.test_marl_q"
+        ]
+      },
+      {
+        "count": 24,
+        "result": "OK",
+        "modules": [
+          "common.test_marl_q42_weights.MARLRewardTests.test_measurements_track_explicit_checkpoint_paths_and_refuse_repeated_seed",
+          "common.test_experiment_measurements",
+          "common.test_marl_paths",
+          "common.test_communication",
+          "common.test_scenarios"
+        ]
+      }
+    ],
+    "lifecycle": {
+      "variants": [
+        "010",
+        "090"
+      ],
+      "devices": [
+        "cpu",
+        "cuda"
+      ],
+      "episodes_per_smoke": 1,
+      "hidden_dims": [
+        16,
+        8
+      ],
+      "real_training_and_validation": true,
+      "paired_checkpoint_reload": true,
+      "frozen_evaluation_and_csv": true,
+      "repeated_output_protection": true
+    },
+    "explicit_checkpoint_paths_and_hashes": "passed"
+  },
+  "runtime": {
+    "torch": "2.5.1+cu121",
+    "cuda_available": true,
+    "cuda_device": "NVIDIA GeForce RTX 4060 Ti"
+  },
+  "preserved": {
+    "scheduling": "idle_vm_only_v1",
+    "checkpoint_success_threshold": 0.92,
+    "global_interval_energy_and_local_host_interval_energy": true,
+    "actual_successor_action_td": true,
+    "critic_then_actor_update": true,
+    "original_source_files_sha256_unchanged": true
+  },
+  "limitations": [
+    "No formal 600-episode training or convergence/performance comparison.",
+    "CPU/CUDA lifecycle smoke used hidden_dims=(16,8), not the production network widths."
+  ],
+  "path_recheck": {
+    "date": "2026-10-31",
+    "tests_passed": 7,
+    "max_training_scene_directory_name_length": 22,
+    "variants": [
+      {
+        "variant": "010",
+        "distinct_final_csv_filenames": 27,
+        "final_csv_parent_count": 1
+      },
+      {
+        "variant": "090",
+        "distinct_final_csv_filenames": 27,
+        "final_csv_parent_count": 1
+      }
+    ],
+    "command_files_bash_syntax": "passed",
+    "parsed_training_commands": 18,
+    "parsed_evaluation_commands": 54,
+    "real_launch_dry_run_entrypoints": 4
+  }
+}

@@ -1,0 +1,54 @@
+# Derived from MARL-Q4.2; delay=0.9, energy=0.1; idle VM only; SR>=92%.
+# MARL-Q marl_q_v4_2_090: nine source models, 27 target scenarios, seeds 700-729, SR >= 92% selection.
+# Run from the project root after the corresponding source models finish training.
+# Optional third argument: target task sizes, for example "M L".
+
+eval_marl_v4_2_090_all() {
+    local res="$1" ddl="$2"
+    local targets="${3:-S M L}"
+    local prefix="outputs/server_eval_logs/eval_marl_q_v4_2_090_fromS${res}_${ddl}_targets${targets// /}_m1_s700-729"
+
+    mkdir -p outputs/server_eval_logs || return 1
+    CUDA_VISIBLE_DEVICES=0 python -c \
+        'import torch; assert torch.cuda.is_available(), "CUDA unavailable"; torch.ones(1, device="cuda")' || return 1
+
+    CUDA_VISIBLE_DEVICES=0 nohup bash -c '
+        res="$1"
+        ddl="$2"
+        targets="$3"
+
+        for task in $targets; do
+            echo "[START] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+
+            python -u launch.py algorithms/marl_q_v4_2_090/evaluate.py \
+                --task "$task" --resource "$res" --deadline "$ddl" \
+                --train-task S --train-resource "$res" --train-deadline "$ddl" \
+                --seeds 700-729 --model-seed 1 \
+                --experiment-protocol configs/f22_split_v1.json \
+                --normalization-mode f19_shared_v1 --device cuda \
+                || exit 1
+
+            echo "[DONE] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+        done
+
+        echo "[ALL_DONE] source=S${res}/${ddl} targets=${targets}"
+    ' marl_q_v4_2_090_eval "$res" "$ddl" "$targets" \
+        > "${prefix}.log" 2>&1 &
+
+    echo $! > "${prefix}.pid"
+}
+
+# Source SS -> target SS, MS, LS
+eval_marl_v4_2_090_all S Tight
+eval_marl_v4_2_090_all S Medium
+eval_marl_v4_2_090_all S Loose
+
+# Source SM -> target SM, MM, LM
+eval_marl_v4_2_090_all M Tight
+eval_marl_v4_2_090_all M Medium
+eval_marl_v4_2_090_all M Loose
+
+# Source SL -> target SL, ML, LL
+eval_marl_v4_2_090_all L Tight
+eval_marl_v4_2_090_all L Medium
+eval_marl_v4_2_090_all L Loose

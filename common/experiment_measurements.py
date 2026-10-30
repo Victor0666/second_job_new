@@ -301,7 +301,7 @@ def collect_validation(env):
 
 class EvaluationRecorder:
     """Synchronized allocation control-path timing, excluding simulator advancement."""
-    def __init__(self,scenario,algorithm,env,agents,directory=None,checkpoint_directory=None):
+    def __init__(self,scenario,algorithm,env,agents,directory=None,checkpoint_directory=None,checkpoint_paths=None):
         self.enabled=enabled();self.env=env;self.scenario=scenario;self.algorithm=algorithm;self.agents=agents
         self.restores=[];self.depth=0;self.pending_seconds=0.;self.samples=[];self.by_role={};self.state_seconds=0.;self.policy_seconds=0.
         self.excluded_seconds=0.;self.cached_state_seconds=0.;self.in_environment=False;self.api_samples=[]
@@ -309,8 +309,9 @@ class EvaluationRecorder:
         self.directory=Path(directory) if directory else root/'outputs/run'/VERSION/algorithm/scenario.output_version/(scenario.task+scenario.resource+'_'+scenario.deadline+'_model'+str(scenario.model_seed))
         checkpoint_algorithm = 'marl' if algorithm == MARL_VERSION else algorithm
         self.checkpoint_directory=checkpoint_directory or (str(scenario.checkpoint_override or scenario.checkpoint_dir(checkpoint_algorithm)) if checkpoint_algorithm in MODEL_NAMES else None)
+        self.checkpoint_paths=checkpoint_paths
         if not self.enabled:return
-        if algorithm in (MARL_VERSION, 'pd3qn_dag'):
+        if algorithm in (MARL_VERSION, 'pd3qn_dag') or checkpoint_paths is not None:
             seed = int(getattr(env, 'episode_seed', env.random_seed))
             for path in (self.directory/'episodes'/f'seed{seed}.json',
                          self.directory/'workflows'/f'seed{seed}.csv',
@@ -393,6 +394,8 @@ class EvaluationRecorder:
         if self.algorithm in ('marl', MARL_VERSION) and self.scenario.marl_options:
             explicit=[self.scenario.marl_options[k] for k in ('ckpt_global','ckpt_local') if self.scenario.marl_options.get(k)]
             if explicit:checkpoints=[artifact_info(p) for p in explicit]
+        if self.checkpoint_paths is not None:
+            checkpoints=[artifact_info(p) for p in self.checkpoint_paths]
         record=dict(version=VERSION,algorithm=self.algorithm,model_seed=self.scenario.model_seed,seed=seed,
             provenance=self.scenario.reproducibility_metadata(),checkpoints=checkpoints,
             task=self.scenario.task,resource=self.scenario.resource,deadline=self.scenario.deadline,

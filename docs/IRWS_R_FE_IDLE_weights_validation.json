@@ -1,0 +1,74 @@
+{
+  "date": "2026-10-31",
+  "source": "irws_r_fe_idle",
+  "source_commit": "95e74c9dd41cdb8bec1627c99bec9ff986083975",
+  "variants": {
+    "irws_r_fe_idle_010": {
+      "delay_weight": 0.1,
+      "energy_weight": 0.9
+    },
+    "irws_r_fe_idle_090": {
+      "delay_weight": 0.9,
+      "energy_weight": 0.1
+    }
+  },
+  "scheduling_protocol": "idle_only_periodic_v1",
+  "waiting_queue_enabled": false,
+  "workflow_success_threshold": 0.92,
+  "tests": {
+    "run": 37,
+    "passed": 37,
+    "skipped": 0,
+    "seconds": 5.451,
+    "command": "python -X utf8 -B -m unittest common.test_irws_r_fe_idle_weights common.test_irws_r_fe_idle common.test_irws_r_fe_r090_idle -v"
+  },
+  "actual_launch_dry_runs": 4,
+  "python_files_syntax_checked": 23,
+  "bash_files_syntax_checked": 4,
+  "expanded_training_commands": 18,
+  "expanded_evaluation_commands": 54,
+  "real_cli_parser_checks": 72,
+  "existing_files_verified_unchanged": 846,
+  "base_idle_source_snapshot_verified": true,
+  "unrelated_workspace_changes_detected": [
+    "docs/MAHDRL_AS_Fast_HScore.md"
+  ],
+  "examples": [
+    {
+      "algorithm": "irws_r_fe_idle_010",
+      "checkpoint_dir": "outputs/ckpts/irws_r_fe_idle_010/SS_Tight_m1_c6b23cd2f",
+      "evaluation_csv": "outputs/run/irws_r_fe_idle_010/eval_irws_r_fe_idle_010_SS_Tight_fromSS_Tight_m1_s700-729_c6b23cd2f.csv"
+    },
+    {
+      "algorithm": "irws_r_fe_idle_090",
+      "checkpoint_dir": "outputs/ckpts/irws_r_fe_idle_090/SS_Tight_m1_cfbd62d85",
+      "evaluation_csv": "outputs/run/irws_r_fe_idle_090/eval_irws_r_fe_idle_090_SS_Tight_fromSS_Tight_m1_s700-729_cfbd62d85.csv"
+    }
+  ],
+  "formal_600_episode_experiments_started": false,
+  "output_path_audit": [
+    {
+      "algorithm": "irws_r_fe_idle_010",
+      "source_models": 9,
+      "flat_scene_csvs": 27,
+      "csv_parent": "outputs/run/irws_r_fe_idle_010",
+      "training_leaf_length_min": 21,
+      "training_leaf_length_max": 22,
+      "training_relative_path_max": 55
+    },
+    {
+      "algorithm": "irws_r_fe_idle_090",
+      "source_models": 9,
+      "flat_scene_csvs": 27,
+      "csv_parent": "outputs/run/irws_r_fe_idle_090",
+      "training_leaf_length_min": 21,
+      "training_leaf_length_max": 22,
+      "training_relative_path_max": 55
+    }
+  ],
+  "publication": {
+    "remote": "origin",
+    "branch": "codex/f11-real-transitions",
+    "scope": "IRWS-R-FE_IDLE_010 and IRWS-R-FE_IDLE_090 only"
+  }
+}

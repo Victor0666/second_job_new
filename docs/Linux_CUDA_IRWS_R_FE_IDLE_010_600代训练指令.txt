@@ -1,0 +1,41 @@
+# Derived directly from IRWS-R-FE_IDLE; delay=0.1, energy=0.9; SR>=0.92.
+# 方案A：只分配空闲VM，保留5秒调度tick；q10仅兼容观测布局，不启用VM等待队列。
+# 在仓库根目录执行。每次调用启动一个后台训练进程；按服务器容量分批选用调用。
+# IRWS-R-FE_IDLE_010：保留V3加速机制，验证总体工作流成功率>=92%后选最低能耗。
+# 固定配置：600回合、模型种子1、q10、dt5、rollout64、float32、F22/F19。
+train_irws_r_fe_idle_010() {
+    local res="$1" ddl="$2"
+    local prefix="outputs/server_train_logs/train_irws_r_fe_idle_010_S${res}_${ddl}_m1"
+
+    mkdir -p outputs/server_train_logs
+
+    CUDA_VISIBLE_DEVICES=0 nohup bash -c '
+        res="$1"
+        ddl="$2"
+
+        exec python -u launch.py algorithms/irws_r_fe_idle_010/train.py \
+            --task S --resource "$res" --deadline "$ddl" \
+            --episodes 600 --model-seed 1 \
+            --experiment-protocol configs/f22_split_v1.json \
+            --normalization-mode f19_shared_v1 \
+            --queue-capacity 10 --slot-duration 5 --rollout-size 64 --precision float32 \
+            --device cuda
+    ' irws_r_fe_idle_010_train "$res" "$ddl" > "${prefix}.log" 2>&1 &
+
+    echo $! > "${prefix}.pid"
+}
+
+# SS：小任务、小资源
+train_irws_r_fe_idle_010 S Tight
+train_irws_r_fe_idle_010 S Medium
+train_irws_r_fe_idle_010 S Loose
+
+# SM：小任务、中资源
+train_irws_r_fe_idle_010 M Tight
+train_irws_r_fe_idle_010 M Medium
+train_irws_r_fe_idle_010 M Loose
+
+# SL：小任务、大资源
+train_irws_r_fe_idle_010 L Tight
+train_irws_r_fe_idle_010 L Medium
+train_irws_r_fe_idle_010 L Loose

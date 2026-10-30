@@ -1,0 +1,236 @@
+{
+  "default_model_seed": 1,
+  "default_preview": true,
+  "default_ha_period": 4,
+  "training_paths": [
+    {
+      "resource": "R100",
+      "deadline": "Tight",
+      "checkpoint_dir": "outputs/ckpts/mahdrl_va100/S_T_m1_c5c7809e9",
+      "log_dir": "outputs/logs/mahdrl_va100/S_T_m1_c5c7809e9",
+      "leaf_length": 16,
+      "checkpoint_absolute_length": 95,
+      "log_absolute_length": 94,
+      "longest_known_training_file_absolute_length": 122
+    },
+    {
+      "resource": "R100",
+      "deadline": "Medium",
+      "checkpoint_dir": "outputs/ckpts/mahdrl_va100/S_M_m1_c5c7809e9",
+      "log_dir": "outputs/logs/mahdrl_va100/S_M_m1_c5c7809e9",
+      "leaf_length": 16,
+      "checkpoint_absolute_length": 95,
+      "log_absolute_length": 94,
+      "longest_known_training_file_absolute_length": 122
+    },
+    {
+      "resource": "R100",
+      "deadline": "Loose",
+      "checkpoint_dir": "outputs/ckpts/mahdrl_va100/S_L_m1_c5c7809e9",
+      "log_dir": "outputs/logs/mahdrl_va100/S_L_m1_c5c7809e9",
+      "leaf_length": 16,
+      "checkpoint_absolute_length": 95,
+      "log_absolute_length": 94,
+      "longest_known_training_file_absolute_length": 122
+    },
+    {
+      "resource": "R150",
+      "deadline": "Tight",
+      "checkpoint_dir": "outputs/ckpts/mahdrl_va150/S_T_m1_cb5c89b31",
+      "log_dir": "outputs/logs/mahdrl_va150/S_T_m1_cb5c89b31",
+      "leaf_length": 16,
+      "checkpoint_absolute_length": 95,
+      "log_absolute_length": 94,
+      "longest_known_training_file_absolute_length": 122
+    },
+    {
+      "resource": "R150",
+      "deadline": "Medium",
+      "checkpoint_dir": "outputs/ckpts/mahdrl_va150/S_M_m1_cb5c89b31",
+      "log_dir": "outputs/logs/mahdrl_va150/S_M_m1_cb5c89b31",
+      "leaf_length": 16,
+      "checkpoint_absolute_length": 95,
+      "log_absolute_length": 94,
+      "longest_known_training_file_absolute_length": 122
+    },
+    {
+      "resource": "R150",
+      "deadline": "Loose",
+      "checkpoint_dir": "outputs/ckpts/mahdrl_va150/S_L_m1_cb5c89b31",
+      "log_dir": "outputs/logs/mahdrl_va150/S_L_m1_cb5c89b31",
+      "leaf_length": 16,
+      "checkpoint_absolute_length": 95,
+      "log_absolute_length": 94,
+      "longest_known_training_file_absolute_length": 122
+    }
+  ],
+  "evaluation_CSVs": [
+    {
+      "resource": "R100",
+      "task": "S",
+      "deadline": "Tight",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_S100_T_from_S100_T_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R100",
+      "task": "M",
+      "deadline": "Tight",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_M100_T_from_S100_T_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R100",
+      "task": "L",
+      "deadline": "Tight",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_L100_T_from_S100_T_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R100",
+      "task": "S",
+      "deadline": "Medium",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_S100_M_from_S100_M_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R100",
+      "task": "M",
+      "deadline": "Medium",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_M100_M_from_S100_M_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R100",
+      "task": "L",
+      "deadline": "Medium",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_L100_M_from_S100_M_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R100",
+      "task": "S",
+      "deadline": "Loose",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_S100_L_from_S100_L_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R100",
+      "task": "M",
+      "deadline": "Loose",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_M100_L_from_S100_L_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R100",
+      "task": "L",
+      "deadline": "Loose",
+      "path": "outputs/run/mahdrl_va100/eval_mahdrl_va100_noapf_sr092_p1h4_L100_L_from_S100_L_m1_s700-729_c5c7809e9.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "S",
+      "deadline": "Tight",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_S150_T_from_S150_T_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "M",
+      "deadline": "Tight",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_M150_T_from_S150_T_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "L",
+      "deadline": "Tight",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_L150_T_from_S150_T_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "S",
+      "deadline": "Medium",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_S150_M_from_S150_M_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "M",
+      "deadline": "Medium",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_M150_M_from_S150_M_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "L",
+      "deadline": "Medium",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_L150_M_from_S150_M_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "S",
+      "deadline": "Loose",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_S150_L_from_S150_L_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "M",
+      "deadline": "Loose",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_M150_L_from_S150_L_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    },
+    {
+      "resource": "R150",
+      "task": "L",
+      "deadline": "Loose",
+      "path": "outputs/run/mahdrl_va150/eval_mahdrl_va150_noapf_sr092_p1h4_L150_L_from_S150_L_m1_s700-729_cb5c89b31.csv",
+      "absolute_length": 156
+    }
+  ],
+  "public_entries": [
+    {
+      "resource": "R100",
+      "mode": "train",
+      "status": "passed"
+    },
+    {
+      "resource": "R100",
+      "mode": "evaluate",
+      "status": "passed"
+    },
+    {
+      "resource": "R100",
+      "mode": "precompute",
+      "status": "passed"
+    },
+    {
+      "resource": "R150",
+      "mode": "train",
+      "status": "passed"
+    },
+    {
+      "resource": "R150",
+      "mode": "evaluate",
+      "status": "passed"
+    },
+    {
+      "resource": "R150",
+      "mode": "precompute",
+      "status": "passed"
+    }
+  ],
+  "shell_test_output": "test_nohup_commands_match_CLI_and_stop_on_failure (common.test_mahdrl_as_fast_vaaware_resources.ResourceTests.test_nohup_commands_match_CLI_and_stop_on_failure) ... ok\n\n----------------------------------------------------------------------\nRan 1 test in 2.657s\n\nOK\n",
+  "formal_experiment_jobs_started": false,
+  "training_directory_count": 6,
+  "unique_flat_CSV_count": 18,
+  "max_checkpoint_absolute_length": 95,
+  "max_log_absolute_length": 94,
+  "max_known_training_file_absolute_length": 122,
+  "max_CSV_absolute_length": 156,
+  "shell_stub_calls": 35
+}

@@ -8,12 +8,16 @@ from algorithms.mahdrl_as_fast_vaaware.config import ALGORITHM, Mechanism, varia
 class CloudWorkflowEnv_VMAgents(RawEnv):
     algorithm = ALGORITHM
 
-    def __init__(self, *args, mechanism=Mechanism(), **kwargs):
+    def __init__(self, *args, mechanism=Mechanism(), experiment_metadata=None, **kwargs):
         self.mechanism = mechanism
+        self._experiment_metadata = experiment_metadata
+        if experiment_metadata is not None:
+            self.algorithm = experiment_metadata["algorithm"]
         super().__init__(*args, **kwargs)
 
     def variant_metadata(self):
-        return dict(super().variant_metadata(), **variant_metadata(self.mechanism))
+        return dict(super().variant_metadata(), **(
+            self._experiment_metadata if self._experiment_metadata is not None else variant_metadata(self.mechanism)))
 
     def preview_vm_states(self):
         if self._cur_tid is None or self._cur_host_id is not None:

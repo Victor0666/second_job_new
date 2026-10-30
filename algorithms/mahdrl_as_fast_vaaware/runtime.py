@@ -15,7 +15,7 @@ from common.experiment_measurements import TrainingRecorder, EvaluationRecorder,
 from algorithms.mahdrl_oe.reward import finish_lower_phase, LowerRewardAudit
 from environments.mahdrl_as_fast_vaaware import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
 from .agent import TAAgent, SetD3QNAgent
-from .config import CHECKPOINT_METADATA_KEY, ALGORITHM, DISPLAY_NAME, MODEL_VERSION, TA_HIDDEN, learning_kwargs, variant_metadata, implementation_metadata
+from .config import CHECKPOINT_METADATA_KEY, TA_HIDDEN, learning_kwargs
 from .selection import selection_metadata, validation_selection, selection_key, validate_checkpoint_selection
 from .updates import UpdateClock, DecisionTrace
 from .preview import prepare_decision
@@ -56,6 +56,7 @@ def build_env_kwargs(scene, seed):
 
 def build_env(scene, seed):
     env = CloudWorkflowEnv_VMAgents(**build_env_kwargs(scene, seed), mechanism=scene.mechanism,
+        experiment_metadata=scene.variant_metadata(),
         profile_mode=scene.profile_mode, profile_every=scene.profile_every)
     env.energy_reward_scale = .001
     env.task_baseline_norm = 300.
@@ -66,13 +67,14 @@ def build_env(scene, seed):
 
 def validate_inputs(scene):
     scene.validate_calibration()
+    reference = scene.deadline_reference_scenario()
     if scene.protocol():
-        check_cache(scene)
+        check_cache(reference, path=scene.cache_path)
     else:
-        # Legacy/debug runs still cannot borrow a cache from another topology.
+        # Legacy/debug runs must also match the explicitly declared reference topology.
         obj = json.loads(scene.cache_path.read_text(encoding="utf-8"))
-        expected = dict(num_hosts=scene.num_hosts, vms_per_host=list(scene.vms_per_host),
-                        task=scene.task, resource=scene.resource)
+        expected = dict(num_hosts=reference.num_hosts, vms_per_host=list(reference.vms_per_host),
+                        task=reference.task, resource=reference.resource)
         for key, value in expected.items():
             if obj.get("meta", {}).get(key) != value:
                 raise ValueError("Deadline cache configuration mismatch: "+key)
@@ -165,6 +167,7 @@ def run_episode(env, agents, *, training=False, warmup=.03, phase_log=None, assi
             row = dict(task_id=int(info["task_id"]), host_id=int(hid), vm_id=int(env.vm_ids[info["vm_global_idx"]]),
                 va_version=int(vm["va_version"]), va_epsilon=float(vm["epsilon"]),
                 legal_host_count=int(host["mask"].sum()), legal_vm_count=int(vm["mask"].sum()),
+                global_legal_vm_count=int(sum(s["mask"].sum() for s in previews.values())),
                 preview_features=extra[ah].tolist(), expected_assignment_energy=expected_energy,
                 assignment_energy=float(info["assignment_energy"]),
                 energy_prediction_error=float(info["assignment_energy"])-expected_energy,
@@ -203,6 +206,8 @@ def run_episode(env, agents, *, training=False, warmup=.03, phase_log=None, assi
     return dict(phase_count=phases, rewards={r: v/max(1, phases) for r,v in returns.items()},
         reward_audit=audit.summary(env, traces["HA"], traces["VA"]), update_clock=clock.summary(),
         vaaware_diagnostics=dict(assignments=len(diagnostics), mean_host_selection_gap=mean("host_selection_gap"),
+            mean_global_legal_vm_count=mean("global_legal_vm_count"),
+            mean_local_legal_vm_count=mean("legal_vm_count"), mean_legal_host_count=mean("legal_host_count"),
             mean_vm_selection_gap=mean("vm_selection_gap"), greedy_match_rate=mean("greedy_match"),
             mean_energy_prediction_error=mean("energy_prediction_error")), **episode_metrics(env))
 
@@ -229,9 +234,9 @@ def train(scene):
     scene.log_dir().mkdir(parents=True)
     for directory in (scene.checkpoint_dir(), scene.log_dir()):
         write_run_metadata(directory, scene)
-        write_json(directory/"algorithm_variant.json", variant_metadata(scene.mechanism))
-        write_json(directory/"implementation.json", implementation_metadata(scene.mechanism))
-    recorder = TrainingRecorder(scene.log_dir(), scene, ALGORITHM, env, agents)
+        write_json(directory/"algorithm_variant.json", scene.variant_metadata())
+        write_json(directory/"implementation.json", scene.implementation_metadata())
+    recorder = TrainingRecorder(scene.log_dir(), scene, scene.algorithm, env, agents)
     f11 = F11Logger(scene.log_dir())
     best, best_rows = None, None
     if agents["TA"].device.type == "cuda":
@@ -274,19 +279,19 @@ def train(scene):
                         instance_seed=scene.training_seed(episode), validation_energy=energy,
                         validation_selection=candidate, selected_as_best=selected,
                         best_episode=best['episode'], **result))
-            append_json(scene.log_dir()/"validation_selection.jsonl", dict(algorithm=ALGORITHM,
-                model_version=MODEL_VERSION, checkpoint_selection=selection_metadata(), episode=episode,
+            append_json(scene.log_dir()/"validation_selection.jsonl", dict(algorithm=scene.algorithm,
+                model_version=scene.model_version, checkpoint_selection=selection_metadata(), episode=episode,
                 instance_seed=scene.training_seed(episode), validation_rows=rows,
                 validation_selection=candidate, best_validation_selection=best,
                 selected_as_best=selected, selected_episode=best['episode']))
             write_json(scene.log_dir()/f"candidates_episode{episode}.json", apf_report(env))
-            print(f"[{DISPLAY_NAME}] episode={episode+1}/{scene.episodes} energy={result['total_energy']:.6f} "
+            print(f"[{scene.display_name}] episode={episode+1}/{scene.episodes} energy={result['total_energy']:.6f} "
                   f"validation_energy={energy:.6f} SR={candidate['workflow_success_rate']:.4f} "
                   f"feasible={candidate['feasible']} selected={selected} best_episode={best['episode']}", flush=True)
         save_agents(agents, scene.checkpoint_dir(), "final", episode=episode,
                     candidate=candidate, best=best, rows=rows, best_rows=best_rows)
-        write_json(scene.log_dir()/"training_summary.json", dict(algorithm=ALGORITHM,
-            model_version=MODEL_VERSION, variant=variant_metadata(scene.mechanism), episodes=scene.episodes, checkpoint_selection=selection_metadata(),
+        write_json(scene.log_dir()/"training_summary.json", dict(algorithm=scene.algorithm,
+            model_version=scene.model_version, variant=scene.variant_metadata(), episodes=scene.episodes, checkpoint_selection=selection_metadata(),
             protocol=scene.selection_protocol(), selected_episode=best['episode'],
             best_validation_selection=best, final_validation_selection=candidate,
             feasible_model_found=best['feasible'], resume_supported=False,
@@ -295,7 +300,7 @@ def train(scene):
             parameter_counts={r: sum(p.numel() for p in a.online.parameters()) for r,a in agents.items()}))
     finally:
         recorder.close()
-    print(f"[MAHDRL-AS-Fast-VAware train completed] models={scene.checkpoint_dir().resolve()} logs={scene.log_dir().resolve()}")
+    print(f"[{scene.display_name} train completed] models={scene.checkpoint_dir().resolve()} logs={scene.log_dir().resolve()}")
     return agents
 
 
@@ -310,15 +315,15 @@ def evaluate(scene):
     set_seed(scene.model_seed)
     agents = load_agents(scene)
     directory.mkdir(parents=True, exist_ok=True)
-    write_json(directory/"algorithm_variant.json", variant_metadata(scene.mechanism))
-    write_json(directory/"implementation.json", implementation_metadata(scene.mechanism))
+    write_json(directory/"algorithm_variant.json", scene.variant_metadata())
+    write_json(directory/"implementation.json", scene.implementation_metadata())
     write_run_metadata(directory, scene)
     values = []
     for seed in scene.seeds:
         set_seed(scene.model_seed)
         env = build_env(scene, seed)
         env.reset()
-        recorder = EvaluationRecorder(scene, ALGORITHM, env, agents,
+        recorder = EvaluationRecorder(scene, scene.algorithm, env, agents,
             directory=directory/"measurements", checkpoint_directory=str(scene.checkpoint_dir()))
         try:
             result = run_episode(env, agents, assignment_log=lambda row: append_json(directory/"assignments.jsonl", dict(seed=seed, **row)))
@@ -327,7 +332,7 @@ def evaluate(scene):
         append_json(directory/"stage_timings.jsonl", dict(seed=seed, scope="evaluation", environment=env.profiler.report()))
         write_json(directory/f"candidates_seed{seed}.json", apf_report(env))
         append_json(directory/"evaluation.jsonl", dict(seed=seed, **result))
-        row = dict(**scene.evaluation_identity(), seed=seed, model_seed=scene.model_seed, model_version=MODEL_VERSION, va_preview=scene.va_preview, ha_update_period=scene.ha_update_period,
+        row = dict(**scene.evaluation_identity(), seed=seed, model_seed=scene.model_seed, model_version=scene.model_version, va_preview=scene.va_preview, ha_update_period=scene.ha_update_period,
             host_apf_enabled=False, vm_apf_enabled=False, **episode_metrics(env))
         with csv_path.open("a", encoding="utf-8", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=list(row))
@@ -338,9 +343,9 @@ def evaluate(scene):
     summary = {key: dict(mean=float(np.mean([v[key] for v in values])),
                         std=float(np.std([v[key] for v in values], ddof=1)) if len(values)>1 else 0.)
                for key in ("total_energy", "wf_success_rate", "wf_avg_tardiness", "makespan", "wf_avg_response_time")}
-    write_json(directory/"summary.json", dict(algorithm=ALGORITHM, model_version=MODEL_VERSION, variant=variant_metadata(scene.mechanism),
+    write_json(directory/"summary.json", dict(algorithm=scene.algorithm, model_version=scene.model_version, variant=scene.variant_metadata(),
         checkpoint_selection=selection_metadata(), selected_episode=agents['TA'].loaded_selection['selected_episode'],
         best_validation_selection=agents['TA'].loaded_selection['best_validation_selection'],
         seeds=list(scene.seeds), metrics=summary))
-    print(f"[MAHDRL-AS-Fast-VAware eval completed] csv={csv_path.resolve()} details={directory.resolve()}")
+    print(f"[{scene.display_name} eval completed] csv={csv_path.resolve()} details={directory.resolve()}")
     return summary

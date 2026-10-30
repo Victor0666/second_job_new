@@ -5,7 +5,7 @@ import torch
 from algorithms.mahdrl_oe_ge_apf_score.agent import CheckpointIdentity
 from algorithms.mahdrl_oe_ge_apf_score_fast.agent import TAAgent as BaseTA, SetD3QNAgent as BaseSet
 from algorithms.mahdrl_oe_ge_apf_score_fast.selection import validate_checkpoint_selection, selection_metadata
-from .config import ALGORITHM, MODEL_VERSION, CHECKPOINT_METADATA_KEY, variant_metadata, implementation_metadata
+from .config import CHECKPOINT_METADATA_KEY
 
 
 class VariantIdentity:
@@ -18,19 +18,21 @@ class VariantIdentity:
             raise ValueError("VAware observation schema mismatch")
         super().bind(scenario, role)
         self.eligible_steps = 0
-        self.identity = dict(variant_metadata(self.mechanism), role=role,
+        self.model_version = scenario.model_version
+        self.implementation = scenario.implementation_metadata()
+        self.identity = dict(scenario.variant_metadata(), role=role,
             parameter_shapes={k: list(v.shape) for k, v in self.online.state_dict().items()})
         self.normalization_metadata.update(algorithm_variant=deepcopy(self.identity),
-            implementation=implementation_metadata(self.mechanism))
-        self.selection_expectation.update(algorithm=ALGORITHM, model_version=MODEL_VERSION,
+            implementation=deepcopy(self.implementation))
+        self.selection_expectation.update(algorithm=scenario.algorithm, model_version=self.model_version,
             mechanism=self.identity["mechanism"])
         return self
 
     def _check_metadata(self, actual):
         if not isinstance(actual, dict):
             raise ValueError("Missing VAware metadata")
-        for key, expected in dict(model_version=MODEL_VERSION, algorithm_variant=self.identity,
-                implementation=implementation_metadata(self.mechanism),
+        for key, expected in dict(model_version=self.model_version, algorithm_variant=self.identity,
+                implementation=self.implementation,
                 experiment_protocol=self.selection_expectation["protocol"],
                 checkpoint_selection=selection_metadata()).items():
             if actual.get(key) != expected:

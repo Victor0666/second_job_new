@@ -1,0 +1,141 @@
+{
+  "full_workload_probe_policy": "untrained_tiny_networks_for_physics_and_reference_checks_only",
+  "public_entries": [
+    {
+      "scale": 100,
+      "mode": "train",
+      "status": "passed"
+    },
+    {
+      "scale": 100,
+      "mode": "evaluate",
+      "status": "passed"
+    },
+    {
+      "scale": 100,
+      "mode": "precompute",
+      "status": "passed"
+    },
+    {
+      "scale": 150,
+      "mode": "train",
+      "status": "passed"
+    },
+    {
+      "scale": 150,
+      "mode": "evaluate",
+      "status": "passed"
+    },
+    {
+      "scale": 150,
+      "mode": "precompute",
+      "status": "passed"
+    }
+  ],
+  "full_workloads": [
+    {
+      "resource": "M",
+      "hosts": 6,
+      "vms": 50,
+      "workflows": 50,
+      "arrival_lambda": 0.03,
+      "workflow_identity_hash": "4f1bab17e2e0da8ed1599d9498cb6bdbc3d1b9617db06f049bbf3e037ec58b3b",
+      "completed": 50,
+      "elapsed_seconds": 7.932514199987054,
+      "diagnostics": {
+        "assignments": 1370,
+        "mean_host_selection_gap": 41.60571778500213,
+        "mean_global_legal_vm_count": 15.188321167883212,
+        "mean_local_legal_vm_count": 2.637956204379562,
+        "mean_legal_host_count": 4.52043795620438,
+        "mean_vm_selection_gap": 80.75285764263917,
+        "greedy_match_rate": 1.0,
+        "mean_energy_prediction_error": 7.883393856608411e-16
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": -5.684341886080802e-14,
+        "team_energy_reward": -329.1519366849259,
+        "selected_host_energy_reward": -329.1519366849259,
+        "assignment_energy_total": 329151.9366849258,
+        "assignment_energy_physical_gap": 1.1641532182693481e-10,
+        "complete_episode": true,
+        "HA_reward_formula_balance": -1.4210854715202004e-14,
+        "VA_reward_formula_balance": -1.4210854715202004e-14
+      }
+    },
+    {
+      "resource": "R100",
+      "hosts": 12,
+      "vms": 100,
+      "workflows": 50,
+      "arrival_lambda": 0.03,
+      "workflow_identity_hash": "4f1bab17e2e0da8ed1599d9498cb6bdbc3d1b9617db06f049bbf3e037ec58b3b",
+      "completed": 50,
+      "elapsed_seconds": 10.859159099985845,
+      "diagnostics": {
+        "assignments": 1370,
+        "mean_host_selection_gap": 96.94510286039784,
+        "mean_global_legal_vm_count": 63.57299270072993,
+        "mean_local_legal_vm_count": 3.4094890510948903,
+        "mean_legal_host_count": 11.446715328467153,
+        "mean_vm_selection_gap": 119.30190034669185,
+        "greedy_match_rate": 1.0,
+        "mean_energy_prediction_error": 9.854242320760513e-16
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": -5.684341886080802e-14,
+        "team_energy_reward": -423.57350976385453,
+        "selected_host_energy_reward": -423.57350976385453,
+        "assignment_energy_total": 423573.50976385444,
+        "assignment_energy_physical_gap": -2.3283064365386963e-10,
+        "complete_episode": true,
+        "HA_reward_formula_balance": -1.4210854715202004e-14,
+        "VA_reward_formula_balance": -1.4210854715202004e-14
+      }
+    },
+    {
+      "resource": "R150",
+      "hosts": 18,
+      "vms": 150,
+      "workflows": 50,
+      "arrival_lambda": 0.03,
+      "workflow_identity_hash": "4f1bab17e2e0da8ed1599d9498cb6bdbc3d1b9617db06f049bbf3e037ec58b3b",
+      "completed": 50,
+      "elapsed_seconds": 13.443594899959862,
+      "diagnostics": {
+        "assignments": 1370,
+        "mean_host_selection_gap": 177.3609666159111,
+        "mean_global_legal_vm_count": 114.06131386861314,
+        "mean_local_legal_vm_count": 3.308759124087591,
+        "mean_legal_host_count": 16.785401459854015,
+        "mean_vm_selection_gap": 112.89074183395913,
+        "greedy_match_rate": 1.0,
+        "mean_energy_prediction_error": -5.705087659387666e-16
+      },
+      "reward_audit": {
+        "physical_energy_balance": 0.0,
+        "lower_energy_balance": -3.410605131648481e-13,
+        "team_energy_reward": -528.5185277952521,
+        "selected_host_energy_reward": -528.5185277952521,
+        "assignment_energy_total": 528518.5277952518,
+        "assignment_energy_physical_gap": -6.984919309616089e-10,
+        "complete_episode": true,
+        "HA_reward_formula_balance": -8.526512829121202e-14,
+        "VA_reward_formula_balance": -8.526512829121202e-14
+      }
+    }
+  ],
+  "shell": {
+    "bash": "D:\\Git\\bin\\bash.exe",
+    "syntax": "passed",
+    "stub_calls": 27,
+    "source_starts_no_jobs": true,
+    "evaluation_failure_stops_remaining_targets": true
+  },
+  "cuda_available": true,
+  "formal_training_started": false,
+  "fixed_reference_protocol": "fixed_load_r50_reference_v1",
+  "parsed_python_files": 24
+}

@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-31",
+  "test_modules": [
+    "common.test_mahdrl_as_fast_hscore",
+    "common.test_mahdrl_as_fast_vaaware",
+    "common.test_mahdrl_as_fast_vaaware_tl",
+    "common.test_mahdrl_as_fast_vaaware_resources",
+    "common.test_mahdrl_as_fast_vaaware_resources_tl"
+  ],
+  "tests": {
+    "run": 52,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "successful": true
+  },
+  "cli": [
+    {
+      "entry": "train",
+      "exit_code": 0,
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_hscore\\SS_T_m1_cec857181",
+      "evaluation_csv": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_hscore\\eval_mahdrl_hscore_noapf_sr092_p1h4_SS_T_from_SS_T_m1_s700-729_cec857181.csv"
+    },
+    {
+      "entry": "evaluate",
+      "exit_code": 0,
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_hscore\\SS_T_m1_cec857181",
+      "evaluation_csv": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_hscore\\eval_mahdrl_hscore_noapf_sr092_p1h4_SL_T_from_SS_T_m1_s700-729_cec857181.csv"
+    },
+    {
+      "entry": "precompute",
+      "exit_code": 0,
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_hscore\\SC3702529e99a4_T_m1_cec857181",
+      "evaluation_csv": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_hscore\\eval_mahdrl_hscore_noapf_sr092_p1h4_SC3702529e99a4_T_from_SC3702529e99a4_T_m1_s0-1000_cec857181.csv"
+    }
+  ],
+  "protected_sources": {
+    "checked": 578,
+    "changed": []
+  },
+  "paths": {
+    "unique_training": 36,
+    "unique_evaluation_csv": 108,
+    "maximum_training_directory_length": 97,
+    "maximum_csv_path_length": 154
+  },
+  "parameter_counts": {
+    "TA": 532596,
+    "HA": 2572034,
+    "VA": 2330378
+  },
+  "cuda_available": true,
+  "elapsed_seconds": 78.81083139998373,
+  "formal_training_started": false,
+  "bash_commands": {
+    "syntax_passed": true,
+    "mock_calls": 39,
+    "failure_stop_calls": 2,
+    "failure_stops_later_targets": true,
+    "public_parser_checked": true,
+    "formal_jobs_started": 0
+  },
+  "output_path_audit": {
+    "date": "2026-10-31",
+    "focused_tests_passed": 11,
+    "focused_test_seconds": 19.145,
+    "training_leaf_lengths": [
+      17
+    ],
+    "unique_training_directories": 36,
+    "unique_csv_basenames": 108,
+    "all_final_csvs_flat": true,
+    "maximum_relative_training_path_length": 45,
+    "maximum_relative_csv_path_length": 102,
+    "actual_deadline_csvs_generated": [
+      "SS_T_from_SS_T",
+      "SS_M_from_SS_T",
+      "SS_L_from_SS_T"
+    ],
+    "separate_command_files": [
+      "docs/Linux_CUDA_MAHDRL_HScore_600代训练指令.txt",
+      "docs/Linux_CUDA_MAHDRL_HScore_九场景评测指令.txt"
+    ],
+    "bash_syntax_passed": true,
+    "protected_existing_files_unchanged": 578
+  }
+}

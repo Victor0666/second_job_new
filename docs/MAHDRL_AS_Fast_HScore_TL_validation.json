@@ -1,0 +1,69 @@
+{
+  "date": "2026-10-31",
+  "focused_tests": {
+    "module": "common.test_mahdrl_as_fast_hscore_tl",
+    "run": 11,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "elapsed_seconds": 28.026
+  },
+  "regression_tests": {
+    "modules": [
+      "common.test_mahdrl_as_fast_hscore",
+      "common.test_mahdrl_as_fast_vaaware",
+      "common.test_mahdrl_as_fast_vaaware_tl"
+    ],
+    "run": 35,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "successful": true
+  },
+  "cli": [
+    {
+      "entry": "train",
+      "exit_code": 0,
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_hscore_tl\\SS_T_m1_c7b778625",
+      "evaluation_csv": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_hscore_tl\\eval_mahdrl_hscore_tl_noapf_sr092_SS_T_from_SS_T_m1_s700-729_c7b778625.csv"
+    },
+    {
+      "entry": "evaluate",
+      "exit_code": 0,
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_hscore_tl\\SS_T_m1_c7b778625",
+      "evaluation_csv": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_hscore_tl\\eval_mahdrl_hscore_tl_noapf_sr092_SL_T_from_SS_T_m1_s700-729_c7b778625.csv"
+    },
+    {
+      "entry": "precompute",
+      "exit_code": 0,
+      "checkpoint_dir": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\ckpts\\mahdrl_hscore_tl\\SC3702529e99a4_T_m1_c7b778625",
+      "evaluation_csv": "E:\\读博生活\\0.科研\\1.论文\\2. 第二个任务\\1. 论文实验材料\\second_job_new\\outputs\\run\\mahdrl_hscore_tl\\eval_mahdrl_hscore_tl_noapf_sr092_SC3702529e99a4_T_from_SC3702529e99a4_T_m1_s0-1000_c7b778625.csv"
+    }
+  ],
+  "commands": {
+    "syntax_passed": true,
+    "mock_calls": 39,
+    "failure_stop_calls": 2,
+    "public_parser_checked": true,
+    "formal_jobs_started": 0
+  },
+  "paths": {
+    "unique_training": 9,
+    "unique_final_csv_names": 27,
+    "flat_final_csv": true,
+    "training_leaf_length": 17,
+    "maximum_absolute_training_path_length": 100,
+    "maximum_absolute_csv_path_length": 155
+  },
+  "parameter_counts": {
+    "TA": 532596,
+    "VA": 2330378
+  },
+  "cuda_available": true,
+  "protected_sources": {
+    "checked": 640,
+    "changed": []
+  },
+  "elapsed_regression_and_audit_seconds": 53.43001520005055,
+  "formal_training_started": false
+}

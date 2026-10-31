@@ -1,0 +1,41 @@
+# 在服务器项目根目录执行，先定义函数，再按需要运行场景调用。
+
+train_mahdrl_as_fast_hscore_tl() {
+    local res="$1" ddl="$2"
+    local seed="${3:-1}"
+    local prefix="outputs/server_train_logs/train_hscore_tl_S${res}_${ddl}_sr092_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
+    mkdir -p outputs/server_train_logs
+
+    CUDA_VISIBLE_DEVICES=${GPU:-0} nohup bash -c '
+        res="$1"
+        ddl="$2"
+        seed="$3"
+
+        echo "[START] train=S${res}/${ddl} model=${seed}"
+        python -u launch.py \
+            algorithms/mahdrl_as_fast_hscore_tl/train.py \
+            --task S --resource "$res" --deadline "$ddl" \
+            --episodes 600 --model-seed "$seed" \
+            --experiment-protocol configs/f22_split_v1.json \
+            --normalization-mode f19_shared_v1 --device cuda \
+            --diagnostics-every 100 \
+            --profile-mode sampled --profile-every 100 \
+            || exit 1
+        echo "[DONE] train=S${res}/${ddl} model=${seed}"
+        echo "[ALL_DONE] train=S${res}/${ddl} model=${seed}"
+    ' mahdrl_as_fast_hscore_tl_train "$res" "$ddl" "$seed" \
+        > "${prefix}.log" 2>&1 < /dev/null &
+
+    echo $! > "${prefix}.pid"
+    printf 'started: %s.log\n' "$prefix"
+}
+
+train_mahdrl_as_fast_hscore_tl S Tight
+train_mahdrl_as_fast_hscore_tl S Medium
+train_mahdrl_as_fast_hscore_tl S Loose
+train_mahdrl_as_fast_hscore_tl M Tight
+train_mahdrl_as_fast_hscore_tl M Medium
+train_mahdrl_as_fast_hscore_tl M Loose
+train_mahdrl_as_fast_hscore_tl L Tight
+train_mahdrl_as_fast_hscore_tl L Medium
+train_mahdrl_as_fast_hscore_tl L Loose

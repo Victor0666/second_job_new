@@ -6,7 +6,7 @@ from algorithms.mahdrl_as_fast_hscore.config import (
 
 ALGORITHM = "mahdrl_as_fast_hscore_tl"
 DISPLAY_NAME = "MAHDRL-AS-Fast-HScore-TL"
-MODEL_VERSION = "mahdrl_hscore_tl_grouped9_v1"
+MODEL_VERSION = "mahdrl_hscore_tl_grouped9_srgt092_v2"
 OUTPUT_TAG = "mahdrl_hscore_tl"
 CHECKPOINT_METADATA_KEY = "mahdrl_hscore_tl"
 
@@ -41,4 +41,4 @@ def implementation_metadata():
         scientific_variant=variant_metadata(), tl_policy=tl_policy_metadata(),
         replay="frozen_Hx93_host_batches_and_9H_masks_real_global_successors",
         environment="unchanged_hscore_physics_fixed9_global_action_adapter",
-        checkpoint_selection="select_sr092_minenergy_v1")
+        checkpoint_selection="select_srgt092_minenergy_v1")

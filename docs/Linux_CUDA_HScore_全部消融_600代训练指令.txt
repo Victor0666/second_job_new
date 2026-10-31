@@ -1,0 +1,135 @@
+# 在项目根目录执行；先加载函数，然后按 GPU 空闲情况选择调用。
+# 每个调用后台运行 600 回合；不要将全部调用同时投到同一 GPU。
+source docs/mahdrl_as_fast_hscore_ablation_commands.sh
+
+# full
+train_mahdrl_as_fast_hscore S Tight
+train_mahdrl_as_fast_hscore S Medium
+train_mahdrl_as_fast_hscore S Loose
+train_mahdrl_as_fast_hscore M Tight
+train_mahdrl_as_fast_hscore M Medium
+train_mahdrl_as_fast_hscore M Loose
+train_mahdrl_as_fast_hscore L Tight
+train_mahdrl_as_fast_hscore L Medium
+train_mahdrl_as_fast_hscore L Loose
+
+# tl
+train_mahdrl_as_fast_hscore_tl S Tight
+train_mahdrl_as_fast_hscore_tl S Medium
+train_mahdrl_as_fast_hscore_tl S Loose
+train_mahdrl_as_fast_hscore_tl M Tight
+train_mahdrl_as_fast_hscore_tl M Medium
+train_mahdrl_as_fast_hscore_tl M Loose
+train_mahdrl_as_fast_hscore_tl L Tight
+train_mahdrl_as_fast_hscore_tl L Medium
+train_mahdrl_as_fast_hscore_tl L Loose
+
+# nta
+train_mahdrl_as_fast_hscore_nta S Tight
+train_mahdrl_as_fast_hscore_nta S Medium
+train_mahdrl_as_fast_hscore_nta S Loose
+train_mahdrl_as_fast_hscore_nta M Tight
+train_mahdrl_as_fast_hscore_nta M Medium
+train_mahdrl_as_fast_hscore_nta M Loose
+train_mahdrl_as_fast_hscore_nta L Tight
+train_mahdrl_as_fast_hscore_nta L Medium
+train_mahdrl_as_fast_hscore_nta L Loose
+
+# nha
+train_mahdrl_as_fast_hscore_nha S Tight
+train_mahdrl_as_fast_hscore_nha S Medium
+train_mahdrl_as_fast_hscore_nha S Loose
+train_mahdrl_as_fast_hscore_nha M Tight
+train_mahdrl_as_fast_hscore_nha M Medium
+train_mahdrl_as_fast_hscore_nha M Loose
+train_mahdrl_as_fast_hscore_nha L Tight
+train_mahdrl_as_fast_hscore_nha L Medium
+train_mahdrl_as_fast_hscore_nha L Loose
+
+# nva
+train_mahdrl_as_fast_hscore_nva S Tight
+train_mahdrl_as_fast_hscore_nva S Medium
+train_mahdrl_as_fast_hscore_nva S Loose
+train_mahdrl_as_fast_hscore_nva M Tight
+train_mahdrl_as_fast_hscore_nva M Medium
+train_mahdrl_as_fast_hscore_nva M Loose
+train_mahdrl_as_fast_hscore_nva L Tight
+train_mahdrl_as_fast_hscore_nva L Medium
+train_mahdrl_as_fast_hscore_nva L Loose
+
+# sync_task
+train_mahdrl_as_fast_hscore_sync_task S Tight
+train_mahdrl_as_fast_hscore_sync_task S Medium
+train_mahdrl_as_fast_hscore_sync_task S Loose
+train_mahdrl_as_fast_hscore_sync_task M Tight
+train_mahdrl_as_fast_hscore_sync_task M Medium
+train_mahdrl_as_fast_hscore_sync_task M Loose
+train_mahdrl_as_fast_hscore_sync_task L Tight
+train_mahdrl_as_fast_hscore_sync_task L Medium
+train_mahdrl_as_fast_hscore_sync_task L Loose
+
+# sync_phase
+train_mahdrl_as_fast_hscore_sync_phase S Tight
+train_mahdrl_as_fast_hscore_sync_phase S Medium
+train_mahdrl_as_fast_hscore_sync_phase S Loose
+train_mahdrl_as_fast_hscore_sync_phase M Tight
+train_mahdrl_as_fast_hscore_sync_phase M Medium
+train_mahdrl_as_fast_hscore_sync_phase M Loose
+train_mahdrl_as_fast_hscore_sync_phase L Tight
+train_mahdrl_as_fast_hscore_sync_phase L Medium
+train_mahdrl_as_fast_hscore_sync_phase L Loose
+
+# ertf
+train_mahdrl_as_fast_hscore_ertf S Tight
+train_mahdrl_as_fast_hscore_ertf S Medium
+train_mahdrl_as_fast_hscore_ertf S Loose
+train_mahdrl_as_fast_hscore_ertf M Tight
+train_mahdrl_as_fast_hscore_ertf M Medium
+train_mahdrl_as_fast_hscore_ertf M Loose
+train_mahdrl_as_fast_hscore_ertf L Tight
+train_mahdrl_as_fast_hscore_ertf L Medium
+train_mahdrl_as_fast_hscore_ertf L Loose
+
+# edf
+train_mahdrl_as_fast_hscore_edf S Tight
+train_mahdrl_as_fast_hscore_edf S Medium
+train_mahdrl_as_fast_hscore_edf S Loose
+train_mahdrl_as_fast_hscore_edf M Tight
+train_mahdrl_as_fast_hscore_edf M Medium
+train_mahdrl_as_fast_hscore_edf M Loose
+train_mahdrl_as_fast_hscore_edf L Tight
+train_mahdrl_as_fast_hscore_edf L Medium
+train_mahdrl_as_fast_hscore_edf L Loose
+
+# cp
+train_mahdrl_as_fast_hscore_cp S Tight
+train_mahdrl_as_fast_hscore_cp S Medium
+train_mahdrl_as_fast_hscore_cp S Loose
+train_mahdrl_as_fast_hscore_cp M Tight
+train_mahdrl_as_fast_hscore_cp M Medium
+train_mahdrl_as_fast_hscore_cp M Loose
+train_mahdrl_as_fast_hscore_cp L Tight
+train_mahdrl_as_fast_hscore_cp L Medium
+train_mahdrl_as_fast_hscore_cp L Loose
+
+# r090
+train_mahdrl_as_fast_hscore_r090 S Tight
+train_mahdrl_as_fast_hscore_r090 S Medium
+train_mahdrl_as_fast_hscore_r090 S Loose
+train_mahdrl_as_fast_hscore_r090 M Tight
+train_mahdrl_as_fast_hscore_r090 M Medium
+train_mahdrl_as_fast_hscore_r090 M Loose
+train_mahdrl_as_fast_hscore_r090 L Tight
+train_mahdrl_as_fast_hscore_r090 L Medium
+train_mahdrl_as_fast_hscore_r090 L Loose
+
+# r010_nopf
+train_mahdrl_as_fast_hscore_r010_nopf S Tight
+train_mahdrl_as_fast_hscore_r010_nopf S Medium
+train_mahdrl_as_fast_hscore_r010_nopf S Loose
+train_mahdrl_as_fast_hscore_r010_nopf M Tight
+train_mahdrl_as_fast_hscore_r010_nopf M Medium
+train_mahdrl_as_fast_hscore_r010_nopf M Loose
+train_mahdrl_as_fast_hscore_r010_nopf L Tight
+train_mahdrl_as_fast_hscore_r010_nopf L Medium
+train_mahdrl_as_fast_hscore_r010_nopf L Loose

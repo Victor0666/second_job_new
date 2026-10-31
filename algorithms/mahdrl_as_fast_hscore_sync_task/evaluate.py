@@ -1,0 +1,9 @@
+"""eval HScore sync_task."""
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from algorithms.mahdrl_as_fast_hscore_sync_task.scenario import parse_scenario
+from algorithms.mahdrl_as_fast_hscore_ablation.runtime import evaluate
+
+if __name__ == "__main__":
+    evaluate(parse_scenario("eval"))

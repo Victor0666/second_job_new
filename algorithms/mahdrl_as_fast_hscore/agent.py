@@ -22,7 +22,7 @@ from .selection import selection_metadata, validate_checkpoint_selection
 
 class VariantIdentity:
     def bind(self, scenario, role):
-        if role not in ("TA", "HA", "VA"):
+        if role not in getattr(scenario, "learned_roles", ("TA", "HA", "VA")):
             raise ValueError("Unknown learner role")
         if role == "HA" and (not self.is_set or (self.context_dim, self.candidate_dim) != (23, scenario.mechanism.host_features)):
             raise ValueError("HScore HA observation schema mismatch")
@@ -32,6 +32,7 @@ class VariantIdentity:
             raise ValueError("HScore TA observation schema mismatch")
         CheckpointIdentity.bind(self, scenario, role)
         self.mechanism = scenario.mechanism
+        self.checkpoint_key = getattr(scenario, "checkpoint_key", CHECKPOINT_METADATA_KEY)
         self.eligible_steps = 0
         self.model_version = scenario.model_version
         self.implementation = scenario.implementation_metadata()
@@ -53,7 +54,7 @@ class VariantIdentity:
                 checkpoint_selection=selection_metadata()).items():
             if actual.get(key) != expected:
                 raise ValueError("HScore checkpoint mismatch: " + key)
-        return validate_checkpoint_selection(actual.get(CHECKPOINT_METADATA_KEY), self.selection_expectation)
+        return validate_checkpoint_selection(actual.get(self.checkpoint_key), self.selection_expectation)
 
     def save(self, path):
         self.normalization_metadata["ha_eligible_steps"] = self.eligible_steps
@@ -75,7 +76,7 @@ class VariantIdentity:
             raise ValueError("HA exploration and optimizer clocks disagree")
         CheckpointIdentity.load(self, path, strict=True, require_learning_model=require_learning_model)
         self.eligible_steps, self.loaded_selection = steps, deepcopy(record)
-        self.normalization_metadata[CHECKPOINT_METADATA_KEY] = deepcopy(record)
+        self.normalization_metadata[self.checkpoint_key] = deepcopy(record)
 
 
 class TAAgent(VariantIdentity, BaseTA):

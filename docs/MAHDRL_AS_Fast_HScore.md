@@ -1,7 +1,9 @@
 # MAHDRL-AS-Fast-VAware-HScore-FixedVA
 
+2026-11-01：HScore 家族已统一为严格 `SR > 0.92`，模型版本已隔离，需要重新训练。全部 11 个消融及统一命令见 [消融说明](MAHDRL_AS_Fast_HScore_ablations.md)。下方早期验证记录仅代表当时版本。
+
 独立算法入口：`algorithms/mahdrl_as_fast_hscore/`。模型版本：
-`mahdrl_hscore_fixedva_v1`。本版以 VAware 完整三层版为基线，仅 HA 使用可变候选
+`mahdrl_hscore_fixedva_srgt092_v2`。本版以 VAware 完整三层版为基线，仅 HA 使用可变候选
 共享打分，VA 改为固定槽位 Dueling Double DQN。原 VAware 及其 TL、R100、R150
 实现和结果不修改；新版不加载旧版权重，需要重新训练。
 
@@ -46,7 +48,7 @@ HA 回放仍为可变候选集合；VA 回放为冻结的 93 维状态、9 维�
 Double DQN 用保存的后继合法掩码选动作，target 网络评估该动作；终止样本不前向
 后继网络、不 bootstrap。掩码不排除仅因速度慢、预计超期或能耗较高的物理合法 VM。
 
-选模沿用 `SR >= 0.92` 后最低验证能耗，三层 best 必须属于同一保存组和选中回合。
+选模统一为 `SR > 0.92` 后最低验证能耗，三层 best 必须属于同一保存组和选中回合。
 检查点校验新身份、角色、实际参数形状、固定 9 容量、93 维观测、主机内动作定义、
 机制、源归一化、协议与选模证据。旧 VAware 与新模型双向拒绝混用；不提供断点续训。
 
@@ -106,9 +108,9 @@ python -u launch.py algorithms/mahdrl_as_fast_hscore/evaluate.py --task S --reso
 `outputs/run/mahdrl_hscore/`。例如同一个 SS/Tight 源模型的三个目标任务场景为：
 
 ```text
-eval_mahdrl_hscore_noapf_sr092_p1h4_SS_T_from_SS_T_m1_s700-729_cec857181.csv
-eval_mahdrl_hscore_noapf_sr092_p1h4_MS_T_from_SS_T_m1_s700-729_cec857181.csv
-eval_mahdrl_hscore_noapf_sr092_p1h4_LS_T_from_SS_T_m1_s700-729_cec857181.csv
+eval_mahdrl_hscore_noapf_srgt092_p1h4_SS_T_from_SS_T_m1_s700-729_cec857181.csv
+eval_mahdrl_hscore_noapf_srgt092_p1h4_MS_T_from_SS_T_m1_s700-729_cec857181.csv
+eval_mahdrl_hscore_noapf_srgt092_p1h4_LS_T_from_SS_T_m1_s700-729_cec857181.csv
 ```
 
 目标截止期变化时，文件名中的目标标记相应变为 `SS_M`、`SS_L`，源标记仍由

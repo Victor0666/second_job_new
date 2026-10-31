@@ -1,9 +1,11 @@
 # MAHDRL-AS-Fast-HScore-TL
 
+2026-11-01：HScore 家族已统一为严格 `SR > 0.92`，模型版本已隔离，需要重新训练。全部 11 个消融及统一命令见 [消融说明](MAHDRL_AS_Fast_HScore_ablations.md)。下方早期验证记录仅代表当时版本。
+
 独立入口：`algorithms/mahdrl_as_fast_hscore_tl/`，模型版本
-`mahdrl_hscore_tl_grouped9_v1`。本版按 HScore 的 TL 消融定义，仅训练 TA、VA，
-删除独立 HA 网络、优化器、回放、动作和更新时钟。HScore、VAware 及已有 TL 的
-代码与输出目录均不修改。
+`mahdrl_hscore_tl_grouped9_srgt092_v2`。本版按 HScore 的 TL 消融定义，仅训练 TA、VA，
+删除独立 HA 网络、优化器、回放、动作和更新时钟。HScore 家族共享严格选模协议；
+VAware 及其已有 TL 的代码与输出目录保持独立。
 
 ## 策略与网络
 
@@ -50,7 +52,7 @@
 以及原学习率、gamma、batch、buffer、warmup、epsilon 衰减和目标网络设置。
 两级 APF 关闭，慢、预计超期或能耗较高本身不屏蔽物理合法 VM。
 
-选模仍为 `SR >= .92` 后最低验证能耗。TA/VA 的 best 必须属于同一保存组、同一
+选模统一为 `SR > .92` 后最低验证能耗。TA/VA 的 best 必须属于同一保存组、同一
 选中回合及同一验证证据。即使 VA 的权重形状相同，也拒绝混用 HScore、VAware-TL
 或其他策略的检查点；必须重新训练。检查点只保存 `best_manager.pth`、`best_vm.pth`
 和对应 final 文件，不创建 HA 占位模型。不提供断点续训。
@@ -97,9 +99,9 @@ source 只定义函数；脚本末尾给出全部 9 组源场景训练和评测�
 `outputs/run/mahdrl_hscore_tl/`，例如：
 
 ```text
-eval_mahdrl_hscore_tl_noapf_sr092_SS_T_from_SS_T_m1_s700-729_cXXXXXXXX.csv
-eval_mahdrl_hscore_tl_noapf_sr092_MS_T_from_SS_T_m1_s700-729_cXXXXXXXX.csv
-eval_mahdrl_hscore_tl_noapf_sr092_LS_T_from_SS_T_m1_s700-729_cXXXXXXXX.csv
+eval_mahdrl_hscore_tl_noapf_srgt092_SS_T_from_SS_T_m1_s700-729_cXXXXXXXX.csv
+eval_mahdrl_hscore_tl_noapf_srgt092_MS_T_from_SS_T_m1_s700-729_cXXXXXXXX.csv
+eval_mahdrl_hscore_tl_noapf_srgt092_LS_T_from_SS_T_m1_s700-729_cXXXXXXXX.csv
 ```
 
 目标/源场景、模型种子及测试种子体现在文件名，明细在 `_details/` 下。CSV 包含

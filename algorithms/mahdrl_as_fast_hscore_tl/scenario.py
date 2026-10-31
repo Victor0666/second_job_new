@@ -4,10 +4,11 @@ from algorithms.mahdrl_as_fast_vaaware_tl.scenario import ScoreScenario as BaseS
 from algorithms.mahdrl_as_fast_vaaware_tl.scenario import parse_scenario as base_parse
 from .config import (ALGORITHM, DISPLAY_NAME, MODEL_VERSION, OUTPUT_TAG, VM_CAPACITY,
                      VM_INPUT_DIM, variant_metadata, implementation_metadata)
+from algorithms.mahdrl_as_fast_hscore.protocol import StrictSelection
 
 
 @dataclass(frozen=True)
-class ScoreScenario(BaseScenario):
+class ScoreScenario(StrictSelection, BaseScenario):
     algorithm = ALGORITHM
     display_name = DISPLAY_NAME
     model_version = MODEL_VERSION

@@ -11,7 +11,7 @@ train_mahdrl_as_fast_hscore() {
         off) preview_flag="--no-va-preview"; p=0 ;;
         *) printf 'preview must be on/off\n' >&2; return 2 ;;
     esac
-    local prefix="outputs/server_train_logs/train_hscore_S${res}_${ddl}_p${p}h${period}_sr092_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
+    local prefix="outputs/server_train_logs/train_hscore_S${res}_${ddl}_p${p}h${period}_srgt092_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
     mkdir -p outputs/server_train_logs
 
     CUDA_VISIBLE_DEVICES=${GPU:-0} nohup bash -c '
@@ -51,7 +51,7 @@ eval_mahdrl_as_fast_hscore_all() {
         off) preview_flag="--no-va-preview"; p=0 ;;
         *) printf 'preview must be on/off\n' >&2; return 2 ;;
     esac
-    local prefix="outputs/server_eval_logs/eval_hscore_S${res}_${ddl}_targets${targets// /}_p${p}h${period}_sr092_s700-729_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
+    local prefix="outputs/server_eval_logs/eval_hscore_S${res}_${ddl}_targets${targets// /}_p${p}h${period}_srgt092_s700-729_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
     mkdir -p outputs/server_eval_logs
 
     CUDA_VISIBLE_DEVICES=${GPU:-0} nohup bash -c '

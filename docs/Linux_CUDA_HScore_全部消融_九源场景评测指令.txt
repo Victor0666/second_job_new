@@ -1,0 +1,171 @@
+# 在项目根目录执行；先加载函数。必须先完成对应源模型训练。
+# 每个源模型依次评测 S/M/L 三种任务规模、同资源与截止期，seeds 700-729。
+source docs/mahdrl_as_fast_hscore_ablation_commands.sh
+
+# full
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_all S Tight
+eval_mahdrl_as_fast_hscore_all S Medium
+eval_mahdrl_as_fast_hscore_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_all M Tight
+eval_mahdrl_as_fast_hscore_all M Medium
+eval_mahdrl_as_fast_hscore_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_all L Tight
+eval_mahdrl_as_fast_hscore_all L Medium
+eval_mahdrl_as_fast_hscore_all L Loose
+
+# tl
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_tl_all S Tight
+eval_mahdrl_as_fast_hscore_tl_all S Medium
+eval_mahdrl_as_fast_hscore_tl_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_tl_all M Tight
+eval_mahdrl_as_fast_hscore_tl_all M Medium
+eval_mahdrl_as_fast_hscore_tl_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_tl_all L Tight
+eval_mahdrl_as_fast_hscore_tl_all L Medium
+eval_mahdrl_as_fast_hscore_tl_all L Loose
+
+# nta
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_nta_all S Tight
+eval_mahdrl_as_fast_hscore_nta_all S Medium
+eval_mahdrl_as_fast_hscore_nta_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_nta_all M Tight
+eval_mahdrl_as_fast_hscore_nta_all M Medium
+eval_mahdrl_as_fast_hscore_nta_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_nta_all L Tight
+eval_mahdrl_as_fast_hscore_nta_all L Medium
+eval_mahdrl_as_fast_hscore_nta_all L Loose
+
+# nha
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_nha_all S Tight
+eval_mahdrl_as_fast_hscore_nha_all S Medium
+eval_mahdrl_as_fast_hscore_nha_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_nha_all M Tight
+eval_mahdrl_as_fast_hscore_nha_all M Medium
+eval_mahdrl_as_fast_hscore_nha_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_nha_all L Tight
+eval_mahdrl_as_fast_hscore_nha_all L Medium
+eval_mahdrl_as_fast_hscore_nha_all L Loose
+
+# nva
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_nva_all S Tight
+eval_mahdrl_as_fast_hscore_nva_all S Medium
+eval_mahdrl_as_fast_hscore_nva_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_nva_all M Tight
+eval_mahdrl_as_fast_hscore_nva_all M Medium
+eval_mahdrl_as_fast_hscore_nva_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_nva_all L Tight
+eval_mahdrl_as_fast_hscore_nva_all L Medium
+eval_mahdrl_as_fast_hscore_nva_all L Loose
+
+# sync_task
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_sync_task_all S Tight
+eval_mahdrl_as_fast_hscore_sync_task_all S Medium
+eval_mahdrl_as_fast_hscore_sync_task_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_sync_task_all M Tight
+eval_mahdrl_as_fast_hscore_sync_task_all M Medium
+eval_mahdrl_as_fast_hscore_sync_task_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_sync_task_all L Tight
+eval_mahdrl_as_fast_hscore_sync_task_all L Medium
+eval_mahdrl_as_fast_hscore_sync_task_all L Loose
+
+# sync_phase
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_sync_phase_all S Tight
+eval_mahdrl_as_fast_hscore_sync_phase_all S Medium
+eval_mahdrl_as_fast_hscore_sync_phase_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_sync_phase_all M Tight
+eval_mahdrl_as_fast_hscore_sync_phase_all M Medium
+eval_mahdrl_as_fast_hscore_sync_phase_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_sync_phase_all L Tight
+eval_mahdrl_as_fast_hscore_sync_phase_all L Medium
+eval_mahdrl_as_fast_hscore_sync_phase_all L Loose
+
+# ertf
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_ertf_all S Tight
+eval_mahdrl_as_fast_hscore_ertf_all S Medium
+eval_mahdrl_as_fast_hscore_ertf_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_ertf_all M Tight
+eval_mahdrl_as_fast_hscore_ertf_all M Medium
+eval_mahdrl_as_fast_hscore_ertf_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_ertf_all L Tight
+eval_mahdrl_as_fast_hscore_ertf_all L Medium
+eval_mahdrl_as_fast_hscore_ertf_all L Loose
+
+# edf
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_edf_all S Tight
+eval_mahdrl_as_fast_hscore_edf_all S Medium
+eval_mahdrl_as_fast_hscore_edf_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_edf_all M Tight
+eval_mahdrl_as_fast_hscore_edf_all M Medium
+eval_mahdrl_as_fast_hscore_edf_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_edf_all L Tight
+eval_mahdrl_as_fast_hscore_edf_all L Medium
+eval_mahdrl_as_fast_hscore_edf_all L Loose
+
+# cp
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_cp_all S Tight
+eval_mahdrl_as_fast_hscore_cp_all S Medium
+eval_mahdrl_as_fast_hscore_cp_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_cp_all M Tight
+eval_mahdrl_as_fast_hscore_cp_all M Medium
+eval_mahdrl_as_fast_hscore_cp_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_cp_all L Tight
+eval_mahdrl_as_fast_hscore_cp_all L Medium
+eval_mahdrl_as_fast_hscore_cp_all L Loose
+
+# r090
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_r090_all S Tight
+eval_mahdrl_as_fast_hscore_r090_all S Medium
+eval_mahdrl_as_fast_hscore_r090_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_r090_all M Tight
+eval_mahdrl_as_fast_hscore_r090_all M Medium
+eval_mahdrl_as_fast_hscore_r090_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_r090_all L Tight
+eval_mahdrl_as_fast_hscore_r090_all L Medium
+eval_mahdrl_as_fast_hscore_r090_all L Loose
+
+# r010_nopf
+# SS 源模型：目标 SS、MS、LS
+eval_mahdrl_as_fast_hscore_r010_nopf_all S Tight
+eval_mahdrl_as_fast_hscore_r010_nopf_all S Medium
+eval_mahdrl_as_fast_hscore_r010_nopf_all S Loose
+# SM 源模型：目标 SM、MM、LM
+eval_mahdrl_as_fast_hscore_r010_nopf_all M Tight
+eval_mahdrl_as_fast_hscore_r010_nopf_all M Medium
+eval_mahdrl_as_fast_hscore_r010_nopf_all M Loose
+# SL 源模型：目标 SL、ML、LL
+eval_mahdrl_as_fast_hscore_r010_nopf_all L Tight
+eval_mahdrl_as_fast_hscore_r010_nopf_all L Medium
+eval_mahdrl_as_fast_hscore_r010_nopf_all L Loose

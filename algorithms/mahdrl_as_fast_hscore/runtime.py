@@ -15,7 +15,7 @@ from common.experiment_measurements import TrainingRecorder, EvaluationRecorder,
 from algorithms.mahdrl_oe.reward import finish_lower_phase, LowerRewardAudit
 from environments.mahdrl_as_fast_hscore import CloudWorkflowEnv_VMAgents, MANAGER_ACTION_TABLE
 from .agent import TAAgent, HAAgent, FixedVAAgent
-from .config import CHECKPOINT_METADATA_KEY, TA_HIDDEN, learning_kwargs
+from .config import TA_HIDDEN, learning_kwargs
 from .selection import selection_metadata, validation_selection, selection_key, validate_checkpoint_selection
 from .updates import UpdateClock, DecisionTrace
 from .preview import prepare_decision
@@ -102,13 +102,13 @@ def save_agents(agents, directory, kind, *, episode, candidate, best, rows, best
     group = uuid.uuid4().hex
     for role, agent in agents.items():
         agent.checkpoint_group = group
-        agent.normalization_metadata[CHECKPOINT_METADATA_KEY] = records[role]
+        agent.normalization_metadata[agent.checkpoint_key] = records[role]
         name = f"best_{FILES[role]}.pth" if kind == "best" else f"{FILES[role]}_{kind}.pth"
         agent.save(str(Path(directory)/name))
 
 
-def load_agents(scene):
-    agents = build_agents(scene)
+def load_agents(scene, *, agent_builder=None):
+    agents = (agent_builder or build_agents)(scene)
     for role, agent in agents.items():
         agent.load(str(scene.checkpoint_dir()/f"best_{FILES[role]}.pth"), require_learning_model=True)
     if len({a.loaded_group for a in agents.values()}) != 1:
@@ -224,11 +224,13 @@ def apf_report(env):
                 host_windows={str(h): dict(start=w[0], end=w[1], duration=w[1]-w[0]) for h,w in windows.items()})
 
 
-def train(scene):
+def train(scene, *, env_builder=None, agent_builder=None, rollout=None):
+    make_env, make_agents, episode_runner = env_builder or build_env, agent_builder or build_agents, rollout or run_episode
     protect_training_outputs(scene.checkpoint_dir(), scene.log_dir())
     validate_inputs(scene)
     set_seed(scene.model_seed)
-    env, agents = build_env(scene, scene.training_seed(0)), build_agents(scene)
+    env, agents = make_env(scene, scene.training_seed(0)), make_agents(scene)
+    device = next(iter(agents.values())).device
     env.reset()
     scene.checkpoint_dir().mkdir(parents=True)
     scene.log_dir().mkdir(parents=True)
@@ -239,13 +241,13 @@ def train(scene):
     recorder = TrainingRecorder(scene.log_dir(), scene, scene.algorithm, env, agents)
     f11 = F11Logger(scene.log_dir())
     best, best_rows = None, None
-    if agents["TA"].device.type == "cuda":
-        torch.cuda.reset_peak_memory_stats(agents["TA"].device)
+    if device.type == "cuda":
+        torch.cuda.reset_peak_memory_stats(device)
     try:
         for episode in range(scene.episodes):
             if episode:
                 env.reset(seed=scene.training_seed(episode))
-            result = run_episode(env, agents, training=True,
+            result = episode_runner(env, agents, training=True,
                 phase_log=lambda row: append_json(scene.log_dir()/"phases.jsonl", dict(episode=episode, **row)),
                 assignment_log=lambda row: append_json(scene.log_dir()/"assignments.jsonl", dict(episode=episode, **row)))
             append_json(scene.log_dir()/"stage_timings.jsonl", dict(episode=episode, scope="training",
@@ -255,9 +257,9 @@ def train(scene):
             def validate():
                 values = []
                 for seed in scene.validation_seeds():
-                    validation = build_env(scene, seed)
+                    validation = make_env(scene, seed)
                     validation.reset()
-                    result = run_episode(validation, agents)
+                    result = episode_runner(validation, agents)
                     if result['wf_count'] != validation.workflows_per_episode:
                         raise RuntimeError('Validation ended before all workflows arrived')
                     values.append(dict(seed=int(seed), **{key: result[key] for key in
@@ -296,7 +298,7 @@ def train(scene):
             best_validation_selection=best, final_validation_selection=candidate,
             feasible_model_found=best['feasible'], resume_supported=False,
             best_validation_energy=best['mean_total_energy'], peak_cuda_allocated_bytes=(
-                torch.cuda.max_memory_allocated(agents["TA"].device) if agents["TA"].device.type == "cuda" else None),
+                torch.cuda.max_memory_allocated(device) if device.type == "cuda" else None),
             parameter_counts={r: sum(p.numel() for p in a.online.parameters()) for r,a in agents.items()}))
     finally:
         recorder.close()
@@ -304,7 +306,8 @@ def train(scene):
     return agents
 
 
-def evaluate(scene):
+def evaluate(scene, *, env_builder=None, agent_builder=None, rollout=None):
+    make_env, episode_runner = env_builder or build_env, rollout or run_episode
     directory = scene.evaluation_dir()
     csv_path = scene.evaluation_csv()
     if csv_path.exists():
@@ -313,7 +316,7 @@ def evaluate(scene):
         raise FileExistsError(f"Refusing to overwrite evaluation artifacts: {directory}")
     validate_inputs(scene)
     set_seed(scene.model_seed)
-    agents = load_agents(scene)
+    agents = load_agents(scene, agent_builder=agent_builder)
     directory.mkdir(parents=True, exist_ok=True)
     write_json(directory/"algorithm_variant.json", scene.variant_metadata())
     write_json(directory/"implementation.json", scene.implementation_metadata())
@@ -321,12 +324,12 @@ def evaluate(scene):
     values = []
     for seed in scene.seeds:
         set_seed(scene.model_seed)
-        env = build_env(scene, seed)
+        env = make_env(scene, seed)
         env.reset()
         recorder = EvaluationRecorder(scene, scene.algorithm, env, agents,
             directory=directory/"measurements", checkpoint_directory=str(scene.checkpoint_dir()))
         try:
-            result = run_episode(env, agents, assignment_log=lambda row: append_json(directory/"assignments.jsonl", dict(seed=seed, **row)))
+            result = episode_runner(env, agents, assignment_log=lambda row: append_json(directory/"assignments.jsonl", dict(seed=seed, **row)))
         finally:
             recorder.finish()
         append_json(directory/"stage_timings.jsonl", dict(seed=seed, scope="evaluation", environment=env.profiler.report()))
@@ -344,8 +347,8 @@ def evaluate(scene):
                         std=float(np.std([v[key] for v in values], ddof=1)) if len(values)>1 else 0.)
                for key in ("total_energy", "wf_success_rate", "wf_avg_tardiness", "makespan", "wf_avg_response_time")}
     write_json(directory/"summary.json", dict(algorithm=scene.algorithm, model_version=scene.model_version, variant=scene.variant_metadata(),
-        checkpoint_selection=selection_metadata(), selected_episode=agents['TA'].loaded_selection['selected_episode'],
-        best_validation_selection=agents['TA'].loaded_selection['best_validation_selection'],
+        checkpoint_selection=selection_metadata(), selected_episode=next(iter(agents.values())).loaded_selection['selected_episode'],
+        best_validation_selection=next(iter(agents.values())).loaded_selection['best_validation_selection'],
         seeds=list(scene.seeds), metrics=summary))
     print(f"[{scene.display_name} eval completed] csv={csv_path.resolve()} details={directory.resolve()}")
     return summary

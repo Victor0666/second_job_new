@@ -1,0 +1,73 @@
+{
+  "date": "2026-11-01",
+  "base_commit": "638b06af5b5b4571fb72157619f6bd01f2764171",
+  "added_variants": [
+    "nta",
+    "nha",
+    "nva",
+    "sync_task",
+    "sync_phase",
+    "ertf",
+    "edf",
+    "cp",
+    "r090",
+    "r010_nopf"
+  ],
+  "existing_ablation": "tl",
+  "ablation_count": 11,
+  "full_plus_ablations": 12,
+  "selection": {
+    "rule": "strict_SR_gt_0.92_then_min_validation_energy",
+    "boundary_46_of_50": false,
+    "boundary_47_of_50": true
+  },
+  "host_apf": false,
+  "vm_apf": false,
+  "preserved": [
+    "GE",
+    "OE",
+    "fixed_VA_93_to_9",
+    "HA_transition_clock_period4"
+  ],
+  "joint_regression": {
+    "tests": 63,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "staged_snapshot_regression": {
+    "tests": 32,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "cuda_available": true,
+  "real_checks": [
+    "all_ten_short_train_save_load_frozen_eval",
+    "retained_roles_only_checkpoints",
+    "all_ten_frozen_transfer_to_six_custom_hosts",
+    "random_policy_legal_uniform_independent_rng",
+    "random_VA_preview_matches_actual_policy_Q_zero",
+    "fixed_sort_exact_keys",
+    "real_successors_terminal_zero_masks",
+    "reward_OE_balances",
+    "sync_deferred_credits",
+    "removed_networks_never_constructed",
+    "old_identity_rejection",
+    "evaluation_no_overwrite"
+  ],
+  "entry_and_paths": {
+    "dry_run_entries": 36,
+    "training_paths": 108,
+    "csv_filenames": 324,
+    "max_training_relative_path": 48
+  },
+  "commands": {
+    "bash_files": 9,
+    "stub_calls": 432,
+    "failure_stops_remaining_targets": true
+  },
+  "formal_600_episode_training_started": false,
+  "formal_30_seed_evaluation_started": false,
+  "unrelated_worktree_changes_included": false
+}

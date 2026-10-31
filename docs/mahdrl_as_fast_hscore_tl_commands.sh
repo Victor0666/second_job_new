@@ -5,7 +5,7 @@
 train_mahdrl_as_fast_hscore_tl() {
     local res="$1" ddl="$2"
     local seed="${3:-1}"
-    local prefix="outputs/server_train_logs/train_hscore_tl_S${res}_${ddl}_sr092_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
+    local prefix="outputs/server_train_logs/train_hscore_tl_S${res}_${ddl}_srgt092_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
     mkdir -p outputs/server_train_logs
 
     CUDA_VISIBLE_DEVICES=${GPU:-0} nohup bash -c '
@@ -37,7 +37,7 @@ eval_mahdrl_as_fast_hscore_tl_all() {
     local res="$1" ddl="$2"
     local targets="${3:-S M L}"
     local seed="${4:-1}"
-    local prefix="outputs/server_eval_logs/eval_hscore_tl_S${res}_${ddl}_targets${targets// /}_sr092_s700-729_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
+    local prefix="outputs/server_eval_logs/eval_hscore_tl_S${res}_${ddl}_targets${targets// /}_srgt092_s700-729_m${seed}_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
     mkdir -p outputs/server_eval_logs
 
     CUDA_VISIBLE_DEVICES=${GPU:-0} nohup bash -c '

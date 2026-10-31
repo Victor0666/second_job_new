@@ -5,7 +5,7 @@ from algorithms.mahdrl_oe_ge_apf_score.config import TRUNK
 
 ALGORITHM = "mahdrl_as_fast_hscore"
 DISPLAY_NAME = "MAHDRL-AS-Fast-VAware-HScore-FixedVA"
-MODEL_VERSION = "mahdrl_hscore_fixedva_v1"
+MODEL_VERSION = "mahdrl_hscore_fixedva_srgt092_v2"
 OUTPUT_TAG = "mahdrl_hscore"
 CHECKPOINT_METADATA_KEY = "mahdrl_hscore"
 VM_CAPACITY = 9
@@ -38,4 +38,4 @@ def implementation_metadata(mechanism=Mechanism()):
         replay="HA_frozen_set_VA_frozen_93_vector_9_mask",
         environment="raw_legal_noapf_float64_fixed9_adapter",
         preview="batched_fixed93_no_grad_no_rng_cached9",
-        checkpoint_selection="select_sr092_minenergy_v1")
+        checkpoint_selection="select_srgt092_minenergy_v1")

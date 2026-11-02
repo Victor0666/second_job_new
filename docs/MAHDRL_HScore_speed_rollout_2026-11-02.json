@@ -1,0 +1,42 @@
+{
+  "scope": "5_workflow_real_rollouts_production_width_full_prefilled_replay_no_validation_or_disk_logging",
+  "workflows": 5,
+  "repeats": 3,
+  "tasks_last_run": 134,
+  "update_clock": {
+    "transitions": {
+      "TA": 49,
+      "HA": 134,
+      "VA": 134
+    },
+    "update_requests": {
+      "TA": 49,
+      "HA": 33,
+      "VA": 134
+    },
+    "optimizer_steps": {
+      "TA": 49,
+      "HA": 33,
+      "VA": 134
+    },
+    "ha_eligible_steps": 402
+  },
+  "seconds": {
+    "original": [
+      2.823694200022146,
+      2.385378699982539,
+      2.421252200147137
+    ],
+    "speed": [
+      1.5599233000539243,
+      1.6098164999857545,
+      1.4955100000370294
+    ]
+  },
+  "median_seconds": {
+    "original": 2.421252200147137,
+    "speed": 1.5599233000539243
+  },
+  "speedup": 1.5521610582157712,
+  "exact_match": "all_assignment_diagnostics_results_online_parameters_each_repeat"
+}

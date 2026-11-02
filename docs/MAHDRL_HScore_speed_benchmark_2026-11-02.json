@@ -1,0 +1,114 @@
+{
+  "scope": "synthetic_full_replay_production_width_learner_updates_not_end_to_end_training",
+  "python": "3.12.10",
+  "torch": "2.5.1+cu121",
+  "numpy": "2.1.2",
+  "device": "cuda",
+  "gpu": "NVIDIA GeForce RTX 4060 Ti",
+  "cpu_threads": 1,
+  "updates_per_repeat": 30,
+  "repeats": 5,
+  "timing": "wall_clock_cuda_synchronized_alternating_order_after_5_warmup_updates",
+  "data": "512 distinct immutable transitions repeated to full capacity; 1/7 terminal; HA has 3 hosts",
+  "roles": [
+    {
+      "role": "TA",
+      "batch_size": 256,
+      "buffer_capacity": 60000,
+      "online_parameters": 532596,
+      "median_update_seconds": {
+        "original": 0.0044418533332645895,
+        "speed": 0.0045364366611465815
+      },
+      "update_speedup": 0.9791503034326317,
+      "repeat_seconds_per_update": {
+        "original": [
+          0.004542639999029537,
+          0.004244690000390013,
+          0.004892073331090311,
+          0.0044418533332645895,
+          0.0042321033387755355
+        ],
+        "speed": [
+          0.0045364366611465815,
+          0.004187720005090038,
+          0.005289046668137113,
+          0.004945289995521307,
+          0.004328146670013666
+        ]
+      },
+      "sample_seconds": {
+        "original": 0.00014385699992999434,
+        "speed": 8.65540001541376e-05
+      },
+      "sample_speedup": 1.6620491216328543,
+      "final_online_parameters_exactly_equal": true
+    },
+    {
+      "role": "HA",
+      "batch_size": 256,
+      "buffer_capacity": 120000,
+      "online_parameters": 2572034,
+      "median_update_seconds": {
+        "original": 0.007032699999399483,
+        "speed": 0.006763730004119377
+      },
+      "update_speedup": 1.0397665186393148,
+      "repeat_seconds_per_update": {
+        "original": [
+          0.007032699999399483,
+          0.006934409999909501,
+          0.007054146666390201,
+          0.007175013337594767,
+          0.007026743330061436
+        ],
+        "speed": [
+          0.006763730004119377,
+          0.006722923337171475,
+          0.0067244966669629015,
+          0.006789643332983057,
+          0.008560606666530171
+        ]
+      },
+      "sample_seconds": {
+        "original": 0.000469565000385046,
+        "speed": 9.136499837040901e-05
+      },
+      "sample_speedup": 5.1394408007468115,
+      "final_online_parameters_exactly_equal": true
+    },
+    {
+      "role": "VA",
+      "batch_size": 256,
+      "buffer_capacity": 120000,
+      "online_parameters": 2330378,
+      "median_update_seconds": {
+        "original": 0.01103940666653216,
+        "speed": 0.004597836663015187
+      },
+      "update_speedup": 2.4010001823972353,
+      "repeat_seconds_per_update": {
+        "original": [
+          0.011141803332914908,
+          0.010964489999848108,
+          0.011008463326531152,
+          0.01103940666653216,
+          0.011376689995328586
+        ],
+        "speed": [
+          0.004597836663015187,
+          0.004684239998459816,
+          0.0045830400039752325,
+          0.004970706665577988,
+          0.004592499998398125
+        ]
+      },
+      "sample_seconds": {
+        "original": 0.00037394999992102385,
+        "speed": 9.81119996868074e-05
+      },
+      "sample_speedup": 3.811460383181925,
+      "final_online_parameters_exactly_equal": true
+    }
+  ]
+}

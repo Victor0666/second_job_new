@@ -1,0 +1,61 @@
+# MAHDRL HScore speed2：Linux/CUDA 独立后台评测
+# 在项目根目录运行；model seed=1，preview=on，HA period=4，严格 SR > 0.92。
+# 各调用按需执行；同一张 GPU 上同时启动多组实验会争用算力。
+
+# 也可直接加载定义（source 不启动作业）：
+# source docs/mahdrl_as_fast_hscore_speed2_commands.sh
+
+eval_mahdrl_as_fast_hscore_speed2_all() {
+    local res="${1:-}" ddl="${2:-}"
+    local targets="${3:-S M L}" target
+    case "$res" in S|M|L) ;; *) printf 'resource must be S/M/L\n' >&2; return 2 ;; esac
+    case "$ddl" in Tight|Medium|Loose) ;; *) printf 'deadline must be Tight/Medium/Loose\n' >&2; return 2 ;; esac
+    for target in $targets; do
+        case "$target" in S|M|L) ;; *) printf 'targets must contain only S/M/L\n' >&2; return 2 ;; esac
+    done
+    local prefix="outputs/server_eval_logs/eval_hscore_speed2_sourceS${res}_${ddl}_targets${targets// /}_p1h4_srgt092_s700-729_m1_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
+    mkdir -p outputs/server_eval_logs || return
+
+    CUDA_VISIBLE_DEVICES=0 nohup bash -c '
+        res="$1"
+        ddl="$2"
+        targets="$3"
+
+        for task in $targets; do
+            echo "[START] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+            python -u launch.py \
+                algorithms/mahdrl_as_fast_hscore_speed2/evaluate.py \
+                --task "$task" --resource "$res" --deadline "$ddl" \
+                --train-task S --train-resource "$res" \
+                --train-deadline "$ddl" \
+                --seeds 700-729 --model-seed 1 \
+                --experiment-protocol configs/f22_split_v1.json \
+                --normalization-mode f19_shared_v1 --device cuda \
+                --va-preview --ha-update-period 4 \
+                --diagnostics-every 100 \
+                --profile-mode sampled --profile-every 100 \
+                || exit 1
+            echo "[DONE] source=S${res}/${ddl} target=${task}${res}/${ddl}"
+        done
+        echo "[ALL_DONE] source=S${res}/${ddl} targets=${targets}"
+    ' mahdrl_as_fast_hscore_speed2_eval "$res" "$ddl" "$targets" \
+        > "${prefix}.log" 2>&1 < /dev/null &
+
+    echo $! > "${prefix}.pid"
+    printf 'started: %s.log\n' "$prefix"
+}
+
+# SS 源模型：评测 SS、MS、LS
+eval_mahdrl_as_fast_hscore_speed2_all S Tight
+eval_mahdrl_as_fast_hscore_speed2_all S Medium
+eval_mahdrl_as_fast_hscore_speed2_all S Loose
+
+# SM 源模型：评测 SM、MM、LM
+eval_mahdrl_as_fast_hscore_speed2_all M Tight
+eval_mahdrl_as_fast_hscore_speed2_all M Medium
+eval_mahdrl_as_fast_hscore_speed2_all M Loose
+
+# SL 源模型：评测 SL、ML、LL
+eval_mahdrl_as_fast_hscore_speed2_all L Tight
+eval_mahdrl_as_fast_hscore_speed2_all L Medium
+eval_mahdrl_as_fast_hscore_speed2_all L Loose

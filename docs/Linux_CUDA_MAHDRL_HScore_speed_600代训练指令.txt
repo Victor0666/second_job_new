@@ -1,0 +1,51 @@
+# MAHDRL HScore speed：Linux/CUDA 独立后台训练
+# 在项目根目录运行；model seed=1，preview=on，HA period=4，严格 SR > 0.92。
+# 各调用按需执行；同一张 GPU 上同时启动多组实验会争用算力。
+
+# 也可直接加载定义（source 不启动作业）：
+# source docs/mahdrl_as_fast_hscore_speed_commands.sh
+
+train_mahdrl_as_fast_hscore_speed() {
+    local res="${1:-}" ddl="${2:-}"
+    case "$res" in S|M|L) ;; *) printf 'resource must be S/M/L\n' >&2; return 2 ;; esac
+    case "$ddl" in Tight|Medium|Loose) ;; *) printf 'deadline must be Tight/Medium/Loose\n' >&2; return 2 ;; esac
+    local prefix="outputs/server_train_logs/train_hscore_speed_S${res}_${ddl}_p1h4_srgt092_m1_$(date +%Y%m%d_%H%M%S)_${RANDOM}"
+    mkdir -p outputs/server_train_logs || return
+
+    CUDA_VISIBLE_DEVICES=0 nohup bash -c '
+        res="$1"
+        ddl="$2"
+
+        echo "[START] train=S${res}/${ddl}"
+        python -u launch.py \
+            algorithms/mahdrl_as_fast_hscore_speed/train.py \
+            --task S --resource "$res" --deadline "$ddl" \
+            --episodes 600 --model-seed 1 \
+            --experiment-protocol configs/f22_split_v1.json \
+            --normalization-mode f19_shared_v1 --device cuda \
+            --va-preview --ha-update-period 4 \
+            --diagnostics-every 100 \
+            --profile-mode sampled --profile-every 100 \
+            || exit 1
+        echo "[DONE] train=S${res}/${ddl}"
+    ' mahdrl_as_fast_hscore_speed_train "$res" "$ddl" \
+        > "${prefix}.log" 2>&1 < /dev/null &
+
+    echo $! > "${prefix}.pid"
+    printf 'started: %s.log\n' "$prefix"
+}
+
+# SS 源场景：
+train_mahdrl_as_fast_hscore_speed S Tight
+train_mahdrl_as_fast_hscore_speed S Medium
+train_mahdrl_as_fast_hscore_speed S Loose
+
+# SM 源场景：
+train_mahdrl_as_fast_hscore_speed M Tight
+train_mahdrl_as_fast_hscore_speed M Medium
+train_mahdrl_as_fast_hscore_speed M Loose
+
+# SL 源场景：
+train_mahdrl_as_fast_hscore_speed L Tight
+train_mahdrl_as_fast_hscore_speed L Medium
+train_mahdrl_as_fast_hscore_speed L Loose

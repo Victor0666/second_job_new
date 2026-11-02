@@ -1,0 +1,760 @@
+{
+  "scope": "2_full_50_workflow_SS_Tight_episodes_with_seed600_validation_logging_checkpoint",
+  "caveat": "synthetic_full_prefilled_replay_to_measure_learning_phase; two_episode_legacy_run_not_600_episode_experiment",
+  "model_version": "mahdrl_hscore_fixedva_srgt092_speed_v1",
+  "gpu": "NVIDIA GeForce RTX 4060 Ti",
+  "torch": "2.5.1+cu121",
+  "cpu_threads": 1,
+  "includes": "training_control_loop_reset_logging_validation_checkpoint_in_measurement_scope",
+  "setup_and_total_seconds": 58.950347300153226,
+  "mean_seconds": {
+    "train_seconds": 20.29059480014257,
+    "validation_seconds": 8.334359849919565,
+    "checkpoint_seconds": 0.11850210011471063,
+    "episode_wall_seconds": 28.743456750176847
+  },
+  "episodes": [
+    {
+      "version": "review_metrics_v1",
+      "algorithm": "mahdrl_as_fast_hscore_speed",
+      "episode": 0,
+      "model_seed": 1,
+      "instance_seed": 1,
+      "train_seconds": 21.077434100443497,
+      "reset_seconds": 0.0,
+      "validation_seconds": 8.505304999882355,
+      "checkpoint_seconds": 0.07547279982827604,
+      "episode_wall_seconds": 29.65821190015413,
+      "cumulative_train_seconds": 21.077434100443497,
+      "cumulative_validation_seconds": 8.505304999882355,
+      "cumulative_checkpoint_seconds": 0.07547279982827604,
+      "assignment_calls": 1364,
+      "phase_advance_calls": 429,
+      "policy_calls": {
+        "TA": 429,
+        "HA": 1364,
+        "VA": 0
+      },
+      "optimizer_steps": {
+        "TA.optim": 429,
+        "HA.optim": 341,
+        "VA.optim": 1364
+      },
+      "optimizer_sample_presentations": {
+        "TA.optim": 109824,
+        "HA.optim": 87296,
+        "VA.optim": 349184
+      },
+      "learning_samples": {
+        "TA": {
+          "transitions": 429,
+          "gradient_updates": 429,
+          "sampled_targets": 109824
+        },
+        "HA": {
+          "transitions": 1364,
+          "gradient_updates": 341,
+          "sampled_targets": 87296
+        },
+        "VA": {
+          "transitions": 1364,
+          "gradient_updates": 1364,
+          "sampled_targets": 349184
+        }
+      },
+      "rollout_transition_presentations": {
+        "TA": 0,
+        "HA": 0,
+        "VA": 0
+      },
+      "metrics": {
+        "total_energy": 324016.5299589067,
+        "first_arrival_time": 35.76763421241797,
+        "final_completion_time": 2511.391507357236,
+        "makespan": 2475.6238731448184,
+        "task_count": 1364,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 50,
+        "wf_completed_count": 50,
+        "wf_success_count": 50,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 359.7483843865394
+      },
+      "validation": [
+        {
+          "seed": 1,
+          "total_energy": 319567.0178419976,
+          "first_arrival_time": 35.76763421241797,
+          "final_completion_time": 2317.635936210854,
+          "makespan": 2281.8683019984364,
+          "task_count": 1364,
+          "task_tardy_count": 0,
+          "task_avg_tardiness": 0.0,
+          "task_success_rate": 1.0,
+          "wf_count": 50,
+          "wf_completed_count": 50,
+          "wf_success_count": 50,
+          "wf_tardy_count": 0,
+          "wf_success_rate": 1.0,
+          "wf_avg_tardiness": 0.0,
+          "wf_avg_response_time": 315.313000378358
+        }
+      ]
+    },
+    {
+      "version": "review_metrics_v1",
+      "algorithm": "mahdrl_as_fast_hscore_speed",
+      "episode": 1,
+      "model_seed": 1,
+      "instance_seed": 2,
+      "train_seconds": 19.503755499841645,
+      "reset_seconds": 0.0028147001285105944,
+      "validation_seconds": 8.163414699956775,
+      "checkpoint_seconds": 0.16153140040114522,
+      "episode_wall_seconds": 27.828701600199565,
+      "cumulative_train_seconds": 40.58118960028514,
+      "cumulative_validation_seconds": 16.66871969983913,
+      "cumulative_checkpoint_seconds": 0.23700420022942126,
+      "assignment_calls": 1391,
+      "phase_advance_calls": 199,
+      "policy_calls": {
+        "TA": 199,
+        "HA": 1391,
+        "VA": 0
+      },
+      "optimizer_steps": {
+        "TA.optim": 199,
+        "HA.optim": 347,
+        "VA.optim": 1391
+      },
+      "optimizer_sample_presentations": {
+        "TA.optim": 50944,
+        "HA.optim": 88832,
+        "VA.optim": 356096
+      },
+      "learning_samples": {
+        "TA": {
+          "transitions": 199,
+          "gradient_updates": 199,
+          "sampled_targets": 50944
+        },
+        "HA": {
+          "transitions": 1391,
+          "gradient_updates": 347,
+          "sampled_targets": 88832
+        },
+        "VA": {
+          "transitions": 1391,
+          "gradient_updates": 1391,
+          "sampled_targets": 356096
+        }
+      },
+      "rollout_transition_presentations": {
+        "TA": 0,
+        "HA": 0,
+        "VA": 0
+      },
+      "metrics": {
+        "total_energy": 319365.65960185154,
+        "first_arrival_time": 4.328704533466217,
+        "final_completion_time": 1994.1608447548979,
+        "makespan": 1989.8321402214317,
+        "task_count": 1391,
+        "task_tardy_count": 0,
+        "task_avg_tardiness": 0.0,
+        "task_success_rate": 1.0,
+        "wf_count": 50,
+        "wf_completed_count": 50,
+        "wf_success_count": 50,
+        "wf_tardy_count": 0,
+        "wf_success_rate": 1.0,
+        "wf_avg_tardiness": 0.0,
+        "wf_avg_response_time": 407.0279473372063
+      },
+      "validation": [
+        {
+          "seed": 1,
+          "total_energy": 315957.8510650741,
+          "first_arrival_time": 35.76763421241797,
+          "final_completion_time": 2378.66115086378,
+          "makespan": 2342.8935166513625,
+          "task_count": 1364,
+          "task_tardy_count": 1,
+          "task_avg_tardiness": 0.0016867122670577149,
+          "task_success_rate": 0.999266862170088,
+          "wf_count": 50,
+          "wf_completed_count": 50,
+          "wf_success_count": 50,
+          "wf_tardy_count": 0,
+          "wf_success_rate": 1.0,
+          "wf_avg_tardiness": 0.0,
+          "wf_avg_response_time": 349.0720079094634
+        }
+      ]
+    }
+  ],
+  "sampled_stages": [
+    {
+      "episode": 0,
+      "scope": "training",
+      "environment": {
+        "mode": "sampled",
+        "every": 100,
+        "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+        "cpu_exclusive": {
+          "raw_legal_candidate_preview": {
+            "calls": 14,
+            "seconds": 0.0008939993567764759
+          },
+          "host_observation": {
+            "calls": 14,
+            "seconds": 0.015306401066482067
+          },
+          "vm_observation": {
+            "calls": 22,
+            "seconds": 0.0030982005409896374
+          },
+          "va_preview": {
+            "calls": 14,
+            "seconds": 0.08027899987064302
+          },
+          "environment_assignment": {
+            "calls": 14,
+            "seconds": 0.022358600283041596
+          },
+          "environment_phase_advance": {
+            "calls": 4,
+            "seconds": 0.00029119965620338917
+          }
+        },
+        "cuda_elapsed": {},
+        "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+      },
+      "learners": {
+        "TA": {
+          "mode": "sampled",
+          "every": 100,
+          "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+          "cpu_exclusive": {
+            "replay_pack": {
+              "calls": 5,
+              "seconds": 0.0032652001827955246
+            },
+            "h2d": {
+              "calls": 5,
+              "seconds": 0.0012858000118285418
+            },
+            "diagnostics_inputs": {
+              "calls": 5,
+              "seconds": 2.5997869670391083e-06
+            },
+            "online_current_forward": {
+              "calls": 5,
+              "seconds": 0.0026261997409164906
+            },
+            "online_next_forward": {
+              "calls": 5,
+              "seconds": 0.0022694000508636236
+            },
+            "target_forward": {
+              "calls": 5,
+              "seconds": 0.002500800183042884
+            },
+            "diagnostics": {
+              "calls": 5,
+              "seconds": 0.002002099761739373
+            },
+            "backward_clip_optimizer": {
+              "calls": 5,
+              "seconds": 0.01258660014718771
+            },
+            "target_update": {
+              "calls": 5,
+              "seconds": 0.0011092997156083584
+            }
+          },
+          "cuda_elapsed": {
+            "h2d": {
+              "calls": 5,
+              "seconds": 0.001359807997941971
+            },
+            "online_current_forward": {
+              "calls": 5,
+              "seconds": 0.002963775992393494
+            },
+            "online_next_forward": {
+              "calls": 5,
+              "seconds": 0.0024771199822425844
+            },
+            "target_forward": {
+              "calls": 5,
+              "seconds": 0.0027010879814624786
+            },
+            "backward_clip_optimizer": {
+              "calls": 5,
+              "seconds": 0.012043360233306885
+            },
+            "target_update": {
+              "calls": 5,
+              "seconds": 0.01331820774078369
+            }
+          },
+          "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+        },
+        "HA": {
+          "mode": "sampled",
+          "every": 100,
+          "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+          "cpu_exclusive": {
+            "replay_pack": {
+              "calls": 4,
+              "seconds": 0.004949700320139527
+            },
+            "h2d": {
+              "calls": 4,
+              "seconds": 0.0016862000338733196
+            },
+            "diagnostics_inputs": {
+              "calls": 8,
+              "seconds": 0.010178999975323677
+            },
+            "online_current_forward": {
+              "calls": 4,
+              "seconds": 0.023063499946147203
+            },
+            "online_next_forward": {
+              "calls": 4,
+              "seconds": 0.0031330997589975595
+            },
+            "target_forward": {
+              "calls": 4,
+              "seconds": 0.002364699961617589
+            },
+            "diagnostics": {
+              "calls": 4,
+              "seconds": 0.0016803001053631306
+            },
+            "backward_clip_optimizer": {
+              "calls": 4,
+              "seconds": 0.013642500154674053
+            },
+            "target_update": {
+              "calls": 4,
+              "seconds": 0.0011407004203647375
+            }
+          },
+          "cuda_elapsed": {
+            "h2d": {
+              "calls": 4,
+              "seconds": 0.001626591980457306
+            },
+            "online_current_forward": {
+              "calls": 4,
+              "seconds": 0.02184652715921402
+            },
+            "online_next_forward": {
+              "calls": 4,
+              "seconds": 0.002947136044502258
+            },
+            "target_forward": {
+              "calls": 4,
+              "seconds": 0.002236415982246399
+            },
+            "backward_clip_optimizer": {
+              "calls": 4,
+              "seconds": 0.01355843186378479
+            },
+            "target_update": {
+              "calls": 4,
+              "seconds": 0.0033808960318565365
+            }
+          },
+          "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+        },
+        "VA": {
+          "mode": "sampled",
+          "every": 100,
+          "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+          "cpu_exclusive": {
+            "replay_pack": {
+              "calls": 14,
+              "seconds": 0.009812199976295233
+            },
+            "h2d": {
+              "calls": 14,
+              "seconds": 0.005323699908331037
+            },
+            "online_current_forward": {
+              "calls": 14,
+              "seconds": 0.02188749983906746
+            },
+            "online_next_forward": {
+              "calls": 14,
+              "seconds": 0.05103430012241006
+            },
+            "target_forward": {
+              "calls": 14,
+              "seconds": 0.018699499778449535
+            },
+            "diagnostics": {
+              "calls": 14,
+              "seconds": 0.014534900896251202
+            },
+            "backward_clip_optimizer": {
+              "calls": 14,
+              "seconds": 0.13453339994885027
+            },
+            "target_update": {
+              "calls": 14,
+              "seconds": 0.004041900159791112
+            }
+          },
+          "cuda_elapsed": {
+            "h2d": {
+              "calls": 14,
+              "seconds": 0.005771776020526886
+            },
+            "online_current_forward": {
+              "calls": 14,
+              "seconds": 0.025427616477012634
+            },
+            "online_next_forward": {
+              "calls": 14,
+              "seconds": 0.05105363076925278
+            },
+            "target_forward": {
+              "calls": 14,
+              "seconds": 0.02837824064493179
+            },
+            "backward_clip_optimizer": {
+              "calls": 14,
+              "seconds": 0.12389251422882079
+            },
+            "target_update": {
+              "calls": 14,
+              "seconds": 0.026773984074592593
+            }
+          },
+          "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+        }
+      }
+    },
+    {
+      "episode": 0,
+      "scope": "validation",
+      "seed": 1,
+      "environment": {
+        "mode": "sampled",
+        "every": 100,
+        "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+        "cpu_exclusive": {
+          "raw_legal_candidate_preview": {
+            "calls": 14,
+            "seconds": 0.0008872998878359795
+          },
+          "host_observation": {
+            "calls": 14,
+            "seconds": 0.01511229993775487
+          },
+          "vm_observation": {
+            "calls": 23,
+            "seconds": 0.0030188006348907948
+          },
+          "va_preview": {
+            "calls": 14,
+            "seconds": 0.009136999491602182
+          },
+          "environment_assignment": {
+            "calls": 14,
+            "seconds": 0.018330300459638238
+          }
+        },
+        "cuda_elapsed": {},
+        "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+      }
+    },
+    {
+      "episode": 1,
+      "scope": "training",
+      "environment": {
+        "mode": "sampled",
+        "every": 100,
+        "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+        "cpu_exclusive": {
+          "raw_legal_candidate_preview": {
+            "calls": 14,
+            "seconds": 0.000968399690464139
+          },
+          "host_observation": {
+            "calls": 14,
+            "seconds": 0.022296400740742683
+          },
+          "vm_observation": {
+            "calls": 18,
+            "seconds": 0.0027545003686100245
+          },
+          "va_preview": {
+            "calls": 14,
+            "seconds": 0.009688300313428044
+          },
+          "environment_assignment": {
+            "calls": 14,
+            "seconds": 0.03201860003173351
+          }
+        },
+        "cuda_elapsed": {},
+        "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+      },
+      "learners": {
+        "TA": {
+          "mode": "sampled",
+          "every": 100,
+          "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+          "cpu_exclusive": {
+            "replay_pack": {
+              "calls": 2,
+              "seconds": 0.0012908000499010086
+            },
+            "h2d": {
+              "calls": 2,
+              "seconds": 0.0005123000591993332
+            },
+            "diagnostics_inputs": {
+              "calls": 2,
+              "seconds": 1.00000761449337e-06
+            },
+            "online_current_forward": {
+              "calls": 2,
+              "seconds": 0.0010134999174624681
+            },
+            "online_next_forward": {
+              "calls": 2,
+              "seconds": 0.001004599966108799
+            },
+            "target_forward": {
+              "calls": 2,
+              "seconds": 0.0012723999097943306
+            },
+            "diagnostics": {
+              "calls": 2,
+              "seconds": 0.0009257998317480087
+            },
+            "backward_clip_optimizer": {
+              "calls": 2,
+              "seconds": 0.004657899960875511
+            },
+            "target_update": {
+              "calls": 2,
+              "seconds": 0.0004384000785648823
+            }
+          },
+          "cuda_elapsed": {
+            "h2d": {
+              "calls": 2,
+              "seconds": 0.0005531840026378632
+            },
+            "online_current_forward": {
+              "calls": 2,
+              "seconds": 0.0011345919966697692
+            },
+            "online_next_forward": {
+              "calls": 2,
+              "seconds": 0.0013516799807548523
+            },
+            "target_forward": {
+              "calls": 2,
+              "seconds": 0.0012732479870319366
+            },
+            "backward_clip_optimizer": {
+              "calls": 2,
+              "seconds": 0.004605952024459839
+            },
+            "target_update": {
+              "calls": 2,
+              "seconds": 0.005183520078659057
+            }
+          },
+          "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+        },
+        "HA": {
+          "mode": "sampled",
+          "every": 100,
+          "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+          "cpu_exclusive": {
+            "replay_pack": {
+              "calls": 3,
+              "seconds": 0.003511400194838643
+            },
+            "h2d": {
+              "calls": 3,
+              "seconds": 0.0010673000942915678
+            },
+            "diagnostics_inputs": {
+              "calls": 6,
+              "seconds": 0.002981700235977769
+            },
+            "online_current_forward": {
+              "calls": 3,
+              "seconds": 0.002424800070002675
+            },
+            "online_next_forward": {
+              "calls": 3,
+              "seconds": 0.002008100040256977
+            },
+            "target_forward": {
+              "calls": 3,
+              "seconds": 0.0017373000737279654
+            },
+            "diagnostics": {
+              "calls": 3,
+              "seconds": 0.0015533999539911747
+            },
+            "backward_clip_optimizer": {
+              "calls": 3,
+              "seconds": 0.010514900088310242
+            },
+            "target_update": {
+              "calls": 3,
+              "seconds": 0.0008185002952814102
+            }
+          },
+          "cuda_elapsed": {
+            "h2d": {
+              "calls": 3,
+              "seconds": 0.001093696027994156
+            },
+            "online_current_forward": {
+              "calls": 3,
+              "seconds": 0.0021756799817085268
+            },
+            "online_next_forward": {
+              "calls": 3,
+              "seconds": 0.0019291520118713378
+            },
+            "target_forward": {
+              "calls": 3,
+              "seconds": 0.0016322559714317321
+            },
+            "backward_clip_optimizer": {
+              "calls": 3,
+              "seconds": 0.010049152135849
+            },
+            "target_update": {
+              "calls": 3,
+              "seconds": 0.0026787840127944947
+            }
+          },
+          "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+        },
+        "VA": {
+          "mode": "sampled",
+          "every": 100,
+          "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+          "cpu_exclusive": {
+            "replay_pack": {
+              "calls": 14,
+              "seconds": 0.009426499949768186
+            },
+            "h2d": {
+              "calls": 14,
+              "seconds": 0.004479099530726671
+            },
+            "online_current_forward": {
+              "calls": 14,
+              "seconds": 0.010196200106292963
+            },
+            "online_next_forward": {
+              "calls": 14,
+              "seconds": 0.0094455995131284
+            },
+            "target_forward": {
+              "calls": 14,
+              "seconds": 0.008938099956139922
+            },
+            "diagnostics": {
+              "calls": 14,
+              "seconds": 0.0059390009846538305
+            },
+            "backward_clip_optimizer": {
+              "calls": 14,
+              "seconds": 0.03773359954357147
+            },
+            "target_update": {
+              "calls": 14,
+              "seconds": 0.003383699804544449
+            }
+          },
+          "cuda_elapsed": {
+            "h2d": {
+              "calls": 14,
+              "seconds": 0.004277664005756378
+            },
+            "online_current_forward": {
+              "calls": 14,
+              "seconds": 0.01153696006536484
+            },
+            "online_next_forward": {
+              "calls": 14,
+              "seconds": 0.010105792105197905
+            },
+            "target_forward": {
+              "calls": 14,
+              "seconds": 0.010047583878040313
+            },
+            "backward_clip_optimizer": {
+              "calls": 14,
+              "seconds": 0.03603091168403625
+            },
+            "target_update": {
+              "calls": 14,
+              "seconds": 0.02717808032035827
+            }
+          },
+          "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+        }
+      }
+    },
+    {
+      "episode": 1,
+      "scope": "validation",
+      "seed": 1,
+      "environment": {
+        "mode": "sampled",
+        "every": 100,
+        "scope": "first_and_every_N_updates_or_decisions_no_extrapolation",
+        "cpu_exclusive": {
+          "raw_legal_candidate_preview": {
+            "calls": 14,
+            "seconds": 0.0007952000014483929
+          },
+          "host_observation": {
+            "calls": 14,
+            "seconds": 0.013607500120997429
+          },
+          "vm_observation": {
+            "calls": 21,
+            "seconds": 0.002742399927228689
+          },
+          "va_preview": {
+            "calls": 14,
+            "seconds": 0.008548099547624588
+          },
+          "environment_assignment": {
+            "calls": 14,
+            "seconds": 0.035857800161466
+          },
+          "environment_phase_advance": {
+            "calls": 5,
+            "seconds": 0.00038279988802969456
+          }
+        },
+        "cuda_elapsed": {},
+        "timing_note": "CPU wall and CUDA elapsed overlap; do not add them together"
+      }
+    }
+  ]
+}

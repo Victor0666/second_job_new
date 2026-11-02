@@ -1,0 +1,422 @@
+{
+  "date": "2026-11-03",
+  "scope": "both_speed_variants_preview_on_off_HA_period_1_4_model_seed1",
+  "variants": [
+    {
+      "algorithm": "mahdrl_as_fast_hscore_speed",
+      "model_version": "mahdrl_hscore_fixedva_srgt092_speed_v1",
+      "training_dirs": 36,
+      "final_csvs": 108,
+      "standard_model_name_characters": [
+        17
+      ],
+      "max_relative_checkpoint_characters": 51,
+      "max_absolute_checkpoint_characters": 103,
+      "all_csvs_flat": true,
+      "default_command_examples": [
+        {
+          "source": "SS_T",
+          "target": "SS_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SS_T_from_SS_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SS_T",
+          "target": "MS_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_MS_T_from_SS_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SS_T",
+          "target": "LS_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LS_T_from_SS_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SS_M",
+          "target": "SS_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SS_M_from_SS_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SS_M",
+          "target": "MS_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_MS_M_from_SS_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SS_M",
+          "target": "LS_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LS_M_from_SS_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SS_L",
+          "target": "SS_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SS_L_from_SS_L_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SS_L",
+          "target": "MS_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_MS_L_from_SS_L_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SS_L",
+          "target": "LS_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SS_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SS_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LS_L_from_SS_L_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_T",
+          "target": "SM_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SM_T_from_SM_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_T",
+          "target": "MM_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_MM_T_from_SM_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_T",
+          "target": "LM_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LM_T_from_SM_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_M",
+          "target": "SM_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SM_M_from_SM_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_M",
+          "target": "MM_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_MM_M_from_SM_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_M",
+          "target": "LM_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LM_M_from_SM_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_L",
+          "target": "SM_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SM_L_from_SM_L_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_L",
+          "target": "MM_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_MM_L_from_SM_L_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SM_L",
+          "target": "LM_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SM_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SM_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LM_L_from_SM_L_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_T",
+          "target": "SL_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SL_T_from_SL_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_T",
+          "target": "ML_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_ML_T_from_SL_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_T",
+          "target": "LL_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_T_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_T_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LL_T_from_SL_T_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_M",
+          "target": "SL_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SL_M_from_SL_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_M",
+          "target": "ML_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_ML_M_from_SL_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_M",
+          "target": "LL_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_M_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_M_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LL_M_from_SL_M_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_L",
+          "target": "SL_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_SL_L_from_SL_L_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_L",
+          "target": "ML_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_ML_L_from_SL_L_m1_s700-729_cda8619c1.csv"
+        },
+        {
+          "source": "SL_L",
+          "target": "LL_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed/SL_L_m1_cda8619c1",
+          "log": "outputs/logs/mahdrl_hscore_speed/SL_L_m1_cda8619c1",
+          "csv": "outputs/run/mahdrl_hscore_speed/eval_mahdrl_hscore_speed_noapf_srgt092_p1h4_LL_L_from_SL_L_m1_s700-729_cda8619c1.csv"
+        }
+      ]
+    },
+    {
+      "algorithm": "mahdrl_as_fast_hscore_speed2",
+      "model_version": "mahdrl_hscore_fixedva_srgt092_speed_v2",
+      "training_dirs": 36,
+      "final_csvs": 108,
+      "standard_model_name_characters": [
+        17
+      ],
+      "max_relative_checkpoint_characters": 52,
+      "max_absolute_checkpoint_characters": 104,
+      "all_csvs_flat": true,
+      "default_command_examples": [
+        {
+          "source": "SS_T",
+          "target": "SS_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SS_T_from_SS_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SS_T",
+          "target": "MS_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_MS_T_from_SS_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SS_T",
+          "target": "LS_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LS_T_from_SS_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SS_M",
+          "target": "SS_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SS_M_from_SS_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SS_M",
+          "target": "MS_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_MS_M_from_SS_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SS_M",
+          "target": "LS_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LS_M_from_SS_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SS_L",
+          "target": "SS_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SS_L_from_SS_L_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SS_L",
+          "target": "MS_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_MS_L_from_SS_L_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SS_L",
+          "target": "LS_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SS_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SS_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LS_L_from_SS_L_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_T",
+          "target": "SM_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SM_T_from_SM_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_T",
+          "target": "MM_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_MM_T_from_SM_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_T",
+          "target": "LM_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LM_T_from_SM_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_M",
+          "target": "SM_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SM_M_from_SM_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_M",
+          "target": "MM_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_MM_M_from_SM_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_M",
+          "target": "LM_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LM_M_from_SM_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_L",
+          "target": "SM_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SM_L_from_SM_L_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_L",
+          "target": "MM_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_MM_L_from_SM_L_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SM_L",
+          "target": "LM_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SM_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SM_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LM_L_from_SM_L_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_T",
+          "target": "SL_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SL_T_from_SL_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_T",
+          "target": "ML_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_ML_T_from_SL_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_T",
+          "target": "LL_T",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_T_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_T_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LL_T_from_SL_T_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_M",
+          "target": "SL_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SL_M_from_SL_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_M",
+          "target": "ML_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_ML_M_from_SL_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_M",
+          "target": "LL_M",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_M_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_M_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LL_M_from_SL_M_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_L",
+          "target": "SL_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_SL_L_from_SL_L_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_L",
+          "target": "ML_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_ML_L_from_SL_L_m1_s700-729_c3c39d7fd.csv"
+        },
+        {
+          "source": "SL_L",
+          "target": "LL_L",
+          "checkpoint": "outputs/ckpts/mahdrl_hscore_speed2/SL_L_m1_c3c39d7fd",
+          "log": "outputs/logs/mahdrl_hscore_speed2/SL_L_m1_c3c39d7fd",
+          "csv": "outputs/run/mahdrl_hscore_speed2/eval_mahdrl_hscore_speed2_noapf_srgt092_p1h4_LL_L_from_SL_L_m1_s700-729_c3c39d7fd.csv"
+        }
+      ]
+    }
+  ],
+  "validation": "72 unique training directories; 216 unique scene-aware flat CSV names; actual SS/MS/LS CSV exports for both variants; 72 stub CLI calls, failure-stop and invalid-argument checks passed",
+  "clean_baseline_verification": {
+    "base_commit": "5d4a941a96f93230e2ac984992b1d3d2eb55ce37",
+    "tests": 29,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "cuda": true,
+    "notes": "Only publication manifest copied into clean Git worktree; unrelated shared-code modifications excluded"
+  }
+}

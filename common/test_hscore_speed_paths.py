@@ -15,9 +15,11 @@ from algorithms.mahdrl_as_fast_hscore_speed import runtime as speed
 from algorithms.mahdrl_as_fast_hscore_speed.scenario import ScoreScenario as SpeedScenario
 from algorithms.mahdrl_as_fast_hscore_speed2 import runtime as speed2
 from algorithms.mahdrl_as_fast_hscore_speed2.scenario import ScoreScenario as Speed2Scenario
+from algorithms.mahdrl_as_fast_hscore_speed2_sync_task import runtime as sync_task
+from algorithms.mahdrl_as_fast_hscore_speed2_sync_task.scenario import ScoreScenario as SyncTaskScenario
 
 
-VARIANTS = ((SpeedScenario, speed), (Speed2Scenario, speed2))
+VARIANTS = ((SpeedScenario, speed), (Speed2Scenario, speed2), (SyncTaskScenario, sync_task))
 
 
 class PathMatrixTests(unittest.TestCase):
@@ -55,7 +57,7 @@ class PathMatrixTests(unittest.TestCase):
             self.assertNotEqual(target.evaluation_csv().name, replace(target, deadline='Loose').evaluation_csv().name)
             self.assertNotEqual(replace(target, seed_spec='700,702,703').evaluation_csv().name,
                                 replace(target, seed_spec='700,701,703').evaluation_csv().name)
-        self.assertEqual((len(all_models), len(all_csvs)), (72, 216))
+        self.assertEqual((len(all_models), len(all_csvs)), (36*len(VARIANTS), 108*len(VARIANTS)))
 
 
 class ActualCSVTests(unittest.TestCase):
@@ -75,7 +77,7 @@ class ActualCSVTests(unittest.TestCase):
     def tearDownClass(cls):
         fixtures.HScoreTests.tearDownClass()
 
-    def test_source_SS_produces_SS_MS_LS_csvs_in_one_directory_for_both_variants(self):
+    def test_source_SS_produces_SS_MS_LS_csvs_in_one_directory_for_all_variants(self):
         for cls, runner in VARIANTS:
             source = cls(mode='train', episodes=1, legacy_split=True, device='cpu',
                 normalization_config=str(self.scales), cache_file=str(self.cache),

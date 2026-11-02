@@ -18,8 +18,9 @@ from algorithms.mahdrl_as_fast_hscore.scenario import ScoreScenario as Original,
 from algorithms.mahdrl_as_fast_hscore_speed.scenario import ScoreScenario as Speed, parse_scenario as speed_parse
 from algorithms.mahdrl_as_fast_hscore_speed2.scenario import ScoreScenario as Speed2, parse_scenario as speed2_parse
 from algorithms.mahdrl_as_fast_hscore_speed2 import runtime
+from algorithms.mahdrl_as_fast_hscore_speed2_sync_task.scenario import ScoreScenario as SyncTask, parse_scenario as sync_parse
 
-VARIANTS = ((Original, original_parse), (Speed, speed_parse), (Speed2, speed2_parse))
+VARIANTS = ((Original, original_parse), (Speed, speed_parse), (Speed2, speed2_parse), (SyncTask, sync_parse))
 
 
 class ScheduleTests(unittest.TestCase):

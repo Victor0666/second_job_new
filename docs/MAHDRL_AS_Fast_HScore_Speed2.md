@@ -61,6 +61,8 @@ SL 32.85/33.66 s。六代均自动对照 Speed v1 保存记录，训练物理指
 
 ## 运行与隔离
 
+任务级同步版本见 [Speed2 Sync-Task](MAHDRL_HScore_Speed2_SyncTask.md)，使用独立模型与输出目录。
+
 6000 代循环训练与配套评测见 [600 个种子循环 10 轮](MAHDRL_HScore_6000_seed_cycles.md)。
 默认仍为原来的 600 代；新训练预算使用独立的短目录和带轮次的 CSV 名称。
 

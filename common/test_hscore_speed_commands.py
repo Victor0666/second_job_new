@@ -12,7 +12,8 @@ GIT = shutil.which('git')
 BASH = shutil.which('bash') or (str(Path(GIT).parents[1]/'bin/bash.exe') if GIT else None)
 if BASH and not Path(BASH).is_file():
     BASH = None
-VARIANTS = ('mahdrl_as_fast_hscore_speed', 'mahdrl_as_fast_hscore_speed2')
+VARIANTS = ('mahdrl_as_fast_hscore_speed', 'mahdrl_as_fast_hscore_speed2',
+            'mahdrl_as_fast_hscore_speed2_sync_task')
 MOCK = '''#!/usr/bin/env bash
 printf 'GPU=%s\\t' "$CUDA_VISIBLE_DEVICES" >> "$TRACE_FILE"
 printf '%s\\t' "$@" >> "$TRACE_FILE"
@@ -64,7 +65,7 @@ for res in S M L; do
 done
 '''
         rows, logs = self.run_bash(script)
-        self.assertEqual((len(rows), len(logs)), (72, 36))
+        self.assertEqual((len(rows), len(logs)), (36*len(VARIANTS), 18*len(VARIANTS)))
         for variant in VARIANTS:
             selected = [r for r in rows if r[3].startswith(f'algorithms/{variant}/')]
             self.assertEqual(len(selected), 36)
@@ -123,7 +124,7 @@ eval_{variant}_all M Tight "S M L" 10
 wait
 '''
         rows, logs = self.run_bash(script)
-        self.assertEqual((len(rows), len(logs)), (8, 4))
+        self.assertEqual((len(rows), len(logs)), (4*len(VARIANTS), 2*len(VARIANTS)))
         for row in rows:
             self.assertEqual(row[row.index('--episodes')+1], '6000')
             self.assertEqual(row[row.index('--train-seed-cycles')+1], '10')

@@ -57,7 +57,18 @@ def validate_checkpoint_selection(record, expected):
             or not 0 <= selected <= episode or record.get('completed_episodes') != episode + 1):
         raise ValueError('Invalid checkpoint selection episode')
     train_seeds = expected['protocol'].get('train')
-    if train_seeds is not None and episode >= len(train_seeds):
+    budget = len(train_seeds) if train_seeds is not None else None
+    schedule = expected['protocol'].get('training_schedule')
+    if schedule is not None:
+        if (not isinstance(schedule, dict) or budget is None
+                or schedule.get('order') != 'fixed_seed_cycle'
+                or type(schedule.get('train_seed_cycles')) is not int or schedule['train_seed_cycles'] < 2
+                or schedule.get('unique_training_seeds') != budget
+                or type(schedule.get('episodes')) is not int
+                or schedule['episodes'] != budget * schedule['train_seed_cycles']):
+            raise ValueError('Invalid checkpoint training seed schedule')
+        budget = schedule['episodes']
+    if budget is not None and episode >= budget:
         raise ValueError('Checkpoint episode outside training protocol')
     summaries = []
     for name in ('validation_rows', 'best_validation_rows'):

@@ -103,6 +103,9 @@ class Scenario:
     def first_training_seed(self):
         return self.protocol().train[0] if self.protocol() else 1
 
+    def training_episode_limit(self, protocol):
+        return protocol.episodes
+
     def training_seed(self, episode):
         protocol = self.protocol()
         if not 0 <= episode < self.episodes:
@@ -212,7 +215,7 @@ class Scenario:
             raise ValueError("Use explicit --legacy-split for historical overlapping protocols")
         if self.protocol():
             protocol=self.protocol()
-            if self.mode == 'train' and self.episodes > protocol.episodes:
+            if self.mode == 'train' and self.episodes > self.training_episode_limit(protocol):
                 raise ValueError('Episode budget exceeds the shared protocol')
             if self.mode == 'eval' and not set(parse_seeds(self.seed_spec)) <= set(protocol.test):
                 raise ValueError('Evaluation seeds must belong to the selected protocol test partition')

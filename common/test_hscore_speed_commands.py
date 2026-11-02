@@ -76,6 +76,7 @@ done
                 args = row[4:]
                 value = lambda flag: args[args.index(flag)+1]
                 self.assertEqual(value('--model-seed'), '1')
+                self.assertEqual(value('--train-seed-cycles'), '1')
                 self.assertEqual(value('--device'), 'cuda')
                 self.assertEqual(value('--ha-update-period'), '4')
                 self.assertIn('--va-preview', args)
@@ -112,12 +113,32 @@ if wait "$pid"; then exit 9; else [[ $? == 1 ]]; fi
             self.assertEqual(len(logs), 1)
             self.assertNotIn('[ALL_DONE]', next(iter(logs.values())))
 
+    def test_6000_train_and_evaluation_share_the_cycle_settings(self):
+        script = ''
+        for variant in VARIANTS:
+            script += self.source(variant)+f'''
+train_{variant} M Tight 10
+wait
+eval_{variant}_all M Tight "S M L" 10
+wait
+'''
+        rows, logs = self.run_bash(script)
+        self.assertEqual((len(rows), len(logs)), (8, 4))
+        for row in rows:
+            self.assertEqual(row[row.index('--episodes')+1], '6000')
+            self.assertEqual(row[row.index('--train-seed-cycles')+1], '10')
+        self.assertTrue(all('_e6000r10_' in name for name in logs))
+
     def test_invalid_parameters_start_no_jobs(self):
         script = ''
         for variant in VARIANTS:
             script += self.source(variant)+f'''
 if train_{variant} X Tight; then exit 9; fi
 if train_{variant} S invalid; then exit 9; fi
+if train_{variant} S Tight 0; then exit 9; fi
+if train_{variant} S Tight -1; then exit 9; fi
+if train_{variant} S Tight 1.5; then exit 9; fi
+if eval_{variant}_all S Tight "S M L" 0; then exit 9; fi
 if eval_{variant}_all S Tight "S invalid"; then exit 9; fi
 '''
         script += '[[ ! -d outputs ]]\n'

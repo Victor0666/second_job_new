@@ -174,6 +174,9 @@ def parse_scenario(mode, argv=None, *, scenario_class=ScoreScenario, resource_ch
     p.add_argument("--resource", choices=resource_choices, default=resource_default)
     p.add_argument("--deadline", choices=("Tight", "Medium", "Loose"), default="Tight")
     p.add_argument("--episodes", type=int, default=600)
+    if hasattr(scenario_class, 'train_seed_cycles'):
+        p.add_argument('--train-seed-cycles', type=int, default=1,
+                       help='Repeat the training seed partition; also pass the total --episodes at evaluation')
     p.add_argument("--seeds", default="0-1000" if mode == "precompute" else "700-729")
     p.add_argument("--train-task", choices="SML", default="S")
     p.add_argument("--train-resource", choices=resource_choices)
@@ -196,6 +199,7 @@ def parse_scenario(mode, argv=None, *, scenario_class=ScoreScenario, resource_ch
     if a.out and mode != "precompute":
         p.error("--out is reserved for deadline precompute")
     try:
+        schedule = dict(train_seed_cycles=a.train_seed_cycles) if hasattr(a, 'train_seed_cycles') else {}
         scene = scenario_class(va_preview=a.va_preview, ha_update_period=a.ha_update_period, task=a.task, resource=a.resource, deadline=a.deadline, mode=mode,
             episodes=a.episodes, seed_spec=a.seeds, train_task=a.train_task,
             train_resource=a.train_resource, train_deadline=a.train_deadline,
@@ -204,7 +208,7 @@ def parse_scenario(mode, argv=None, *, scenario_class=ScoreScenario, resource_ch
             experiment_protocol=a.experiment_protocol, legacy_split=a.legacy_split,
             model_seed=a.model_seed, workload_profile=a.workload_profile, normalization_mode=a.normalization_mode,
             normalization_config=a.normalization_config, device=a.device,
-            diagnostics_every=a.diagnostics_every, profile_mode=a.profile_mode, profile_every=a.profile_every)
+            diagnostics_every=a.diagnostics_every, profile_mode=a.profile_mode, profile_every=a.profile_every, **schedule)
     except (ValueError, OSError, TypeError) as exc:
         p.error(str(exc))
     if a.dry_run:

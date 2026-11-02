@@ -1,5 +1,8 @@
 # HScore FixedVA v2 的独立训练加速变式
 
+6000 代循环训练与配套评测见 [600 个种子循环 10 轮](MAHDRL_HScore_6000_seed_cycles.md)。
+默认仍为原来的 600 代；新训练预算使用独立的短目录和带轮次的 CSV 名称。
+
 2026-11-03：输出路径已核验并保留原有短目录/平铺 CSV 规则。独立后台函数与九组调用：
 [600 代训练](Linux_CUDA_MAHDRL_HScore_speed_600代训练指令.txt)、
 [九源场景评测](Linux_CUDA_MAHDRL_HScore_speed_九场景评测指令.txt)；

@@ -62,6 +62,7 @@ except Exception:
 
 from common.workflow_opt import LoadRecord, energy_from_records, Workflow, exec_time_components
 from common.read_xml_opt_Tsize import load_workflow_from_dax, poisson_arrival_times
+from common.bursty_workload import apply_arrival_profile
 from common.resource_opt import create_cluster
 from common.ta_weights import normalize_initial_weights, weight_candidates
 
@@ -251,6 +252,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         combo_weights=None,
         workflows_per_episode=8,
         normalization_mode='legacy', normalization_config=None, source_train_scene=None,
+        arrival_profile='standard',
     ):
         super().__init__()
         self.state_normalizer = load_normalizer(normalization_mode, normalization_config, source_train_scene)
@@ -258,6 +260,7 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
         self.rng = np.random.RandomState(random_seed)
         self.horizon = float(horizon)
         self.arrival_lambda = float(arrival_lambda)
+        self.arrival_profile = arrival_profile
         self.dax_paths = list(dax_paths)
         self.random_seed = int(random_seed)
         self.normalize = bool(normalize)
@@ -716,6 +719,8 @@ class CloudWorkflowEnv_VMAgents(gym.Env):
             if n > 0 and len(self.arrival_times) > n:
                 self.arrival_times = self.arrival_times[:n]
 
+        self.arrival_times = apply_arrival_profile(self.arrival_times, self.arrival_profile,
+            self.random_seed, self.workflows_per_episode, self.arrival_lambda)
         self.first_arrival_time = float(self.arrival_times[0]) if self.arrival_times else 0.0
         self.next_arrival_idx = 0
 

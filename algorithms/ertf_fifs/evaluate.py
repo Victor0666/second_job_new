@@ -20,6 +20,20 @@ from environments.mahdrl_fcfs import CloudWorkflowEnv_VMAgents
 from common.workflow_opt import energy_from_records
 
 
+class MaskOnlyERTFEnv(CloudWorkflowEnv_VMAgents):
+    """ERTF reads masks only; omit unused neural features without changing the masks."""
+    def _build_host_obs_for_task(self, tid):
+        mask = np.array([any(self.vm_available_at[j] <= self.current_time + 1e-9
+                             for j in self.host_to_vm_indices[h]) for h in self.host_ids], dtype=np.float32)
+        return np.zeros(self.host_obs_dim, dtype=np.float32), mask
+
+    def _build_vm_obs_for_task_host(self, tid, host_id):
+        mask = np.zeros(self.vm_act_dim, dtype=np.float32)
+        for slot, j in enumerate(self.host_to_vm_indices[host_id]):
+            mask[slot] = self.vm_available_at[j] <= self.current_time + 1e-12
+        return np.zeros(self.vm_obs_dim, dtype=np.float32), mask
+
+
 def set_seed(seed: int):
     random.seed(seed)
     np.random.seed(seed)
@@ -237,7 +251,7 @@ def _compute_metrics(env: CloudWorkflowEnv_VMAgents) -> Dict[str, float]:
     }
 
 
-def run_one_episode(env_cls, env_kwargs: dict, seed: int) -> Dict[str, float]:
+def run_one_episode(env_cls, env_kwargs: dict, seed: int, *, measurement_directory=None) -> Dict[str, float]:
     ctor_block = {
         "energy_reward_scale",
         "task_baseline_norm",
@@ -249,7 +263,7 @@ def run_one_episode(env_cls, env_kwargs: dict, seed: int) -> Dict[str, float]:
     ctor_kwargs["random_seed"] = int(seed)
     env = env_cls(**ctor_kwargs)
     _ = env.reset()
-    measurement = EvaluationRecorder(SCENARIO, 'ertf_fifs', env, {})
+    measurement = EvaluationRecorder(SCENARIO, 'ertf_fifs', env, {}, directory=measurement_directory)
     _sync_env_scales(env, env_kwargs)
     measurement.measure(_force_fcfs_manager, 'TA')(env)
     done = bool(getattr(env, "done_flag", False))
@@ -337,22 +351,26 @@ def save_csv(rows: List[Dict[str, float]], save_path: str, *, append=False):
             writer.writerow({k: r.get(k, "") for k in fieldnames})
 
 
+def build_env_kwargs(scene):
+    """Use the same physical workload and frozen reference cache as the main experiment."""
+    return dict(
+        dax_paths=scene.dax_paths(os.path.join(ROOT_DIR, "data/dax")),
+        horizon=1e9, arrival_lambda=scene.arrival_lambda, random_seed=scene.seeds[0],
+        max_ready_tasks="auto", normalize=True, workflows_per_episode=50,
+        num_hosts=scene.num_hosts, vms_per_host=scene.vms_per_host,
+        pc_tiers=(1., 2., 4., 6., 8.), bw_tiers=(1000., 2000., 4000., 6000., 8000.),
+        deadline_mode="cache_fcfs", deadline_cache_path=str(scene.cache_path), deadline_cache_strict=True,
+        deadline_alpha_small=scene.deadline_choices[0], deadline_alpha_large=scene.deadline_choices[1],
+        deadline_alpha_small_prob=scene.small_probability,
+        manager_alpha_delay=.75, manager_delay_mode="tardiness",
+        energy_reward_scale=.001, task_baseline_norm=300., energy_norm_per_mi_ref=20.,
+        alpha_delay_host=.75, alpha_delay_vm=.75,
+        **scene.arrival_kwargs(),
+    )
+
+
 def main():
-    dax_dir = os.path.join(ROOT_DIR, "data/dax")
-    dax_list = SCENARIO.dax_paths(dax_dir)
-    horizon = 1000000000.0
-    arrival_lambda = 0.03
-    random_seed = SCENARIO.seeds[0]
-    workflows_per_episode = 50
-    max_ready_tasks = "auto"
-    normalize_obs = True
-    energy_reward_scale = 0.001
-    task_baseline_norm = 300.0
-    energy_norm_per_mi_ref = 20.0
-    alpha_delay_host = 0.75
-    alpha_delay_vm = 0.75
-    deadline_alpha_small = 2.0
-    deadline_alpha_large = 3.0
+    deadline_alpha_small, deadline_alpha_large = SCENARIO.deadline_choices
     deadline_alpha_small_prob = SCENARIO.small_probability
     deadline_cache_path = str(SCENARIO.cache_path)
     if not os.path.exists(deadline_cache_path):
@@ -369,32 +387,7 @@ def main():
     )
     eval_seeds = list(SCENARIO.seeds)
     set_seed(SCENARIO.model_seed)
-    env_kwargs = dict(
-        dax_paths=dax_list,
-        horizon=horizon,
-        arrival_lambda=arrival_lambda,
-        random_seed=random_seed,
-        max_ready_tasks=max_ready_tasks,
-        normalize=normalize_obs,
-        workflows_per_episode=workflows_per_episode,
-        num_hosts=SCENARIO.num_hosts,
-        vms_per_host=SCENARIO.vms_per_host,
-        pc_tiers=(1.0, 2.0, 4.0, 6.0, 8.0),
-        bw_tiers=(1000.0, 2000.0, 4000.0, 6000.0, 8000.0),
-        deadline_mode="cache_fcfs",
-        deadline_cache_path=deadline_cache_path,
-        deadline_cache_strict=True,
-        deadline_alpha_small=deadline_alpha_small,
-        deadline_alpha_large=deadline_alpha_large,
-        deadline_alpha_small_prob=SCENARIO.small_probability,
-        manager_alpha_delay=0.75,
-        manager_delay_mode="tardiness",
-        energy_reward_scale=energy_reward_scale,
-        task_baseline_norm=task_baseline_norm,
-        energy_norm_per_mi_ref=energy_norm_per_mi_ref,
-        alpha_delay_host=alpha_delay_host,
-        alpha_delay_vm=alpha_delay_vm,
-    )
+    env_kwargs = build_env_kwargs(SCENARIO)
     print("=" * 100)
     print("FCFS-FIFS baseline on hrl新训练代码 environment")
     print(f"eval_seeds = {eval_seeds[0]}..{eval_seeds[-1]}  (count={len(eval_seeds)})")
@@ -438,5 +431,5 @@ def main():
 
 
 if __name__ == "__main__":
-    SCENARIO = parse_scenario("eval", "ertf_fifs")
+    SCENARIO = parse_scenario("eval", "ertf_fifs", allow_bursty=True)
     main()

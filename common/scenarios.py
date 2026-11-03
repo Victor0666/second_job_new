@@ -14,17 +14,19 @@ from common.f18_state_normalization import VERSION, CURRENT_VERSION, SHARED_VERS
 from common.ta_weights import TA_WEIGHT_MODEL, TA_ALGORITHMS
 from algorithms.marl.identity import MODEL_VERSION as MARL_VERSION, DISPLAY_NAME as MARL_NAME, evaluation_directory, evaluation_csv
 from algorithms.pd3qn_dag.identity import RUN_NAME as PD3QN_DAG, MODEL_VERSION as PD3QN_DAG_VERSION
+from common.bursty_workload import PROFILE as BURSTY_PROFILE, workload_metadata as bursty_metadata
 
 ROOT = Path(__file__).resolve().parents[1]
 VM_COUNTS = {"S": (9, 8, 8), "M": (9, 9, 8, 8, 8, 8), "L": (9, 9, 9, 8, 8, 8, 8, 8, 8)}
 SMALL_PROBABILITY = {"Tight": 0.8, "Medium": 0.5, "Loose": 0.2}
 STRESS_DEADLINE_ALPHAS = {"stress_a1_l006_ref003": 1., "stress_a15_l006_ref003": 1.5}
-WORKLOAD_PROFILES = ("standard", *STRESS_DEADLINE_ALPHAS)
+WORKLOAD_PROFILES = ("standard", *STRESS_DEADLINE_ALPHAS, BURSTY_PROFILE)
 
 
-def add_workload_argument(parser):
-    parser.add_argument('--workload-profile', choices=WORKLOAD_PROFILES, default='standard',
-                        help='Stress: alpha=1 or 1.5, arrivals=0.06, FCFS reference cache=0.03')
+def add_workload_argument(parser, *, allow_bursty=False):
+    choices = WORKLOAD_PROFILES if allow_bursty else tuple(p for p in WORKLOAD_PROFILES if p != BURSTY_PROFILE)
+    parser.add_argument('--workload-profile', choices=choices, default='standard',
+                        help='Stress: alpha=1 or 1.5, arrivals=0.06; bursty_p20_r5: evaluation only with standard checkpoints')
 
 
 DAX_GROUPS = (
@@ -126,6 +128,13 @@ class Scenario:
         return self.workload_profile in STRESS_DEADLINE_ALPHAS
 
     @property
+    def is_bursty_workload(self):
+        return self.workload_profile == BURSTY_PROFILE
+
+    def arrival_kwargs(self):
+        return {'arrival_profile': BURSTY_PROFILE} if self.is_bursty_workload else {}
+
+    @property
     def arrival_lambda(self):
         return .06 if self.is_stress_workload else .03
 
@@ -139,9 +148,19 @@ class Scenario:
     @property
     def workload_suffix(self):
         return {'standard': '', 'stress_a1_l006_ref003': '_a1l006r003',
-                'stress_a15_l006_ref003': '_a15l006r003'}[self.workload_profile]
+                'stress_a15_l006_ref003': '_a15l006r003', BURSTY_PROFILE: '_burstp20r5'}[self.workload_profile]
+
+    @property
+    def training_workload_suffix(self):
+        return '' if self.is_bursty_workload else self.workload_suffix
+
+    def with_evaluation_workload_metadata(self, metadata):
+        if self.is_bursty_workload:
+            return dict(metadata, evaluation_workload=bursty_metadata())
+        return metadata
 
     def with_workload_metadata(self, metadata):
+        # A test-only arrival profile must not change the source checkpoint's training identity.
         if self.is_stress_workload:
             metadata = dict(metadata, workload=dict(profile=self.workload_profile,
                 arrival_lambda=self.arrival_lambda, reference_arrival_lambda=.03,
@@ -167,7 +186,7 @@ class Scenario:
                             experiment_protocol=self.protocol().metadata())
         metadata['reproducibility'] = self.reproducibility_metadata()
         metadata['energy_accounting'] = ENERGY_ACCOUNTING
-        return self.with_workload_metadata(metadata)
+        return self.with_evaluation_workload_metadata(self.with_workload_metadata(metadata))
 
     def validate_calibration(self):
         if self.protocol() and self.normalization_mode in SHARED_VERSIONS:
@@ -180,12 +199,14 @@ class Scenario:
         metadata = reproducibility_metadata(self)
         if self.normalization_mode == PD3QN_UNITS:
             metadata['checkpoint_selection'] = 'minimum_validation_total_energy'
-        return self.with_workload_metadata(metadata)
+        return self.with_evaluation_workload_metadata(self.with_workload_metadata(metadata))
 
 
     def __post_init__(self):
         if self.workload_profile not in WORKLOAD_PROFILES:
             raise ValueError('Unknown workload profile')
+        if self.is_bursty_workload and (self.mode != 'eval' or self.protocol() is None):
+            raise ValueError('Bursty workload is evaluation-only and requires the standard disjoint training protocol')
         if self.is_stress_workload:
             if self.mode not in ('train', 'eval') or self.protocol() is None:
                 raise ValueError('Stress workload requires a disjoint train/eval protocol; reuse the 0.03 reference cache')
@@ -387,14 +408,14 @@ class Scenario:
             if self.mode == 'eval':
                 result.update(evaluation_directory=str(evaluation_directory(self, ROOT)),
                               evaluation_csv=str(evaluation_csv(self, ROOT)))
-        return self.with_workload_metadata(result)
+        return self.with_evaluation_workload_metadata(self.with_workload_metadata(result))
 
 
-def parse_scenario(mode, algorithm=None, scenario_class=Scenario):
+def parse_scenario(mode, algorithm=None, scenario_class=Scenario, *, allow_bursty=False):
     parser = argparse.ArgumentParser(description=f'{algorithm or "Deadline cache"}: {mode}')
     explicit_pd3qn_dag = algorithm in ('pd3qn_v5', PD3QN_DAG)
-    if algorithm == 'marl':
-        add_workload_argument(parser)
+    if algorithm in ('marl', 'ertf_fifs'):
+        add_workload_argument(parser, allow_bursty=allow_bursty)
     if explicit_pd3qn_dag:
         algorithm = 'pd3qn'
     parser.add_argument("--task", choices=VM_COUNTS, default="S", help="Workflow size mixture")
